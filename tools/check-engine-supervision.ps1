@@ -28,18 +28,30 @@ param(
 $ErrorActionPreference = 'Continue'
 
 if (-not (Test-Path $App)) { throw "no application at $App" }
-$App = (Resolve-Path $App).Path
-$appDir = Split-Path -Parent $App
+# PowerShell variable names are case-insensitive, so the path and the process
+# object must not both be called "$app": the second assignment silently replaces
+# the first and Stop-Process then gets a string.
+$appPath = (Resolve-Path $App).Path
+$appDir = Split-Path -Parent $appPath
 
 # aria2c next to the app is what the packaged layout looks like; without it the
 # engine is found on PATH instead, and either is fine.
 $engineName = 'aria2c'
-$engineExe = Join-Path $appDir "aria2c$([System.IO.Path]::GetExtension($App))"
+$engineExe = Join-Path $appDir "aria2c$([System.IO.Path]::GetExtension($appPath))"
 if (-not (Test-Path $engineExe)) { $engineExe = Join-Path $appDir 'aria2c' }
 if (-not (Test-Path $engineExe)) { $engineExe = $null }
 
 function Get-Engines {
     @(Get-Process -Name $engineName -ErrorAction SilentlyContinue)
+}
+
+# The process object of the app we started. -PassThru is not reliable next to
+# -RedirectStandardError (Windows PowerShell returns nothing), so the process is
+# looked up by name when it comes back empty.
+function Resolve-AppProcess($candidate) {
+    if ($candidate -and $candidate -isnot [string]) { return $candidate }
+    return Get-Process -Name 'Fetchora' -ErrorAction SilentlyContinue |
+        Sort-Object StartTime | Select-Object -Last 1
 }
 
 function Get-AppLogTail {
@@ -71,15 +83,15 @@ Get-Engines | Stop-Process -Force -ErrorAction SilentlyContinue
 Get-Process -Name Fetchora -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 2
 
-Write-Host "app:    $App"
+Write-Host "app:    $appPath"
 Write-Host "engine: $(if ($engineExe) { $engineExe } else { "$engineName (from PATH)" })"
 
 # ---------------------------------------------------------------- 1. it starts
 Write-Host "`n--- 1. starting the app starts the engine"
 $script:stderrFile = Join-Path ([System.IO.Path]::GetTempPath()) 'fetchora-supervision-stderr.txt'
 Remove-Item $script:stderrFile -ErrorAction SilentlyContinue
-$app = Start-Process $App -ArgumentList '--new-instance' -PassThru `
-    -RedirectStandardError $script:stderrFile
+$appProcess = Resolve-AppProcess (Start-Process $appPath -ArgumentList '--new-instance' -PassThru `
+    -RedirectStandardError $script:stderrFile)
 $deadline = (Get-Date).AddSeconds($StartupSeconds)
 $first = @()
 while ((Get-Date) -lt $deadline) {
@@ -87,16 +99,17 @@ while ((Get-Date) -lt $deadline) {
     $first = Get-Engines
     if ($first.Count -gt 0) { break }
 }
+$appProcess = Resolve-AppProcess $appProcess
 if ($first.Count -eq 0) {
-    $app.Refresh()
-    if ($app.HasExited) {
-        Fail "the app exited immediately (exit code $($app.ExitCode)) instead of starting the engine"
+    if ($appProcess) { $appProcess.Refresh() }
+    if ($appProcess -and $appProcess.HasExited) {
+        Fail "the app exited immediately (exit code $($appProcess.ExitCode)) instead of starting the engine"
     }
-    Fail "the app is running (pid $($app.Id)) but no $engineName appeared within $StartupSeconds s"
+    Fail "the app is running (pid $($appProcess.Id)) but no $engineName appeared within $StartupSeconds s"
 }
-$app.Refresh()
-if ($app.HasExited) { Fail 'the app exited during startup' }
-Write-Host "ok: engine pid $($first.Id -join ',')"
+$appProcess.Refresh()
+if ($appProcess.HasExited) { Fail 'the app exited during startup' }
+Write-Host "ok: engine pid $($first.Id -join ','), app pid $($appProcess.Id)"
 
 # ------------------------------------------------------------- 2. it comes back
 Write-Host "`n--- 2. killing the engine makes the app start a new one"
@@ -113,7 +126,9 @@ Write-Host "ok: engine pid $($second.Id -join ',') (was $($first.Id -join ','))"
 
 # ------------------------------------------------------- 3. it dies with the app
 Write-Host "`n--- 3. killing the app hard takes the engine with it"
-Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
+if (-not $appProcess) { Fail 'lost track of the app process, cannot test the orphan case' }
+Stop-Process -Id $appProcess.Id -Force -ErrorAction SilentlyContinue
+Write-Host "killed app pid $($appProcess.Id)"
 $deadline = (Get-Date).AddSeconds($ShutdownSeconds)
 $left = Get-Engines
 while ((Get-Date) -lt $deadline -and $left.Count -gt 0) {

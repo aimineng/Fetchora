@@ -172,6 +172,33 @@ if(WIN32)
             -static
         )
     endif()
+
+    # ...and the same for the Qt runtime, for the same reason. Without this the
+    # executable in the build tree only starts when Qt's bin directory happens to
+    # be on PATH: double-clicking it in Explorer gives no window, no message and
+    # no log line, because nothing of ours ever runs - which is indistinguishable
+    # from a crash to anybody watching.
+    #
+    # The compiler runtime is deliberately *not* skipped: Fetchora itself links
+    # libgcc/libstdc++ statically, but Qt's own DLLs do not, so libgcc_s_seh-1,
+    # libstdc++-6 and libwinpthread-1 have to travel with them.
+    get_target_property(APP_QMAKE Qt6::qmake IMPORTED_LOCATION)
+    if(APP_QMAKE)
+        get_filename_component(APP_QT_BIN_DIR "${APP_QMAKE}" DIRECTORY)
+        find_program(APP_WINDEPLOYQT windeployqt HINTS "${APP_QT_BIN_DIR}")
+    endif()
+    if(APP_WINDEPLOYQT)
+        add_custom_command(TARGET Fetchora POST_BUILD
+            COMMAND "${APP_WINDEPLOYQT}"
+                    --no-translations
+                    --no-system-d3d-compiler
+                    "$<TARGET_FILE:Fetchora>"
+            COMMENT "Deploying the Qt runtime next to Fetchora.exe"
+            VERBATIM)
+    else()
+        message(WARNING "windeployqt was not found: Fetchora.exe will only run "
+                        "with Qt's bin directory on PATH")
+    endif()
 endif()
 
 # ------------------------------------------------------------- crash debugging
