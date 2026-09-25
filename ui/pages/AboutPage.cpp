@@ -2,6 +2,7 @@
 
 #include "Aria2Manager.h"
 #include "DownloadHistory.h"
+#include "SettingsManager.h"
 #include "ui/FluentButton.h"
 #include "ui/FluentTheme.h"
 #include "ui/FluentWidgets.h"
@@ -15,6 +16,9 @@
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QLocale>
+#include <QRegularExpression>
+#include <QShowEvent>
 #include <QStandardPaths>
 #include <QUrl>
 #include <QVBoxLayout>
@@ -33,8 +37,16 @@ const int kBadgeCount = 4;
 /// 功能特性条目数量，retranslate() 里逐条填充。
 const int kFeatureCount = 10;
 
-/// 运行状态行数量：状态 / 版本 / PID / 任务 / 活动队列 / 历史 / 累计下载。
-const int kFactCount = 7;
+/// 运行状态行数量：状态 / 版本 / PID / 任务 / 活动队列 / 历史 / 累计下载 /
+/// 最新版本 / 更新通道。
+const int kFactCount = 9;
+
+/// 检查更新写进运行状态卡片的两行。
+const int kFactLatestVersion = 7;
+const int kFactUpdateChannel = 8;
+
+/// release notes 摘进 InfoBar 的字符数上限。
+const int kSummaryLimit = 300;
 
 /**
  * QLabel 样式串。
@@ -60,12 +72,62 @@ QFrame *makeDivider(QWidget *parent)
     return line;
 }
 
+/**
+ * InfoBar 只暴露 set* 系列接口，一次结果要写四个字段，这里收在一处。
+ *
+ * actionText 为空时 InfoBar 会把动作按钮藏起来，所以不需要单独清理上一次的
+ * 「打开发布页面」。
+ */
+void showNotice(InfoBar *bar, InfoBar::Severity severity, const QString &title,
+                const QString &message, const QString &actionText = QString())
+{
+    if (!bar)
+        return;
+    bar->setSeverity(severity);
+    bar->setTitle(title);
+    bar->setMessage(message);
+    bar->setActionText(actionText);
+    bar->show();
+}
+
+/**
+ * 把 release notes 压成一行短摘要：去掉 markdown 标题符号，换行折成空格。
+ *
+ * GitHub 的正文是多行 markdown，整段塞进 InfoBar 会把页面撑得很难看，所以只留
+ * 开头 kSummaryLimit 个字，超出的用省略号收尾。
+ */
+QString summarizeNotes(const QString &notes)
+{
+    QString text = notes;
+
+    static const QRegularExpression heading(QStringLiteral("(?m)^[ \\t]{0,3}#{1,6}[ \\t]*"));
+    text.remove(heading);
+
+    static const QRegularExpression lineBreaks(QStringLiteral("[\\r\\n\\t]+"));
+    text.replace(lineBreaks, QStringLiteral(" "));
+
+    static const QRegularExpression gaps(QStringLiteral(" {2,}"));
+    text.replace(gaps, QStringLiteral(" "));
+
+    text = text.trimmed();
+    if (text.size() > kSummaryLimit) {
+        int cut = kSummaryLimit;
+        // 别把一个代理对从中间切断，否则末尾会多出一个替换字符。
+        if (text.at(cut - 1).isHighSurrogate())
+            --cut;
+        text = text.left(cut) + QStringLiteral("…");
+    }
+    return text;
+}
+
 } // namespace
 
-AboutPage::AboutPage(Aria2Manager *aria2, QWidget *parent)
+AboutPage::AboutPage(Aria2Manager *aria2, QWidget *parent, SettingsManager *settings)
     : QWidget(parent)
     , ui(new Ui::AboutPage)
     , m_aria2(aria2)
+    // 主窗口可以不传设置：引擎自己就挂着一份，两条路都通。
+    , m_settings(settings ? settings : (aria2 ? aria2->settings() : nullptr))
 {
     ui->setupUi(this);
 
@@ -87,6 +149,9 @@ AboutPage::AboutPage(Aria2Manager *aria2, QWidget *parent)
     buildCards();
     buildActions();
     wireManager();
+
+    m_updates = new UpdateChecker(this);
+    wireUpdateChecker();
 
     retranslate();
     restyle();
@@ -251,6 +316,19 @@ void AboutPage::wireManager()
     connect(FluentTheme::instance(), &FluentTheme::changed, this, &AboutPage::restyle);
 }
 
+void AboutPage::wireUpdateChecker()
+{
+    connect(m_updates, &UpdateChecker::checkFinished, this, &AboutPage::onUpdateCheckFinished);
+    connect(m_updates, &UpdateChecker::checkFailed, this, &AboutPage::onUpdateCheckFailed);
+    connect(m_updates, &UpdateChecker::downloadProgress, this, &AboutPage::onUpdateProgress);
+    connect(m_updates, &UpdateChecker::downloadFinished, this, &AboutPage::onUpdateDownloaded);
+    connect(m_updates, &UpdateChecker::downloadFailed, this, &AboutPage::onUpdateDownloadFailed);
+
+    // 「打开发布页面」只连一次：每次结果只换动作文案，不重新接线，否则点一下会
+    // 打开好几个标签页。动作真正打开的地址在触发时从 m_release 里取。
+    connect(m_notice, &InfoBar::actionTriggered, this, &AboutPage::openReleasePage);
+}
+
 // ============================================================================
 //  行为
 // ============================================================================
@@ -313,18 +391,316 @@ void AboutPage::openConfigFolder()
     QDesktopServices::openUrl(QUrl::fromLocalFile(dir));
 }
 
+// ---------------------------------------------------------------------------
+//  检查更新
+//
+//  一个按钮走完「检查 → 可下载 → 正在下载 → 可安装」：状态机在这里，网络与
+//  发布列表的解析都在 UpdateChecker 里，本页只把结果翻译成界面。
+// ---------------------------------------------------------------------------
 void AboutPage::checkForUpdates()
 {
-    // 本程序没有内置在线更新源，这里只重新读取本机的版本信息。
+    switch (m_updateState) {
+    case UpdateState::Idle:
+    case UpdateState::UpToDate:
+        beginUpdateCheck();
+        break;
+    case UpdateState::Available:
+        beginUpdateDownload();
+        break;
+    case UpdateState::ReadyToInstall:
+        installReadyUpdate();
+        break;
+    case UpdateState::Checking:
+    case UpdateState::Downloading:
+        // 这两个状态下按钮是禁用的，正常点不到；真点到了也不该重入。
+        break;
+    }
+}
+
+void AboutPage::beginUpdateCheck()
+{
+    // 引擎版本、PID 之类的本地事实顺手重读一次，和以前的行为一致。
     refresh();
-    const QString engine = (m_aria2 && !m_aria2->engineVersion().isEmpty())
-                               ? m_aria2->engineVersion()
-                               : tr("未连接");
-    m_notice->setSeverity(InfoBar::Info);
-    m_notice->setTitle(tr("当前版本 %1").arg(QCoreApplication::applicationVersion()));
-    m_notice->setMessage(tr("aria2 引擎：%1。本程序未内置在线更新源，版本信息来自本地构建。")
-                             .arg(engine));
-    m_notice->show();
+
+    m_updateState = UpdateState::Checking;
+    m_noticeKind = NoticeKind::Checking;
+    updateButtonForState();
+    renderNotice();
+    // 通道选择来自设置：勾了预发布就把 GitHub 的 pre-release 也算进来。
+    m_updates->check(m_settings && m_settings->updateIncludePrerelease());
+}
+
+void AboutPage::onUpdateCheckFinished(const UpdateChecker::Release &release, bool updateAvailable)
+{
+    if (updateAvailable) {
+        m_release = release;
+        // 记住已经提醒过哪一个版本，下次启动的检查就不会重复打扰用户。
+        if (m_settings && m_settings->lastNotifiedVersion() != release.version)
+            m_settings->setLastNotifiedVersion(release.version);
+
+        m_updateState = UpdateState::Available;
+        m_noticeKind = NoticeKind::Available;
+        emit toast(tr("发现新版本 %1").arg(release.version), false);
+    } else {
+        m_release = UpdateChecker::Release();
+        m_updateState = UpdateState::UpToDate;
+        m_noticeKind = NoticeKind::UpToDate;
+        emit toast(tr("已是最新版本"), false);
+    }
+    updateButtonForState();
+    renderNotice();
+    updateUpdateFacts();
+}
+
+void AboutPage::onUpdateCheckFailed(const QString &reason)
+{
+    // 退回可重试的状态；失败原因由 UpdateChecker 给，已经是翻译好的文本，
+    // 这里不能再套一层 tr()。
+    m_updateState = UpdateState::Idle;
+    m_noticeKind = NoticeKind::CheckFailed;
+    m_lastError = reason;
+    updateButtonForState();
+    renderNotice();
+    emit toast(reason, true);
+    updateUpdateFacts();
+}
+
+void AboutPage::beginUpdateDownload()
+{
+    const QUrl asset = m_release.preferredAsset();
+    // 资源地址的最后一段就是文件名，UpdateChecker 用它落到临时目录里。
+    const QString fileName = asset.fileName();
+    if (!asset.isValid() || fileName.isEmpty()) {
+        // 这个平台没有对应产物：不下载，直接把发布页面递到用户手上。
+        m_noticeKind = NoticeKind::NoAsset;
+        renderNotice();
+        emit toast(tr("这个版本没有适用于当前平台的安装包"), true);
+        return;
+    }
+
+    m_downloadPercent = -1;
+    m_downloadName = fileName;
+    m_updateState = UpdateState::Downloading;
+    m_noticeKind = NoticeKind::Downloading;
+    updateButtonForState();
+    renderNotice();
+    m_updates->download(asset, fileName);
+}
+
+void AboutPage::onUpdateProgress(qint64 received, qint64 total)
+{
+    // 总大小未知时（分块传输）没有百分数可报，按钮保持「正在下载…」。
+    if (total <= 0 || m_updateState != UpdateState::Downloading)
+        return;
+    const int percent = static_cast<int>(received * 100 / total);
+    if (percent == m_downloadPercent)
+        return;
+    m_downloadPercent = percent;
+    updateButtonForState();
+}
+
+void AboutPage::onUpdateDownloaded(const QString &path)
+{
+    m_installerPath = path;
+    m_downloadPercent = 100;
+    m_updateState = UpdateState::ReadyToInstall;
+    m_noticeKind = NoticeKind::ReadyToInstall;
+    updateButtonForState();
+    renderNotice();
+    emit toast(tr("安装包已下载完成"), false);
+    updateUpdateFacts();
+}
+
+void AboutPage::onUpdateDownloadFailed(const QString &reason)
+{
+    // 回到可下载状态，用户可以直接再点一次重试。
+    m_downloadPercent = -1;
+    m_updateState = UpdateState::Available;
+    m_noticeKind = NoticeKind::DownloadFailed;
+    m_lastError = reason;
+    updateButtonForState();
+    renderNotice();
+    emit toast(reason, true);
+    updateUpdateFacts();
+}
+
+void AboutPage::installReadyUpdate()
+{
+    if (m_installerPath.isEmpty() || !UpdateChecker::launchInstaller(m_installerPath)) {
+        m_noticeKind = NoticeKind::InstallFailed;
+        renderNotice();
+        emit toast(tr("无法启动安装包"), true);
+        return;
+    }
+#if defined(Q_OS_WIN)
+    // 安装程序要替换正在运行的可执行文件，本进程必须先让开。
+    QCoreApplication::quit();
+#endif
+}
+
+void AboutPage::openReleasePage()
+{
+    // InfoBar 的动作按钮只接了一次，目标地址在触发时才取：先看当前提供的那
+    // 个版本，没有就用发布列表页兜底。
+    QString page = m_release.pageUrl;
+    if (page.isEmpty())
+        page = UpdateChecker::releasesPageUrl().toString();
+    if (!page.isEmpty())
+        UpdateChecker::openInBrowser(QUrl(page));
+}
+
+void AboutPage::renderNotice()
+{
+    switch (m_noticeKind) {
+    case NoticeKind::None:
+        // 还没出过结果：InfoBar 保持原样（可能压根没显示过）。
+        break;
+    case NoticeKind::Checking:
+        showNotice(m_notice, InfoBar::Warning, tr("正在检查更新…"),
+                   tr("正在从 GitHub 获取发布列表，请稍候。"));
+        break;
+    case NoticeKind::UpToDate:
+        showNotice(m_notice, InfoBar::Success, tr("已是最新版本"),
+                   tr("当前版本 %1，没有可用的更新。").arg(UpdateChecker::currentVersion()));
+        break;
+    case NoticeKind::Available:
+        showNotice(m_notice, InfoBar::Info, tr("发现新版本 %1").arg(m_release.version),
+                   releaseSummary(m_release), tr("打开发布页面"));
+        break;
+    case NoticeKind::Downloading:
+        showNotice(m_notice, InfoBar::Info, tr("正在下载更新"),
+                   tr("正在下载 %1，完成后即可安装。").arg(m_downloadName));
+        break;
+    case NoticeKind::ReadyToInstall:
+#if defined(Q_OS_WIN)
+        showNotice(m_notice, InfoBar::Success, tr("安装包已下载"),
+                   tr("安装包已保存到 %1。点击“重启并安装”完成更新。").arg(m_installerPath));
+#else
+        // 非 Windows 没有可执行的安装程序，只能把文件交给系统。
+        showNotice(m_notice, InfoBar::Success, tr("安装包已下载"),
+                   tr("安装包已保存到 %1，已交由系统打开。").arg(m_installerPath));
+#endif
+        break;
+    case NoticeKind::CheckFailed:
+        // 原因是 UpdateChecker 给的翻译好的文本，直接显示。
+        showNotice(m_notice, InfoBar::Warning, tr("检查更新失败"), m_lastError);
+        break;
+    case NoticeKind::DownloadFailed:
+        showNotice(m_notice, InfoBar::Error, tr("下载更新失败"), m_lastError);
+        break;
+    case NoticeKind::NoAsset:
+        showNotice(m_notice, InfoBar::Warning, tr("这个版本没有适用于当前平台的安装包"),
+                   tr("发布页面里可能还有其它文件，你可以手动挑选。"), tr("打开发布页面"));
+        break;
+    case NoticeKind::InstallFailed:
+        showNotice(m_notice, InfoBar::Error, tr("无法启动安装包"),
+                   tr("安装包 %1 无法运行，请手动打开或重新下载。").arg(m_installerPath));
+        break;
+    }
+
+    // 按钮在页面底部，结果却显示在顶部：把那条通知滚进视野，否则点了半天看不到
+    // 反馈（Toast 会立刻出现，但转瞬即逝）。
+    if (m_notice->isVisible())
+        ui->scrollArea->ensureWidgetVisible(m_notice, 0, FluentTheme::spacingL());
+}
+
+void AboutPage::updateButtonForState()
+{
+    if (!m_updateButton)
+        return;
+
+    switch (m_updateState) {
+    case UpdateState::Idle:
+    case UpdateState::UpToDate:
+    case UpdateState::Checking:
+        m_updateButton->setGlyph(FluentTheme::Glyph::Refresh);
+        break;
+    case UpdateState::Available:
+    case UpdateState::Downloading:
+        m_updateButton->setGlyph(FluentTheme::Glyph::Download);
+        break;
+    case UpdateState::ReadyToInstall:
+        m_updateButton->setGlyph(FluentTheme::Glyph::Rocket);
+        break;
+    }
+
+    switch (m_updateState) {
+    case UpdateState::Idle:
+    case UpdateState::UpToDate:
+        m_updateButton->setLoading(false);
+        m_updateButton->setText(tr("检查更新"));
+        m_updateButton->setTooltipText(tr("从 GitHub Releases 检查是否有新版本"));
+        break;
+    case UpdateState::Checking:
+        // setLoading() 自己会禁用按钮。
+        m_updateButton->setText(tr("正在检查…"));
+        m_updateButton->setTooltipText(tr("正在从 GitHub 获取发布列表…"));
+        m_updateButton->setLoading(true);
+        break;
+    case UpdateState::Available:
+        m_updateButton->setLoading(false);
+        m_updateButton->setText(m_release.isValid()
+                                    ? tr("下载并安装 %1").arg(m_release.version)
+                                    : tr("下载并安装新版本"));
+        m_updateButton->setTooltipText(tr("下载新版本的安装包"));
+        break;
+    case UpdateState::Downloading:
+        m_updateButton->setLoading(false);
+        m_updateButton->setText(m_downloadPercent >= 0
+                                    ? tr("正在下载 %1%").arg(m_downloadPercent)
+                                    : tr("正在下载…"));
+        m_updateButton->setTooltipText(tr("正在下载安装包…"));
+        m_updateButton->setEnabled(false);
+        break;
+    case UpdateState::ReadyToInstall:
+        m_updateButton->setLoading(false);
+        m_updateButton->setText(tr("重启并安装"));
+        m_updateButton->setTooltipText(tr("运行已下载的安装包并退出本程序"));
+        break;
+    }
+}
+
+void AboutPage::updateUpdateFacts()
+{
+    if (m_facts.size() < kFactCount)
+        return;
+
+    const UpdateChecker::Release latest = m_updates ? m_updates->latest() : UpdateChecker::Release();
+    switch (m_updateState) {
+    case UpdateState::Available:
+    case UpdateState::Downloading:
+    case UpdateState::ReadyToInstall:
+        setFact(kFactLatestVersion, m_release.version, QStringLiteral("accent"));
+        break;
+    case UpdateState::UpToDate:
+        setFact(kFactLatestVersion,
+                latest.isValid() ? latest.version : UpdateChecker::currentVersion(),
+                QStringLiteral("success"));
+        break;
+    case UpdateState::Idle:
+    case UpdateState::Checking:
+        setFact(kFactLatestVersion, latest.isValid() ? latest.version : tr("尚未检查"),
+                QStringLiteral("secondary"));
+        break;
+    }
+
+    // 通道是设置里的选项，每次出结果都重读一遍，改完设置回来就是新值。
+    const bool prerelease = m_settings && m_settings->updateIncludePrerelease();
+    setFact(kFactUpdateChannel, prerelease ? tr("包含预览版") : tr("稳定版"),
+            prerelease ? QStringLiteral("accent") : QStringLiteral("secondary"));
+}
+
+QString AboutPage::releaseSummary(const UpdateChecker::Release &release) const
+{
+    // GitHub 给的是 UTC，按规格用系统区域格式原样显示，不做时区换算。
+    const QString published = release.publishedAt.isValid()
+                                  ? QLocale::system().toString(release.publishedAt, QLocale::ShortFormat)
+                                  : tr("未知时间");
+    const QString tag = release.tagName.isEmpty() ? release.version : release.tagName;
+    const QString notes = summarizeNotes(release.notes);
+    if (notes.isEmpty())
+        return tr("标签 %1 · 发布于 %2").arg(tag, published);
+    return tr("标签 %1 · 发布于 %2 —— %3").arg(tag, published, notes);
 }
 
 void AboutPage::setFact(int index, const QString &value, const QString &tone)
@@ -369,6 +745,14 @@ void AboutPage::changeEvent(QEvent *event)
     }
 }
 
+void AboutPage::showEvent(QShowEvent *event)
+{
+    QWidget::showEvent(event);
+    // 每次翻回这一页都重读一遍：更新通道是设置里的选项，可能刚在设置页被改过，
+    // 引擎状态也同理。
+    refresh();
+}
+
 void AboutPage::refresh()
 {
     const QString version = QCoreApplication::applicationVersion();
@@ -403,6 +787,9 @@ void AboutPage::refresh()
     setFact(5, QString::number(history ? history->count() : 0), dim);
     setFact(6, FluentTheme::formatSize(stats.value(QStringLiteral("completedLength")).toDouble()),
             dim);
+
+    // ---- 更新 ------------------------------------------------------------
+    updateUpdateFacts();
 }
 
 void AboutPage::retranslate()
@@ -437,7 +824,8 @@ void AboutPage::retranslate()
 
     // ---- 运行状态 --------------------------------------------------------
     const QStringList factLabels = {tr("引擎状态"), tr("引擎版本"), tr("进程 PID"), tr("任务总数"),
-                                    tr("活动 / 队列"), tr("历史条目"), tr("累计下载")};
+                                    tr("活动 / 队列"), tr("历史条目"), tr("累计下载"),
+                                    tr("最新版本"), tr("更新通道")};
     for (int i = 0; i < m_facts.size(); ++i)
         m_facts[i].label->setText(factLabels.value(i));
 
@@ -457,8 +845,11 @@ void AboutPage::retranslate()
         m_creditItems[i]->setText(credits.value(i));
 
     // ---- 操作按钮 --------------------------------------------------------
-    m_updateButton->setText(tr("检查更新"));
-    m_updateButton->setTooltipText(tr("重新读取本机版本与 aria2 引擎信息"));
+    // 检查更新按钮的文案、图标与提示随状态变化（下载中还带百分数），统一由状态
+    // 机重新套用；切换语言后这里也必须走一遍，否则会留下旧语言的文案。
+    updateButtonForState();
+    // 已经显示出来的那条通知同理：按当时的结果用新语言重建一遍。
+    renderNotice();
     m_homeButton->setText(tr("打开项目主页"));
     m_homeButton->setTooltipText(tr("打开随程序分发的项目说明文档"));
     m_configButton->setText(tr("打开配置目录"));

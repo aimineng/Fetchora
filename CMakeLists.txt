@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(Fetchora VERSION 0.1 LANGUAGES CXX)
+project(Fetchora VERSION 0.1.4 LANGUAGES CXX)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
@@ -30,7 +30,7 @@ if(WIN32 AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/version.rc.in")
 
     # Every variable used by version.rc.in must exist *before* configure_file()
     # runs - it substitutes at call time.
-    set(APP_COMMA_VERSION "${PROJECT_VERSION_MAJOR},${PROJECT_VERSION_MINOR},0,0")
+    set(APP_COMMA_VERSION "${PROJECT_VERSION_MAJOR},${PROJECT_VERSION_MINOR},${PROJECT_VERSION_PATCH},0")
     set(APP_PRODUCT_NAME "Fetchora")
 
     configure_file(
@@ -51,6 +51,7 @@ set(APP_BACKEND_SOURCES
     TorrentUtils.cpp      TorrentUtils.h
     HttpServer.cpp        HttpServer.h
     ClipboardHelper.cpp   ClipboardHelper.h
+    UpdateChecker.cpp     UpdateChecker.h
     NotificationManager.cpp NotificationManager.h
 )
 
@@ -95,7 +96,9 @@ set_target_properties(Fetchora PROPERTIES
     # bundle to behave (notarisation, Launch Services registration, preferences).
     MACOSX_BUNDLE_GUI_IDENTIFIER "com.fetchora.downloadmanager"
     MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
-    MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+    # Finder shows the short version; keeping the patch level out of it made the
+    # bundle claim "0.1" while the app called itself 0.1.4.
+    MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
     WIN32_EXECUTABLE TRUE
 )
 

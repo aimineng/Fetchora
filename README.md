@@ -270,13 +270,20 @@ they exist in the project root.
 .\build.ps1 -Release -Test # Windows
 ```
 
-This validates the two things that fail silently in a download manager:
+This validates the things that fail silently in a download manager:
 
-1. **The aria2c command line.** Every switch the settings layer generates is checked
+1. **The update logic.** How versions are ordered (tags with and without a leading
+   `v`, pre-releases, `0.1.10` against `0.1.9`) and which release asset each
+   platform is offered — including the order the GitHub API happens to list the
+   assets in. No network here; `--check-updates` is the mode that talks to GitHub.
+2. **The aria2c command line.** Every switch the settings layer generates is checked
    against `aria2c --help=#all`. An unknown switch makes aria2 exit with code 28 and the
    engine never comes up.
-2. **The bencode output.** A torrent is created from a nested directory, re-read, and the
+3. **The bencode output.** A torrent is created from a nested directory, re-read, and the
    info hash is compared both ways — then aria2 itself is asked to parse it.
+
+A failing check is printed with the exit code that says which group it came from: 5 is the
+update logic, 2–4 are the engine checks.
 
 ## Translations
 
@@ -316,12 +323,58 @@ Fetchora [options] [urls...]      # Fetchora.exe on Windows
       --new-instance         Do not forward to a running instance
       --screenshot <file>    Render the window to a PNG and exit
       --screenshot-delay <ms>  Wait before --screenshot
-      --self-test            Validate the generated aria2c command line
+      --self-test            Validate the update logic and the aria2c command line
+      --check-updates        Ask GitHub for the newest release and exit
+      --prerelease           Include pre-releases in --check-updates
       --make-torrent <src>   Create a .torrent (with --output, --tracker)
       --inspect-torrent <f>  Print a .torrent's contents
   -h, --help                 Show help
   -v, --version              Show version
 ```
+
+## Updates
+
+Fetchora is distributed through GitHub Releases, so the release list *is* the
+update feed — there is no update server of ours to go down, and it is the same
+place you would go to download it by hand.
+
+- A few seconds after launch the app asks GitHub whether a newer release exists.
+  If there is one you get a toast and a notification, **once per version** — not
+  on every launch until you give in. *Check for updates at startup* under
+  Settings → About → Updates turns it off.
+- **About → Check for updates** does it on demand and shows what it found: the
+  new version, when it was published, and an excerpt of its release notes.
+  *Include pre-releases* (same settings card) decides whether pre-releases count;
+  the About page shows the channel it is using next to the version.
+- On Windows, **下载并安装** fetches the installer into
+  `%TEMP%\Fetchora\updates` and then hands it to the system. The installer is an
+  Inno Setup package, so it closes Fetchora, replaces the files and offers to
+  start the app again. On macOS the downloaded `.dmg` is opened for you. On Linux
+  the release page is opened instead, because the tarball is unpacked by hand.
+
+Check it from a terminal — this is the same code the button runs, not a second
+implementation:
+
+```console
+$ Fetchora --check-updates
+current: 0.1.4
+channel: stable
+latest:  0.1.5  (tag v0.1.5)
+published: 2026-10-02T09:12:44Z
+prerelease: no
+asset for this platform: Fetchora-0.1.5-windows-x64-setup.exe
+update available: yes
+RESULT: update available
+```
+
+**What the update check does not guarantee.** The releases are not code-signed,
+so nothing verifies that a downloaded binary was built by us. What HTTPS to
+`api.github.com` buys is that the answer came from GitHub — not that the file is
+authentic. Fetchora says so rather than implying a guarantee it cannot make: it
+never installs anything without asking, and it tells you the exact path it
+downloaded to. If that is not good enough for your threat model, download from
+the [Releases page](https://github.com/aimineng/Fetchora/releases) yourself, or
+build from source.
 
 ## Browser extension
 

@@ -184,6 +184,9 @@ void SettingsManager::loadSettings()
     m_browserPort = boundedInt(get("browserPort", 8899).toInt(), 1024, 65535);
     m_confirmOnExit = get("confirmOnExit", false).toBool();
     m_showDetailsPanel = get("showDetailsPanel", true).toBool();
+    m_checkForUpdates = get("checkForUpdates", true).toBool();
+    m_updateIncludePrerelease = get("updateIncludePrerelease", false).toBool();
+    m_lastNotifiedVersion = get("lastNotifiedVersion", "").toString();
 
     // ---- download behaviour ------------------------------------------------
     m_userAgent = get("userAgent", "").toString();
@@ -382,6 +385,9 @@ IMPL_SETTING(BOOL_PARAM, BrowserIntegration, m_browserIntegration, "browserInteg
 IMPL_SETTING(INT_PARAM, BrowserPort, m_browserPort, "browserPort", browserPortChanged)
 IMPL_SETTING(BOOL_PARAM, ConfirmOnExit, m_confirmOnExit, "confirmOnExit", confirmOnExitChanged)
 IMPL_SETTING(BOOL_PARAM, ShowDetailsPanel, m_showDetailsPanel, "showDetailsPanel", showDetailsPanelChanged)
+IMPL_SETTING(BOOL_PARAM, CheckForUpdates, m_checkForUpdates, "checkForUpdates", checkForUpdatesChanged)
+IMPL_SETTING(BOOL_PARAM, UpdateIncludePrerelease, m_updateIncludePrerelease, "updateIncludePrerelease", updateIncludePrereleaseChanged)
+IMPL_SETTING(QSTRING_PARAM, LastNotifiedVersion, m_lastNotifiedVersion, "lastNotifiedVersion", lastNotifiedVersionChanged)
 
 // ---- download behaviour ---------------------------------------------------
 IMPL_SETTING(QSTRING_PARAM, UserAgent, m_userAgent, "userAgent", userAgentChanged)

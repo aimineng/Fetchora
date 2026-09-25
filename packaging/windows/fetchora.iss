@@ -6,7 +6,7 @@
 ;  texts that have to travel with those binaries.
 ;
 ;  Build it with:
-;      ISCC.exe /DAppVersion=0.1 /DStageDir=..\..\stage\Fetchora fetchora.iss
+;      ISCC.exe /DAppVersion=0.1.4 /DStageDir=..\..\stage\Fetchora fetchora.iss
 ;  Both defines have working defaults, so opening the file in the Inno Setup
 ;  Compiler IDE and pressing F9 also works.
 ;
@@ -15,7 +15,7 @@
 ; ---------------------------------------------------------------------------
 
 #ifndef AppVersion
-  #define AppVersion "0.1"
+  #define AppVersion "0.1.4"
 #endif
 
 ; The tree to package. The workflow fills it with:

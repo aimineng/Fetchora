@@ -74,6 +74,13 @@ public:
     Q_PROPERTY(bool confirmOnExit READ confirmOnExit WRITE setConfirmOnExit NOTIFY confirmOnExitChanged)
     Q_PROPERTY(bool showDetailsPanel READ showDetailsPanel WRITE setShowDetailsPanel NOTIFY showDetailsPanelChanged)
 
+    // Update checking. lastNotifiedVersion remembers which release the user has
+    // already been told about, so a new one is announced once rather than on
+    // every launch.
+    Q_PROPERTY(bool checkForUpdates READ checkForUpdates WRITE setCheckForUpdates NOTIFY checkForUpdatesChanged)
+    Q_PROPERTY(bool updateIncludePrerelease READ updateIncludePrerelease WRITE setUpdateIncludePrerelease NOTIFY updateIncludePrereleaseChanged)
+    Q_PROPERTY(QString lastNotifiedVersion READ lastNotifiedVersion WRITE setLastNotifiedVersion NOTIFY lastNotifiedVersionChanged)
+
     bool autoStart() const { return m_autoStart; }
     void setAutoStart(bool v);
     bool startMinimized() const { return m_startMinimized; }
@@ -116,8 +123,15 @@ public:
     void setBrowserPort(int v);
     bool confirmOnExit() const { return m_confirmOnExit; }
     void setConfirmOnExit(bool v);
+
     bool showDetailsPanel() const { return m_showDetailsPanel; }
     void setShowDetailsPanel(bool v);
+    bool checkForUpdates() const { return m_checkForUpdates; }
+    void setCheckForUpdates(bool v);
+    bool updateIncludePrerelease() const { return m_updateIncludePrerelease; }
+    void setUpdateIncludePrerelease(bool v);
+    QString lastNotifiedVersion() const { return m_lastNotifiedVersion; }
+    void setLastNotifiedVersion(const QString &v);
 
     // ===================================================== download behaviour
     Q_PROPERTY(QString userAgent READ userAgent WRITE setUserAgent NOTIFY userAgentChanged)
@@ -499,6 +513,9 @@ signals:
     void browserPortChanged();
     void confirmOnExitChanged();
     void showDetailsPanelChanged();
+    void checkForUpdatesChanged();
+    void updateIncludePrereleaseChanged();
+    void lastNotifiedVersionChanged();
 
     void userAgentChanged();
     void refererChanged();
@@ -658,6 +675,9 @@ private:
     int m_browserPort = 8899;
     bool m_confirmOnExit = false;
     bool m_showDetailsPanel = true;
+    bool m_checkForUpdates = true;
+    bool m_updateIncludePrerelease = false;
+    QString m_lastNotifiedVersion;
 
     QString m_userAgent;
     QString m_referer;

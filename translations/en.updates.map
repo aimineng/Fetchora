@@ -1,0 +1,68 @@
+# English strings for the update feature: UpdateChecker (backend), the About
+# page's update card and the update switches on the Settings page.
+#
+# Format is the usual "中文 => English"; a [Context] prefix restricts an entry
+# to one Qt context (see tools/make-translations.ps1).
+#
+# "包含预览版" is a switch caption on the Settings page but a fact *value* on
+# the About page, where "Stable + pre-releases" reads better, hence the two
+# entries.
+
+# ------------------------------------------------------------------ 设置 / Settings
+版本、更新与许可信息 => Version, updates and licensing
+更新 => Updates
+启动时检查更新 => Check for updates at startup
+启动后向 GitHub 查询新版本，发现更新时只提示一次 => Ask GitHub for a newer version after launch; each update is mentioned only once
+把 GitHub 上标记为预览版的发布也算作可用更新 => Also treat releases GitHub marks as pre-releases as available updates
+在左侧「关于」页面可以随时手动检查更新并下载安装包。 => The About page on the left can check for updates and download the installer at any time.
+
+# ------------------------------------------------------------------ 关于 / About page
+[AboutPage] 包含预览版 => Stable + pre-releases
+包含预览版 => Include pre-releases
+稳定版 => Stable
+更新通道 => Update channel
+最新版本 => Latest version
+尚未检查 => Not checked yet
+未知时间 => unknown date
+从 GitHub Releases 检查是否有新版本 => Check GitHub Releases for a newer version
+正在检查… => Checking…
+正在检查更新… => Checking for updates…
+正在从 GitHub 获取发布列表… => Fetching the release list from GitHub…
+正在从 GitHub 获取发布列表，请稍候。 => Fetching the release list from GitHub, please wait.
+检查更新失败 => Update check failed
+已是最新版本 => You are up to date
+当前版本 %1，没有可用的更新。 => Version %1 is the newest release.
+发现新版本 %1 => Version %1 is available
+标签 %1 · 发布于 %2 => Tag %1 · published %2
+标签 %1 · 发布于 %2 —— %3 => Tag %1 · published %2 — %3
+打开发布页面 => Open the release page
+下载并安装 %1 => Download and install %1
+下载并安装新版本 => Download and install the new version
+下载新版本的安装包 => Download the new version's installer
+正在下载 %1% => Downloading %1%
+正在下载… => Downloading…
+正在下载安装包… => Downloading the installer…
+正在下载更新 => Downloading the update
+正在下载 %1，完成后即可安装。 => Downloading %1; it can be installed as soon as it finishes.
+下载更新失败 => Update download failed
+安装包已下载 => Installer downloaded
+安装包已下载完成 => Installer downloaded
+安装包已保存到 %1。点击“重启并安装”完成更新。 => The installer was saved to %1. Choose "Restart and install" to finish updating.
+安装包已保存到 %1，已交由系统打开。 => The installer was saved to %1 and handed to the system to open.
+重启并安装 => Restart and install
+运行已下载的安装包并退出本程序 => Run the downloaded installer and quit Fetchora
+无法启动安装包 => Could not start the installer
+安装包 %1 无法运行，请手动打开或重新下载。 => %1 could not be started; open it by hand or download it again.
+这个版本没有适用于当前平台的安装包 => This release has no installer for your platform
+发布页面里可能还有其它文件，你可以手动挑选。 => The release page may offer other files you can pick from by hand.
+
+# ------------------------------------------------------- 启动提示 / startup notice (main.cpp)
+Fetchora 有新版本 => A new Fetchora release is available
+发现新版本 %1，当前版本 %2。在「关于」页可以查看并安装。 => Version %1 is available and you are running %2. Open the About page to review and install it.
+
+# ------------------------------------------------------------ 更新引擎 / UpdateChecker
+找不到仓库 %1 的发布列表。 => No release list found for repository %1.
+无法解析 GitHub 返回的数据：%1 => Could not read the data GitHub returned: %1
+GitHub 拒绝了这次请求（可能是匿名调用次数用尽），稍后再试。 => GitHub refused the request (the anonymous rate limit may be exhausted); try again later.
+无法写入 %1：%2 => Could not write %1: %2
+下载到的文件不完整（只有 %1 字节）。 => The downloaded file is incomplete (only %1 bytes).

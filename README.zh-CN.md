@@ -252,12 +252,17 @@ Windows + MinGW 需要额外指定生成器与 Qt 前缀（见上面的 PowerShe
 .\build.ps1 -Release -Test  # Windows
 ```
 
-它会验证下载器里最容易"静默出错"的两件事：
+它会验证下载器里最容易"静默出错"的几件事：
 
-1. **aria2c 命令行。** 设置层生成的每一个开关都会与 `aria2c --help=#all` 对照。
+1. **更新逻辑。** 版本号怎么比大小（带不带前缀 `v`、预览版、`0.1.10` 与 `0.1.9`），
+   以及每个平台会拿到哪个发布产物——包括 GitHub API 恰好把产物列成什么顺序。
+   这一步不联网：联网的是 `--check-updates`。
+2. **aria2c 命令行。** 设置层生成的每一个开关都会与 `aria2c --help=#all` 对照。
    一个不认识的开关会让 aria2 以退出码 28 结束，引擎永远起不来。
-2. **bencode 输出。** 用嵌套目录生成种子、重新读回、双向比对 info hash，
+3. **bencode 输出。** 用嵌套目录生成种子、重新读回、双向比对 info hash，
    最后再让 aria2 自己去解析这个文件。
+
+失败的那一项会连同退出码一起打印出来：5 表示更新逻辑，2–4 表示引擎相关的检查。
 
 ## 多语言
 
@@ -297,12 +302,38 @@ Fetchora [选项] [链接...]      # Windows 下为 Fetchora.exe
       --new-instance         不转发给已运行的实例
       --screenshot <file>    把窗口渲染成 PNG 后退出
       --screenshot-delay <ms>  截图前等待的毫秒数
-      --self-test            校验生成的 aria2c 命令行
+      --self-test            校验更新逻辑与生成的 aria2c 命令行
+      --check-updates        查询 GitHub 上的最新版本后退出
+      --prerelease           让 --check-updates 把预览版也算进来
       --make-torrent <src>   制作种子（配合 --output、--tracker）
       --inspect-torrent <f>  打印种子的内容
   -h, --help                 显示帮助
   -v, --version              显示版本
 ```
+
+## 更新
+
+Fetchora 通过 GitHub Releases 分发，所以**发布列表本身就是更新源**——没有我们自己的更新服务器会挂掉，而且它也正是你手动下载时会去的地方。
+
+- 启动几秒后程序会向 GitHub 查询是否有新版本。有的话给一个 Toast 和一条系统通知，**每个版本只提醒一次**——不会每次启动都弹到你更新为止。可以在 设置 → 关于 → 更新 里关掉 *启动时检查更新*。
+- **关于 → 检查更新** 是手动检查，会显示查到的结果：新版本号、发布时间，以及发布说明的摘录。同一张设置卡里的 *包含预览版* 决定是否把预览版算进来；「关于」页会显示当前使用的通道。
+- Windows 上点 **下载并安装** 会把安装包下到 `%TEMP%\Fetchora\updates`，然后交给系统执行。安装包是 Inno Setup 制作的，它会关闭 Fetchora、替换文件并询问是否重新启动。macOS 上会直接打开下载到的 `.dmg`。Linux 上则是打开发布页面，因为 tar.gz 需要手动解压。
+
+也可以用命令行检查——跑的是按钮背后的同一份代码，不是另写一套：
+
+```console
+$ Fetchora --check-updates
+current: 0.1.4
+channel: stable
+latest:  0.1.5  (tag v0.1.5)
+published: 2026-10-02T09:12:44Z
+prerelease: no
+asset for this platform: Fetchora-0.1.5-windows-x64-setup.exe
+update available: yes
+RESULT: update available
+```
+
+**更新功能不保证什么。** 发布包**没有代码签名**，所以没有任何机制能验证下载到的二进制确实由我们构建。到 `api.github.com` 的 HTTPS 只能保证"这个回答来自 GitHub"，不能保证文件本身可信。Fetchora 选择把这一点说清楚，而不是暗示一个它给不出的保证：它**从不擅自安装**，并且会告诉你文件下载到了哪个确切路径。如果你的威胁模型接受不了，请自己去 [Releases 页面](https://github.com/aimineng/Fetchora/releases)下载，或者从源码构建。
 
 ## 浏览器扩展
 

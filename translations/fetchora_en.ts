@@ -36,16 +36,148 @@
       <translation>No LICENSE file shipped with the app was found.</translation>
     </message>
     <message>
+      <source>发现新版本 %1</source>
+      <translation>Version %1 is available</translation>
+    </message>
+    <message>
+      <source>已是最新版本</source>
+      <translation>You are up to date</translation>
+    </message>
+    <message>
+      <source>这个版本没有适用于当前平台的安装包</source>
+      <translation>This release has no installer for your platform</translation>
+    </message>
+    <message>
+      <source>安装包已下载完成</source>
+      <translation>Installer downloaded</translation>
+    </message>
+    <message>
+      <source>无法启动安装包</source>
+      <translation>Could not start the installer</translation>
+    </message>
+    <message>
+      <source>正在检查更新…</source>
+      <translation>Checking for updates…</translation>
+    </message>
+    <message>
+      <source>正在从 GitHub 获取发布列表，请稍候。</source>
+      <translation>Fetching the release list from GitHub, please wait.</translation>
+    </message>
+    <message>
+      <source>当前版本 %1，没有可用的更新。</source>
+      <translation>Version %1 is the newest release.</translation>
+    </message>
+    <message>
+      <source>打开发布页面</source>
+      <translation>Open the release page</translation>
+    </message>
+    <message>
+      <source>正在下载更新</source>
+      <translation>Downloading the update</translation>
+    </message>
+    <message>
+      <source>正在下载 %1，完成后即可安装。</source>
+      <translation>Downloading %1; it can be installed as soon as it finishes.</translation>
+    </message>
+    <message>
+      <source>安装包已下载</source>
+      <translation>Installer downloaded</translation>
+    </message>
+    <message>
+      <source>安装包已保存到 %1。点击“重启并安装”完成更新。</source>
+      <translation>The installer was saved to %1. Choose "Restart and install" to finish updating.</translation>
+    </message>
+    <message>
+      <source>安装包已保存到 %1，已交由系统打开。</source>
+      <translation>The installer was saved to %1 and handed to the system to open.</translation>
+    </message>
+    <message>
+      <source>检查更新失败</source>
+      <translation>Update check failed</translation>
+    </message>
+    <message>
+      <source>下载更新失败</source>
+      <translation>Update download failed</translation>
+    </message>
+    <message>
+      <source>发布页面里可能还有其它文件，你可以手动挑选。</source>
+      <translation>The release page may offer other files you can pick from by hand.</translation>
+    </message>
+    <message>
+      <source>安装包 %1 无法运行，请手动打开或重新下载。</source>
+      <translation>%1 could not be started; open it by hand or download it again.</translation>
+    </message>
+    <message>
+      <source>从 GitHub Releases 检查是否有新版本</source>
+      <translation>Check GitHub Releases for a newer version</translation>
+    </message>
+    <message>
+      <source>正在检查…</source>
+      <translation>Checking…</translation>
+    </message>
+    <message>
+      <source>正在从 GitHub 获取发布列表…</source>
+      <translation>Fetching the release list from GitHub…</translation>
+    </message>
+    <message>
+      <source>下载并安装 %1</source>
+      <translation>Download and install %1</translation>
+    </message>
+    <message>
+      <source>下载并安装新版本</source>
+      <translation>Download and install the new version</translation>
+    </message>
+    <message>
+      <source>下载新版本的安装包</source>
+      <translation>Download the new version's installer</translation>
+    </message>
+    <message>
+      <source>正在下载 %1%</source>
+      <translation>Downloading %1%</translation>
+    </message>
+    <message>
+      <source>正在下载…</source>
+      <translation>Downloading…</translation>
+    </message>
+    <message>
+      <source>正在下载安装包…</source>
+      <translation>Downloading the installer…</translation>
+    </message>
+    <message>
+      <source>重启并安装</source>
+      <translation>Restart and install</translation>
+    </message>
+    <message>
+      <source>运行已下载的安装包并退出本程序</source>
+      <translation>Run the downloaded installer and quit Fetchora</translation>
+    </message>
+    <message>
+      <source>尚未检查</source>
+      <translation>Not checked yet</translation>
+    </message>
+    <message>
+      <source>包含预览版</source>
+      <translation>Stable + pre-releases</translation>
+    </message>
+    <message>
+      <source>稳定版</source>
+      <translation>Stable</translation>
+    </message>
+    <message>
+      <source>未知时间</source>
+      <translation>unknown date</translation>
+    </message>
+    <message>
+      <source>标签 %1 · 发布于 %2</source>
+      <translation>Tag %1 · published %2</translation>
+    </message>
+    <message>
+      <source>标签 %1 · 发布于 %2 —— %3</source>
+      <translation>Tag %1 · published %2 — %3</translation>
+    </message>
+    <message>
       <source>未连接</source>
       <translation>Not connected</translation>
-    </message>
-    <message>
-      <source>当前版本 %1</source>
-      <translation>Current version %1</translation>
-    </message>
-    <message>
-      <source>aria2 引擎：%1。本程序未内置在线更新源，版本信息来自本地构建。</source>
-      <translation>aria2 engine: %1. This app has no built-in online update source; version information comes from the local build.</translation>
     </message>
     <message>
       <source>开发版本</source>
@@ -180,6 +312,14 @@
       <translation>Total downloaded</translation>
     </message>
     <message>
+      <source>最新版本</source>
+      <translation>Latest version</translation>
+    </message>
+    <message>
+      <source>更新通道</source>
+      <translation>Update channel</translation>
+    </message>
+    <message>
       <source>本项目以 MIT 许可证开源。</source>
       <translation>This project is open source under the MIT License.</translation>
     </message>
@@ -210,10 +350,6 @@
     <message>
       <source>检查更新</source>
       <translation>Check for updates</translation>
-    </message>
-    <message>
-      <source>重新读取本机版本与 aria2 引擎信息</source>
-      <translation>Re-read the local version and aria2 engine information.</translation>
     </message>
     <message>
       <source>打开项目主页</source>
@@ -1682,6 +1818,14 @@ Info Hash %2 · Size %3</translation>
       <translation>Quit</translation>
     </message>
     <message>
+      <source>发现新版本 %1，当前版本 %2。在「关于」页可以查看并安装。</source>
+      <translation>Version %1 is available and you are running %2. Open the About page to review and install it.</translation>
+    </message>
+    <message>
+      <source>Fetchora 有新版本</source>
+      <translation>A new Fetchora release is available</translation>
+    </message>
+    <message>
       <source>下载中</source>
       <translation>Downloading</translation>
     </message>
@@ -2989,8 +3133,32 @@ Info Hash %2 · Size %3</translation>
       <translation>About</translation>
     </message>
     <message>
-      <source>版本与许可信息</source>
-      <translation>Version and license information</translation>
+      <source>版本、更新与许可信息</source>
+      <translation>Version, updates and licensing</translation>
+    </message>
+    <message>
+      <source>更新</source>
+      <translation>Updates</translation>
+    </message>
+    <message>
+      <source>启动时检查更新</source>
+      <translation>Check for updates at startup</translation>
+    </message>
+    <message>
+      <source>启动后向 GitHub 查询新版本，发现更新时只提示一次</source>
+      <translation>Ask GitHub for a newer version after launch; each update is mentioned only once</translation>
+    </message>
+    <message>
+      <source>包含预览版</source>
+      <translation>Include pre-releases</translation>
+    </message>
+    <message>
+      <source>把 GitHub 上标记为预览版的发布也算作可用更新</source>
+      <translation>Also treat releases GitHub marks as pre-releases as available updates</translation>
+    </message>
+    <message>
+      <source>在左侧「关于」页面可以随时手动检查更新并下载安装包。</source>
+      <translation>The About page on the left can check for updates and download the installer at any time.</translation>
     </message>
     <message>
       <source>关于 Fetchora</source>
@@ -3393,6 +3561,29 @@ Info Hash %2 · Size %3</translation>
     <message>
       <source>缺少 info 字典。</source>
       <translation>The info dictionary is missing.</translation>
+    </message>
+  </context>
+  <context>
+    <name>UpdateChecker</name>
+    <message>
+      <source>GitHub 拒绝了这次请求（可能是匿名调用次数用尽），稍后再试。</source>
+      <translation>GitHub refused the request (the anonymous rate limit may be exhausted); try again later.</translation>
+    </message>
+    <message>
+      <source>找不到仓库 %1 的发布列表。</source>
+      <translation>No release list found for repository %1.</translation>
+    </message>
+    <message>
+      <source>无法解析 GitHub 返回的数据：%1</source>
+      <translation>Could not read the data GitHub returned: %1</translation>
+    </message>
+    <message>
+      <source>无法写入 %1：%2</source>
+      <translation>Could not write %1: %2</translation>
+    </message>
+    <message>
+      <source>下载到的文件不完整（只有 %1 字节）。</source>
+      <translation>The downloaded file is incomplete (only %1 bytes).</translation>
     </message>
   </context>
 </TS>

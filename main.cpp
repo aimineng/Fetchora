@@ -3,6 +3,7 @@
 #include "NotificationManager.h"
 #include "SettingsManager.h"
 #include "TorrentUtils.h"
+#include "UpdateChecker.h"
 
 #include "ui/FluentButton.h"
 #include "ui/FluentInputs.h"
@@ -168,8 +169,136 @@ QSet<QString> aria2KnownOptions(const QString &executable)
     return known;
 }
 
+/**
+ * The update feature's deterministic half: how versions are ordered, which asset
+ * a platform is offered, and what counts as an update at all.
+ *
+ * No network here on purpose - `--check-updates` is the mode that talks to
+ * GitHub. Keeping the logic testable without a server is what lets every CI job
+ * on every platform cover it, including the platforms that ship no installer.
+ *
+ * Exit code 0 when every check passed, 5 otherwise.
+ */
+int runUpdateSelfTest()
+{
+    out() << "update self-test\n";
+    int failures = 0;
+    // The exact magnitude of compareVersions() is not part of its contract, only
+    // the sign, so the checks below compare signs.
+    const auto check = [&failures](const QString &what, bool ok, const QString &detail) {
+        out() << (ok ? "  ok   " : "  FAIL ") << what;
+        if (!detail.isEmpty())
+            out() << "  (" << detail << ')';
+        out() << '\n';
+        if (!ok)
+            ++failures;
+    };
+
+    // ---- version ordering -------------------------------------------------
+    struct Comparison {
+        const char *left;
+        const char *right;
+        int sign; ///< -1 older, 0 same, 1 newer
+    };
+    // The cases a real release list produces: tags with and without a leading v,
+    // pre-releases, and versions where lexicographic ordering would be wrong.
+    const Comparison comparisons[] = {
+        {"0.1.4", "0.1.4", 0},
+        {"v0.1.4", "0.1.4", 0},
+        {"V0.1.4", "v0.1.4", 0},
+        {"0.1.5", "0.1.4", 1},
+        {"0.1.4", "0.1.5", -1},
+        {"0.1.10", "0.1.9", 1},   // as text "0.1.10" < "0.1.9"; as a version it is newer
+        {"1.0", "0.99.99", 1},
+        {"0.1.4", "0.2", -1},
+        {"0.1.4-beta.1", "0.1.4", -1}, // a pre-release is older than its release
+        {"0.1.4", "0.1.4-rc1", 1},
+        {"0.1.5-beta.1", "0.1.4", 1},  // ...but newer than the previous release
+        {"", "0.1.4", -1},             // an empty tag never wins
+    };
+    for (const Comparison &comparison : comparisons) {
+        const QString left = QString::fromLatin1(comparison.left);
+        const QString right = QString::fromLatin1(comparison.right);
+        const int got = UpdateChecker::compareVersions(left, right);
+        const int sign = got < 0 ? -1 : (got > 0 ? 1 : 0);
+        check(QStringLiteral("compareVersions(\"%1\", \"%2\")").arg(left, right),
+              sign == comparison.sign,
+              QStringLiteral("got %1, wanted %2")
+                  .arg(sign == 0 ? QStringLiteral("=")
+                                 : (sign > 0 ? QStringLiteral(">") : QStringLiteral("<")),
+                       comparison.sign == 0 ? QStringLiteral("=")
+                                            : (comparison.sign > 0 ? QStringLiteral(">")
+                                                                   : QStringLiteral("<"))));
+    }
+
+    // ---- the asset this platform is offered -------------------------------
+    // The names are the ones .github/workflows/release.yml uploads.
+#if defined(Q_OS_WIN)
+    // Windows gets two builds and the installer wins over the portable package,
+    // whatever order the API happens to list them in.
+    const QString wanted = QStringLiteral("Fetchora-0.1.5-windows-x64-setup.exe");
+    const QString fallback = QStringLiteral("Fetchora-0.1.5-windows-x64.zip");
+    const QString foreign = QStringLiteral("Fetchora-macos-arm64.dmg");
+    const QStringList preference = {wanted, fallback};
+#elif defined(Q_OS_MACOS)
+    const QString wanted = QStringLiteral("Fetchora-macos-arm64.dmg");
+    const QString foreign = QStringLiteral("Fetchora-0.1.5-windows-x64-setup.exe");
+    const QStringList preference = {wanted};
+#else
+    const QString wanted = QStringLiteral("Fetchora-linux-x86_64.tar.gz");
+    const QString foreign = QStringLiteral("Fetchora-0.1.5-windows-x64-setup.exe");
+    const QStringList preference = {wanted};
+#endif
+    const auto urlFor = [](const QString &name) {
+        return QUrl(QStringLiteral("https://example.invalid/") + name);
+    };
+    const auto assetName = [](const UpdateChecker::Release &release) {
+        const QUrl asset = release.preferredAsset();
+        return asset.isValid() ? asset.fileName() : QStringLiteral("(none)");
+    };
+
+    // Each round drops this platform's first choice, so the last round is the
+    // worst package that is still usable here. The assets are listed worst-first
+    // and a foreign build is always appended last: anything that takes the first
+    // match, or ignores the platform, fails here.
+    for (int i = 0; i < preference.size(); ++i) {
+        UpdateChecker::Release sample;
+        sample.version = QStringLiteral("0.1.5");
+        for (int j = preference.size() - 1; j >= i; --j)
+            sample.assets.append({preference.at(j), urlFor(preference.at(j))});
+        sample.assets.append({foreign, urlFor(foreign)});
+        check(QStringLiteral("preferredAsset() picks %1").arg(preference.at(i)),
+              assetName(sample) == preference.at(i), assetName(sample));
+    }
+
+    UpdateChecker::Release tagged;
+    tagged.tagName = QStringLiteral("v0.1.5");
+    tagged.version = tagged.tagName.mid(1);
+    check(QStringLiteral("Release::isValid() for a parsed tag"), tagged.isValid(), QString());
+
+    // Nothing for this platform: the About page opens the release page instead of
+    // downloading a foreign binary.
+    UpdateChecker::Release foreignOnly;
+    foreignOnly.version = QStringLiteral("0.1.5");
+    foreignOnly.assets = {{foreign, urlFor(foreign)}};
+    check(QStringLiteral("a release with no build for this platform offers nothing"),
+          assetName(foreignOnly) == QLatin1String("(none)"), assetName(foreignOnly));
+
+    if (failures > 0) {
+        out() << "RESULT: " << failures << " update check(s) failed\n";
+        return 5;
+    }
+    out() << "RESULT: update logic OK\n";
+    return 0;
+}
+
 int runSelfTest(SettingsManager &settings)
 {
+    // Deterministic and engine-free, so it runs first - and on every platform,
+    // including the ones that bundle no aria2c.
+    if (const int updates = runUpdateSelfTest(); updates != 0)
+        return updates;
+
     out() << "aria2c self-test\n";
     const QString executable = Aria2Process::locateAria2(settings.aria2Executable());
     if (executable.isEmpty()) {
@@ -244,8 +373,7 @@ int runMakeTorrent(const QStringList &args)
     return 0;
 }
 
-int runInspectTorrent(const QString &path)
-{
+int runInspectTorrent(const QString &path){
     TorrentUtils torrents;
     const QVariantMap info = torrents.inspect(path);
     if (!info.value(QStringLiteral("ok")).toBool()) {
@@ -277,6 +405,57 @@ int runInspectTorrent(const QString &path)
     return 0;
 }
 
+/**
+ * Ask GitHub for the newest release and print what was found.
+ *
+ * Uses the same UpdateChecker the About page drives, so the behaviour a
+ * maintainer can reproduce from a terminal is the behaviour users get. Exit
+ * codes: 0 = ran (whether or not an update exists), 3 = the check failed.
+ */
+int runUpdateCheck(bool includePrerelease)
+{
+    QApplication *application = qobject_cast<QApplication *>(QCoreApplication::instance());
+    if (!application)
+        return 3;
+
+    UpdateChecker checker;
+    QObject::connect(&checker, &UpdateChecker::checkFinished, application,
+                     [application, includePrerelease](const UpdateChecker::Release &release,
+                                                      bool available) {
+                         out() << "current: " << UpdateChecker::currentVersion() << '\n';
+                         out() << "channel: " << (includePrerelease ? "stable+prerelease" : "stable")
+                               << '\n';
+                         if (!release.isValid()) {
+                             out() << "latest:  (no releases yet)\n";
+                             out() << "RESULT: no releases published\n";
+                             QCoreApplication::exit(0);
+                             return;
+                         }
+                         out() << "latest:  " << release.version << "  (tag " << release.tagName << ")\n";
+                         out() << "published: " << release.publishedAt.toString(Qt::ISODate) << '\n';
+                         out() << "prerelease: " << (release.prerelease ? "yes" : "no") << '\n';
+                         const QUrl asset = release.preferredAsset();
+                         out() << "asset for this platform: "
+                               << (asset.isValid() ? asset.fileName() : QStringLiteral("(none)"))
+                               << '\n';
+                         out() << "update available: " << (available ? "yes" : "no") << '\n';
+                         out() << "RESULT: " << (available ? "update available" : "up to date") << '\n';
+                         out().flush();
+                         QCoreApplication::exit(0);
+                     });
+    QObject::connect(&checker, &UpdateChecker::checkFailed, application,
+                     [application](const QString &reason) {
+                         out() << "RESULT: check failed: " << reason << '\n';
+                         out().flush();
+                         QCoreApplication::exit(3);
+                     });
+
+    out() << "checking " << UpdateChecker::releasesApiUrl().toString() << " ...\n";
+    out().flush();
+    checker.check(includePrerelease);
+    return QApplication::exec();
+}
+
 } // namespace
 
 int main(int argc, char *argv[])
@@ -285,7 +464,7 @@ int main(int argc, char *argv[])
     app.setApplicationName(QString::fromLatin1(kAppName));
     app.setApplicationDisplayName(QString::fromLatin1(kAppName));
     app.setOrganizationName(QString::fromLatin1(kAppName));
-    app.setApplicationVersion(QStringLiteral("0.1"));
+    app.setApplicationVersion(QStringLiteral("0.1.4"));
     app.setWindowIcon(makeAppIcon());
     // A download manager keeps running in the tray when its window closes.
     app.setQuitOnLastWindowClosed(false);
@@ -312,7 +491,8 @@ int main(int argc, char *argv[])
     QCommandLineOption newInstanceOption(QStringLiteral("new-instance"),
                                          QStringLiteral("Do not forward to a running instance."));
     QCommandLineOption selfTestOption(QStringLiteral("self-test"),
-                                      QStringLiteral("Check the generated aria2c command line and exit."));
+                                      QStringLiteral("Run the built-in self-tests "
+                                                     "(update logic, aria2c command line) and exit."));
     QCommandLineOption makeTorrentOption(QStringLiteral("make-torrent"),
                                          QStringLiteral("Create a .torrent from a file or folder (headless)."),
                                          QStringLiteral("source"));
@@ -325,6 +505,10 @@ int main(int argc, char *argv[])
     QCommandLineOption inspectTorrentOption(QStringLiteral("inspect-torrent"),
                                             QStringLiteral("Print the contents of a .torrent and exit."),
                                             QStringLiteral("file"));
+    QCommandLineOption checkUpdatesOption(QStringLiteral("check-updates"),
+                                          QStringLiteral("Ask GitHub for the newest release and exit."));
+    QCommandLineOption prereleaseOption(QStringLiteral("prerelease"),
+                                        QStringLiteral("Include pre-releases in --check-updates."));
     parser.addOption(minimizedOption);
     parser.addOption(newInstanceOption);
     parser.addOption(screenshotOption);
@@ -336,6 +520,8 @@ int main(int argc, char *argv[])
     parser.addOption(outputOption);
     parser.addOption(trackerOption);
     parser.addOption(inspectTorrentOption);
+    parser.addOption(checkUpdatesOption);
+    parser.addOption(prereleaseOption);
     parser.addPositionalArgument(QStringLiteral("urls"),
                                  QStringLiteral("Links, magnet URIs or .torrent files to download."));
     parser.process(app);
@@ -355,6 +541,12 @@ int main(int argc, char *argv[])
     }
     if (parser.isSet(inspectTorrentOption))
         return runInspectTorrent(parser.value(inspectTorrentOption));
+
+    // Update check as a headless mode. It is the same UpdateChecker the About
+    // page drives, which is the point: what CI or a maintainer can exercise from
+    // a terminal is exactly what the button does, not a second implementation.
+    if (parser.isSet(checkUpdatesOption))
+        return runUpdateCheck(parser.isSet(prereleaseOption));
 
     if (!parser.isSet(newInstanceOption) && notifyRunningInstance(positional, QDir::currentPath()))
         return 0;
@@ -446,7 +638,7 @@ int main(int argc, char *argv[])
     auto *historyPage = new HistoryPage(&aria2, pageStack);
     auto *createTorrentPage = new CreateTorrentPage(&torrents, pageStack);
     auto *settingsPage = new SettingsPage(&settings, &aria2, pageStack);
-    auto *aboutPage = new AboutPage(&aria2, pageStack);
+    auto *aboutPage = new AboutPage(&aria2, pageStack, &settings);
 
     // The download list and the inspector share one splitter, so the details
     // pane can be toggled without losing the list's scroll position.
@@ -552,6 +744,10 @@ int main(int argc, char *argv[])
                          toasts->push(text, isError ? ToastHost::Error : ToastHost::Success);
                      });
     QObject::connect(settingsPage, &SettingsPage::toast, &window,
+                     [toasts](const QString &text, bool isError) {
+                         toasts->push(text, isError ? ToastHost::Error : ToastHost::Success);
+                     });
+    QObject::connect(aboutPage, &AboutPage::toast, &window,
                      [toasts](const QString &text, bool isError) {
                          toasts->push(text, isError ? ToastHost::Error : ToastHost::Success);
                      });
@@ -724,6 +920,39 @@ int main(int argc, char *argv[])
     };
     QObject::connect(&aria2, &Aria2Manager::statisticsChanged, tray, updateTrayTooltip);
     updateTrayTooltip();
+
+    // ------------------------------------------------------------ update check
+    // Quietly, once, a few seconds after startup: late enough not to compete with
+    // the engine coming up, and it blocks nothing. The result is a toast and a
+    // notification, never a dialog - an update is news, not an obstacle.
+    //
+    // Each version is announced once. Without remembering the last one the toast
+    // would reappear on every launch until the user gave in, which is nagging,
+    // and the About page already offers a check whenever they want one.
+    auto *updates = new UpdateChecker(&app);
+    QObject::connect(updates, &UpdateChecker::checkFinished, &window,
+                     [&settings, toasts, &notifications](const UpdateChecker::Release &release,
+                                                         bool available) {
+                         if (!available || release.version.isEmpty())
+                             return;
+                         if (settings.lastNotifiedVersion() == release.version)
+                             return;
+                         settings.setLastNotifiedVersion(release.version);
+                         const QString message =
+                             QObject::tr("发现新版本 %1，当前版本 %2。在「关于」页可以查看并安装。")
+                                 .arg(release.version, UpdateChecker::currentVersion());
+                         toasts->push(message, ToastHost::Info, 9000);
+                         notifications.showNotification(QObject::tr("Fetchora 有新版本"), message);
+                     });
+    QObject::connect(updates, &UpdateChecker::checkFailed, &window, [](const QString &) {
+        // Deliberately silent. The user did not ask for this check, so a toast
+        // about a DNS hiccup or an exhausted anonymous rate limit on startup is
+        // noise; the About page reports failures when the check is explicit.
+    });
+    if (settings.checkForUpdates()) {
+        QTimer::singleShot(8000, updates,
+                           [updates, &settings]() { updates->check(settings.updateIncludePrerelease()); });
+    }
 
     // Closing to the tray is the friendly default for a download manager - but
     // only when there is a tray to restore the window from. Without one, hiding

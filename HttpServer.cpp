@@ -13,7 +13,7 @@
 namespace {
 
 const char *kAppName = "Aria2 Downloader";
-const char *kAppVersion = "0.1";
+const char *kAppVersion = "0.1.4";
 
 /// RFC 6455 handshake GUID.
 const char *kWebSocketGuid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";

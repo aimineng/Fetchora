@@ -759,8 +759,16 @@ void SettingsPage::buildSections()
     page->addStretch(1);
 
     // ==================================================== 9. 关于 / About
-    page = addSectionPage(QT_TR_NOOP("关于"), QT_TR_NOOP("版本与许可信息"),
+    page = addSectionPage(QT_TR_NOOP("关于"), QT_TR_NOOP("版本、更新与许可信息"),
                           FluentTheme::Glyph::App);
+    body = addGroupCard(page, QT_TR_NOOP("更新"));
+    addSwitch(body, QStringLiteral("checkForUpdates"), QT_TR_NOOP("启动时检查更新"),
+              QT_TR_NOOP("启动后向 GitHub 查询新版本，发现更新时只提示一次"));
+    addSwitch(body, QStringLiteral("updateIncludePrerelease"), QT_TR_NOOP("包含预览版"),
+              QT_TR_NOOP("把 GitHub 上标记为预览版的发布也算作可用更新"));
+    addCaption(body, QT_TR_NOOP("在左侧「关于」页面可以随时手动检查更新并下载安装包。"),
+               "caption", QString(), true);
+
     body = addGroupCard(page, QT_TR_NOOP("关于 Fetchora"));
     addCaption(body, QT_TR_NOOP("Fetchora %1"), "subtitle",
                QCoreApplication::applicationVersion());
