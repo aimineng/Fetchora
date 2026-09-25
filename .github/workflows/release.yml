@@ -281,7 +281,16 @@ jobs:
             "packaging\windows\fetchora.iss"
           if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
 
-          Get-ChildItem "$env:GITHUB_WORKSPACE\dist" | Select-Object Name, Length
+          # A zero exit code only means ISCC was happy; it does not prove the
+          # file landed where the upload globs look. Ask for it by name.
+          $installer = Get-ChildItem "$env:GITHUB_WORKSPACE\dist" -Filter '*-setup.exe' -ErrorAction SilentlyContinue |
+                       Select-Object -First 1
+          if (-not $installer) {
+            $found = (Get-ChildItem "$env:GITHUB_WORKSPACE\dist" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name) -join ', '
+            echo "::error title=ISCC produced no installer::dist/ contains: [$found]"
+            exit 1
+          }
+          Write-Host ("installer: {0} ({1:N0} bytes)" -f $installer.Name, $installer.Length)
 
       - name: Package the macOS disk image
         if: runner.os == 'macOS'
@@ -370,6 +379,28 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "publishing $tag"
 
+      - name: Check that every expected asset is present
+        # `fail_on_unmatched_files` below only proves that each *pattern* matched
+        # something. v0.1.1 shipped without its Windows installer because the
+        # `.exe` pattern was missing from that list entirely - all three listed
+        # patterns matched, so nothing complained and the installer went no
+        # further than the artifact. Asserting the full set here is what turns
+        # that silent drop into a failed run.
+        run: |
+          set -euo pipefail
+          missing=0
+          for pattern in '*.zip' '*.exe' '*.dmg' '*.tar.gz'; do
+            if ! compgen -G "assets/$pattern" > /dev/null; then
+              echo "::error title=Release asset missing ($pattern)::assets/ contains: $(ls assets | tr '\n' ' ')"
+              missing=1
+            fi
+          done
+          if [ $missing -ne 0 ]; then
+            echo "refusing to publish a partial release"
+            exit 1
+          fi
+          ls -l assets
+
       - name: List what will be published
         run: ls -l assets
 
@@ -385,6 +416,7 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             assets/*.zip
+            assets/*.exe
             assets/*.dmg
             assets/*.tar.gz
           body: |
