@@ -285,7 +285,7 @@ int main(int argc, char *argv[])
     app.setApplicationName(QString::fromLatin1(kAppName));
     app.setApplicationDisplayName(QString::fromLatin1(kAppName));
     app.setOrganizationName(QString::fromLatin1(kAppName));
-    app.setApplicationVersion(QStringLiteral("2.1"));
+    app.setApplicationVersion(QStringLiteral("0.1"));
     app.setWindowIcon(makeAppIcon());
     // A download manager keeps running in the tray when its window closes.
     app.setQuitOnLastWindowClosed(false);
