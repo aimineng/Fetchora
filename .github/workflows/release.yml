@@ -334,13 +334,51 @@ jobs:
       - name: List what will be published
         run: ls -l assets
 
+      - name: Check out the source
+        uses: actions/checkout@v4
+        with:
+          # The commit list in the notes comes from the range between the previous
+          # tag and this one, which the default shallow clone does not have.
+          fetch-depth: 0
+
+      - name: Compose the release notes
+        # The About page shows an excerpt of this body when it offers an update
+        # (summarizeNotes() in AboutPage.cpp), so the body opens with what
+        # changed and only then lists the downloads.
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          previous="$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || true)"
+          {
+            echo "### What's new in $TAG"
+            echo
+            if [ -n "$previous" ]; then
+              echo "Changes since $previous:"
+              echo
+              git log --no-merges --pretty='- %s' "$previous..$TAG"
+            else
+              # The first release has no previous tag to compare against.
+              git log --no-merges --pretty='- %s' -n 20 "$TAG"
+            fi
+            echo
+            cat packaging/release-body.md
+          } > release-body.md
+          # A body without a single bullet means the range was wrong, and a
+          # release note that says nothing is worse than a failed run.
+          if ! grep -q '^- ' release-body.md; then
+            echo "::error::the release notes list no commits - check the tag range"
+            exit 1
+          fi
+          cat release-body.md
+
       - name: Create the Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: Fetchora ${{ steps.tag.outputs.tag }}
-          # generate_release_notes prepends/append the auto-generated notes to
-          # this body, so the platform caveats below always appear.
+          # generate_release_notes appends the auto-generated notes (the changelog
+          # link) to this body, so the platform caveats above always appear.
           generate_release_notes: true
           # A missing archive must fail the release instead of publishing two.
           fail_on_unmatched_files: true
@@ -349,40 +387,4 @@ jobs:
             assets/*.exe
             assets/*.dmg
             assets/*.tar.gz
-          body: |
-            ### Downloads
-
-            | Platform | Asset | Notes |
-            | --- | --- | --- |
-            | Windows 10/11 (x64) | `Fetchora-*-windows-x64-setup.exe` | Installer. No administrator rights needed, and **aria2 is included**. |
-            | Windows 10/11 (x64), portable | `Fetchora-windows-x64.zip` | Same thing without an installer: unpack anywhere and run `Fetchora.exe`. |
-            | macOS (Apple silicon or Intel) | `Fetchora-macos-*.dmg` | Open the image and drag Fetchora into Applications. |
-            | Linux (x86_64) | `Fetchora-linux-*.tar.gz` | Binary, `fetchora.desktop` and the icon. |
-
-            **The Windows packages include the engine** - `aria2c.exe` 1.37.0, the official
-            upstream build, unmodified - so they work as downloaded. See `licenses/` for its
-            GPL-2.0 text and `ARIA2-BUILD-INFO.txt` for exactly what that build links.
-            **macOS and Linux do not bundle the engine.** Fetchora drives `aria2c` 1.36+;
-            install it with `brew install aria2` or your package manager. A brew- or apt-built
-            aria2 is dynamically linked against that system's own libraries, so copying just
-            the executable would produce something that cannot start elsewhere.
-
-            **Linux:** the tarball is portable but not self-contained - the binary links against
-            the *distribution's* Qt 6 (6.5 or newer) at runtime. Install it, for example on
-            Debian/Ubuntu:
-
-            ```sh
-            sudo apt install libqt6widgets6 libqt6network6 libqt6sql6 libqt6svg6 \
-                             libqt6concurrent6 libxcb-cursor0
-            ```
-
-            Unpack the tarball anywhere, then optionally install the launcher and icon:
-
-            ```sh
-            install -Dm644 fetchora.desktop ~/.local/share/applications/fetchora.desktop
-            install -Dm644 fetchora.png ~/.local/share/icons/hicolor/256x256/apps/fetchora.png
-            ```
-
-            **macOS:** the build is unsigned and not notarised, so Gatekeeper will warn on first
-            launch - right-click the app and choose *Open*, or run
-            `xattr -dr com.apple.quarantine /Applications/Fetchora.app`.
+          body_path: release-body.md

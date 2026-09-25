@@ -91,24 +91,51 @@ void showNotice(InfoBar *bar, InfoBar::Severity severity, const QString &title,
 }
 
 /**
- * 把 release notes 压成一行短摘要：去掉 markdown 标题符号，换行折成空格。
+ * 把 release notes 压成一行短摘要：去掉 markdown 标记，换行折成空格。
  *
  * GitHub 的正文是多行 markdown，整段塞进 InfoBar 会把页面撑得很难看，所以只留
  * 开头 kSummaryLimit 个字，超出的用省略号收尾。
+ *
+ * 逐行过滤而不是整段替换：发布说明的开头往往是「下载表格」和安装代码块（本项目的
+ * 发布正文就是这样），整段折行后会得到一串 `| Platform | Asset |` 和 `sudo apt
+ * install ...`，既不像摘要也读不懂。表格行、代码块与分隔线直接丢掉，剩下的标题、
+ * 列表、强调标记再退化成纯文本——InfoBar 里的 QLabel 不认 markdown。
  */
 QString summarizeNotes(const QString &notes)
 {
-    QString text = notes;
-
-    static const QRegularExpression heading(QStringLiteral("(?m)^[ \\t]{0,3}#{1,6}[ \\t]*"));
-    text.remove(heading);
-
-    static const QRegularExpression lineBreaks(QStringLiteral("[\\r\\n\\t]+"));
-    text.replace(lineBreaks, QStringLiteral(" "));
-
+    static const QRegularExpression heading(QStringLiteral("^[ \\t]{0,3}#{1,6}[ \\t]*"));
+    static const QRegularExpression rule(QStringLiteral("^[ \\t]*([-*_])([ \\t]*\\1){2,}[ \\t]*$"));
+    static const QRegularExpression emphasis(QStringLiteral("(\\*\\*|__|\\*|`)"));
     static const QRegularExpression gaps(QStringLiteral(" {2,}"));
-    text.replace(gaps, QStringLiteral(" "));
 
+    QStringList kept;
+    bool inFence = false;
+    const QStringList lines = notes.split(QLatin1Char('\n'));
+    for (QString line : lines) {
+        line.remove(QLatin1Char('\r'));
+        // ``` 围起来的代码块整块跳过：安装命令不是摘要。
+        if (line.trimmed().startsWith(QLatin1String("```"))) {
+            inFence = !inFence;
+            continue;
+        }
+        if (inFence)
+            continue;
+        const QString trimmed = line.trimmed();
+        // 表格行与 <hr> 都没有可读内容。
+        if (trimmed.startsWith(QLatin1Char('|')) || rule.match(trimmed).hasMatch())
+            continue;
+        if (trimmed.isEmpty()) {
+            // 空行仍然留一个空格，免得两段被粘成一个词。
+            kept << QString();
+            continue;
+        }
+        line.remove(heading);
+        line.remove(emphasis);
+        kept << line.trimmed();
+    }
+
+    QString text = kept.join(QLatin1Char(' '));
+    text.replace(gaps, QStringLiteral(" "));
     text = text.trimmed();
     if (text.size() > kSummaryLimit) {
         int cut = kSummaryLimit;
