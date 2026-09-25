@@ -23,7 +23,9 @@ permissions:
 
 env:
   # Must match ci.yml: an artifact that CI has not validated must not ship.
-  QT_VERSION: '6.8.3'
+  # 6.10.3 or newer is also a hard requirement on macOS 26, where Qt < 6.9.2
+  # links the removed AGL framework (QTBUG-137687).
+  QT_VERSION: '6.10.3'
 
 jobs:
   build:

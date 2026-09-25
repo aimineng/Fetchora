@@ -26,11 +26,18 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Qt 6.8 LTS. The project only requires 6.5 (CMakeLists.txt), and 6.8.3 is
-  # the newest 6.8 patch: an LTS with long-term fixes, the version
-  # install-qt-action itself defaults to and tests, and the version whose
-  # win64_mingw package still depends on the MinGW 13.1 toolchain pinned below.
-  QT_VERSION: '6.8.3'
+  # Qt 6.10.3 - the version the project is developed against, and, more
+  # importantly, new enough to build on macOS 26.
+  #
+  # macOS 26 "Tahoe" removed the AGL framework. Qt's FindWrapOpenGL.cmake still
+  # passed `-framework AGL` on Apple hosts, so every link failed with
+  # "ld: framework 'AGL' not found" (QTBUG-137687, fixed in Qt 6.9.2 - see
+  # https://bugreports.qt.io/browse/QTBUG-137687). `macos-latest` has since
+  # rolled to macOS 26, so anything older than 6.9.2 cannot link there at all.
+  #
+  # 6.10.3's win64_mingw package is still "Prebuilt Components for MinGW 13.1.0",
+  # so the toolchain pinned below is unchanged.
+  QT_VERSION: '6.10.3'
 
 jobs:
   build:
