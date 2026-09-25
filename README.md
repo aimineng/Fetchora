@@ -102,19 +102,35 @@ Captured from the real window with
 
 ## Requirements
 
+### Installing
+
+| Platform | How |
+| --- | --- |
+| Windows 10/11 (x64) | Run `Fetchora-*-windows-x64-setup.exe`. No administrator rights needed, and **aria2 is included**. |
+| Windows, portable | Unpack `Fetchora-windows-x64.zip` anywhere and run `Fetchora.exe`. Same files, engine included. |
+| macOS | Open `Fetchora-macos-*.dmg` and drag Fetchora into Applications. |
+| Linux | Unpack `Fetchora-linux-*.tar.gz`; see the notes in the release for the Qt packages it needs. |
+
+Grab them from [Releases](https://github.com/aimineng/Fetchora/releases).
+
 ### Running
 | | |
 | --- | --- |
 | OS | Windows 10 1809+, macOS 12+, or a modern Linux desktop (X11 or Wayland) |
-| Engine | `aria2c` **1.36 or newer** |
+| Engine | `aria2c` **1.36 or newer** — bundled in the Windows packages, installed separately on macOS and Linux |
 | Runtime | The Qt 6 runtime libraries (`windeployqt` on Windows, a normal package install or `macdeployqt` elsewhere) |
 
 Mica and the rounded window corners need Windows 11 22H2+; on Windows 10 the window
 simply paints its own opaque surface. On macOS and Linux the window uses the native frame
 and title bar.
 
-`aria2c` is **not** bundled with the source tree on Unix. On Windows put `aria2c.exe` next
-to `Fetchora.exe`, or install it into `PATH`. The app looks in this order: the path
+**Where the engine comes from.** The Windows packages carry the official aria2 1.37.0
+build, so they work as downloaded. The macOS and Linux packages do not: a `brew`- or
+`apt`-built aria2 is dynamically linked against that system's own libraries, so copying
+just the executable would produce something that cannot start elsewhere — install it with
+`brew install aria2` or your distribution's package instead.
+
+When there is no bundled engine, the app looks for `aria2c` in this order: the path
 configured in Settings → RPC/引擎, the application directory (and, in a macOS bundle,
 `Contents/Resources`), `/opt/homebrew/bin`, `/usr/local/bin`, `/usr/bin`, then `PATH`.
 
@@ -454,4 +470,22 @@ Where the three platforms differ, and why:
 
 ## License
 
-[MIT](LICENSE) © 2025 Fetchora contributors.
+Fetchora itself is [MIT](LICENSE) © 2025 Fetchora contributors.
+
+It drives other people's software, and the release packages redistribute some of it, so
+those licences apply to the binaries too:
+
+| Component | Licence | Where it is |
+| --- | --- | --- |
+| **aria2** 1.37.0 | GPL-2.0-or-later | bundled `aria2c.exe` in the Windows packages; installed separately on macOS and Linux |
+| **Qt** 6.10 | LGPL-3.0 (dynamic linking) | Qt libraries shipped with every package |
+| **OpenSSL**, **zlib**, **expat**, **SQLite**, **c-ares**, **libssh2**, **GMP** | Apache-2.0, zlib, MIT, public domain, MIT, BSD-3-Clause, LGPL-3.0-or-later/GPL-2.0-or-later | statically linked inside the bundled `aria2c` |
+
+The licence texts travel in `licenses/` inside each Windows package, and the full
+reasoning — including the written offer for aria2's source — is in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) and
+[`third_party/`](third_party/README.md).
+
+Every Windows package also carries `ARIA2-BUILD-INFO.txt`, the verbatim output of
+`aria2c --version`, because which libraries an aria2 build links depends on how it was
+configured — the notice table covers the possibilities, that file records the fact.

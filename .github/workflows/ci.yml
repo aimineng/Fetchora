@@ -39,6 +39,10 @@ env:
   # so the toolchain pinned below is unchanged.
   QT_VERSION: '6.10.3'
 
+  # The engine the Windows self-test runs, and the one the release packages
+  # bundle. Pinned so CI and the shipped product cannot drift apart.
+  ARIA2_VERSION: '1.37.0'
+
 jobs:
   build:
     name: Build and self-test (${{ matrix.os }})
@@ -102,27 +106,32 @@ jobs:
       # ------------------------------------------------- engine for the tests
       # aria2c.exe is not in the repository (it is gitignored), so the self-test
       # has nothing to validate until the engine is installed.
+      #
+      # This downloads the same official archive the release packages bundle, so
+      # CI validates exactly the engine users get - a package manager's build
+      # could pass here and behave differently in the shipped product.
       - name: Install aria2 (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          choco install aria2 --no-progress -y
-          if ($LASTEXITCODE -ne 0) { throw "choco install aria2 failed" }
+          $ver = $env:ARIA2_VERSION
+          $asset = "aria2-$ver-win-64bit-build1.zip"
+          $url = "https://github.com/aria2/aria2/releases/download/release-$ver/$asset"
+          $zip = Join-Path $env:RUNNER_TEMP $asset
+          $dist = "$env:GITHUB_WORKSPACE\aria2-dist"
 
-          # chocolatey exposes a *shim* in chocolatey\bin; copying that shim
-          # next to Fetchora.exe would not run the engine, so take the real
-          # binary from the package directory and prove it works first.
-          $exe = Get-ChildItem "$env:ProgramData\chocolatey\lib\aria2" -Recurse -Filter aria2c.exe -File -ErrorAction SilentlyContinue |
-                 Select-Object -First 1 -ExpandProperty FullName
-          if (-not $exe) { $exe = 'C:\Program Files\aria2\aria2c.exe' }
-          if (-not (Test-Path $exe)) { throw "aria2c.exe not found after 'choco install aria2'" }
-          & $exe --version | Select-Object -First 1
-          if ($LASTEXITCODE -ne 0) { throw "$exe is not a working aria2c" }
+          Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+          New-Item -ItemType Directory -Force -Path $dist | Out-Null
+          Expand-Archive -Path $zip -DestinationPath $dist -Force
 
+          $exe = Get-ChildItem $dist -Recurse -Filter aria2c.exe | Select-Object -First 1
+          if (-not $exe) { throw "aria2c.exe is not in $asset" }
+          & $exe.FullName --version | Select-String -Pattern 'aria2 version|Libraries:'
+          if ($LASTEXITCODE -ne 0) { throw "$($exe.FullName) is not a working aria2c" }
           # build.ps1 copies an aria2c.exe found in the project root next to the
           # executable and then runs its extra torrent/engine round trip with it.
-          Copy-Item $exe "$env:GITHUB_WORKSPACE\aria2c.exe" -Force
-          Write-Host "engine: $exe"
+          Copy-Item $exe.FullName "$env:GITHUB_WORKSPACE\aria2c.exe" -Force
+          Write-Host "engine: $($exe.FullName)"
 
       - name: Install aria2 (macOS)
         if: runner.os == 'macOS'

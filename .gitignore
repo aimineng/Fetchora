@@ -1,4 +1,7 @@
 # Build output -----------------------------------------------------------------
+# Release staging trees assembled by the packaging steps.
+/stage/
+/dist/
 # Every build directory build.ps1 or a Qt Creator kit may create.
 /build*/
 /.qtcreator/

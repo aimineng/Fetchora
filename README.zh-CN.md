@@ -95,19 +95,34 @@ Fluent 图标字体都是 Windows 独有的，因此窗口保留平台自己的�
 
 ## 运行环境
 
+### 安装
+
+| 平台 | 方式 |
+| --- | --- |
+| Windows 10/11 (x64) | 运行 `Fetchora-*-windows-x64-setup.exe`。不需要管理员权限，**已内置 aria2**。 |
+| Windows 免安装 | 解压 `Fetchora-windows-x64.zip` 到任意目录，运行 `Fetchora.exe`。内容与安装包相同，同样内置引擎。 |
+| macOS | 打开 `Fetchora-macos-*.dmg`，把 Fetchora 拖进"应用程序"。 |
+| Linux | 解压 `Fetchora-linux-*.tar.gz`；所需的 Qt 包见 Release 说明。 |
+
+下载地址：[Releases](https://github.com/aimineng/Fetchora/releases)。
+
 ### 运行
 | | |
 | --- | --- |
 | 系统 | Windows 10 1809+、macOS 12+，或现代 Linux 桌面（X11 / Wayland） |
-| 引擎 | `aria2c` **1.36 或更高** |
+| 引擎 | `aria2c` **1.36 或更高** —— Windows 安装包与免安装包已内置，macOS / Linux 需自行安装 |
 | 运行库 | Qt 6 运行时（Windows 用 `windeployqt`；其他平台用包管理器或 `macdeployqt`） |
 
 Mica 与窗口圆角需要 Windows 11 22H2+，在 Windows 10 上窗口直接用不透明表面绘制。
 macOS 与 Linux 使用系统原生窗口边框与标题栏。
 
-`aria2c` 在 Unix 上**不随源码提供**。Windows 上把它放在 `Fetchora.exe` 旁边或装进
-`PATH`。查找顺序为：设置 → RPC/引擎 中配置的路径 → 程序目录（macOS 应用包内还会找
-`Contents/Resources`）→ `/opt/homebrew/bin` → `/usr/local/bin` → `/usr/bin` → `PATH`。
+**引擎从哪来。** Windows 的两个包内置了 aria2 1.37.0 官方构建，下载后开箱即用。
+macOS 和 Linux 的包**不内置**：`brew` / `apt` 构建出来的 aria2 会动态链接到该系统自己的
+库，只复制可执行文件的话换台机器就跑不起来，所以请用 `brew install aria2` 或发行版的包
+管理器安装。
+
+没有内置引擎时，查找顺序为：设置 → RPC/引擎 中配置的路径 → 程序目录（macOS 应用包内还会
+找 `Contents/Resources`）→ `/opt/homebrew/bin` → `/usr/local/bin` → `/usr/bin` → `PATH`。
 
 ### 构建
 | | |
@@ -430,4 +445,19 @@ powershell -File tools\check-syntax.ps1 -Sources ui\pages\YourPage.cpp   # 仅 W
 
 ## 许可证
 
-[MIT](LICENSE) © 2025 Fetchora contributors。
+Fetchora 本身是 [MIT](LICENSE) © 2025 Fetchora contributors。
+
+它驱动的是别人的软件，发布包里也会再分发其中一部分，所以那些许可证同样约束这些二进制：
+
+| 组件 | 许可证 | 在哪里 |
+| --- | --- | --- |
+| **aria2** 1.37.0 | GPL-2.0-or-later | Windows 包内内置的 `aria2c.exe`；macOS / Linux 由用户自行安装 |
+| **Qt** 6.10 | LGPL-3.0（动态链接） | 每个包都附带 Qt 运行库 |
+| **OpenSSL**、**zlib**、**expat**、**SQLite**、**c-ares**、**libssh2**、**GMP** | Apache-2.0、zlib、MIT、公有领域、MIT、BSD-3-Clause、LGPL-3.0-or-later/GPL-2.0-or-later | 静态链接在内置的 `aria2c` 里 |
+
+许可证全文随 Windows 包放在 `licenses/` 目录下；完整说明（包括 aria2 源码的书面提供承诺）
+见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) 与 [`third_party/`](third_party/README.md)。
+
+每个 Windows 包还带一份 `ARIA2-BUILD-INFO.txt`，内容是 `aria2c --version` 的原始输出——
+某个 aria2 构建到底链接了哪些库取决于它的编译配置，上面的表格覆盖的是可能范围，那份文件
+记录的才是事实。

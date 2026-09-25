@@ -27,6 +27,13 @@ env:
   # links the removed AGL framework (QTBUG-137687).
   QT_VERSION: '6.10.3'
 
+  # The bundled engine. Pinned rather than "latest" so a release is reproducible
+  # and ARIA2-BUILD-INFO.txt keeps meaning the same thing over time.
+  ARIA2_VERSION: '1.37.0'
+
+  # Used for the installer's file name and its Add/Remove Programs entry.
+  APP_VERSION: '0.1'
+
 jobs:
   build:
     name: Package (${{ matrix.os }})
@@ -37,7 +44,13 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            asset: Fetchora-windows-x64.zip
+            # Two artifacts: the portable zip and the Inno Setup installer.
+            # upload-artifact takes a newline-separated list of globs and only
+            # errors when nothing at all matches, so the packaging step is what
+            # guarantees both exist.
+            asset: |
+              Fetchora-windows-x64.zip
+              dist/Fetchora-*-windows-x64-setup.exe
           - os: macos-latest
             # The architecture is filled in at package time by uname -m, so the
             # glob stays correct whichever runner image macOS-latest points at.
@@ -76,22 +89,33 @@ jobs:
           version: ${{ env.QT_VERSION }}
 
       # ------------------------------------------------- engine for the tests
+      # The official release archive, not a package manager's build: the same
+      # binary is bundled into the package, so the self-test validates exactly
+      # what ships, and the version is pinned instead of drifting.
       - name: Install aria2 (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          choco install aria2 --no-progress -y
-          if ($LASTEXITCODE -ne 0) { throw "choco install aria2 failed" }
-          # chocolatey's bin\aria2c.exe is a shim; the real engine is in the
-          # package directory, and build.ps1 needs a copy in the project root.
-          $exe = Get-ChildItem "$env:ProgramData\chocolatey\lib\aria2" -Recurse -Filter aria2c.exe -File -ErrorAction SilentlyContinue |
-                 Select-Object -First 1 -ExpandProperty FullName
-          if (-not $exe) { $exe = 'C:\Program Files\aria2\aria2c.exe' }
-          if (-not (Test-Path $exe)) { throw "aria2c.exe not found after 'choco install aria2'" }
-          & $exe --version | Select-Object -First 1
-          if ($LASTEXITCODE -ne 0) { throw "$exe is not a working aria2c" }
-          Copy-Item $exe "$env:GITHUB_WORKSPACE\aria2c.exe" -Force
-          Write-Host "engine: $exe"
+          $ver = $env:ARIA2_VERSION
+          $asset = "aria2-$ver-win-64bit-build1.zip"
+          $url = "https://github.com/aria2/aria2/releases/download/release-$ver/$asset"
+          $zip = Join-Path $env:RUNNER_TEMP $asset
+          $dist = "$env:GITHUB_WORKSPACE\aria2-dist"
+
+          Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+          if (-not (Test-Path $zip)) { throw "could not download $url" }
+          New-Item -ItemType Directory -Force -Path $dist | Out-Null
+          Expand-Archive -Path $zip -DestinationPath $dist -Force
+
+          $exe = Get-ChildItem $dist -Recurse -Filter aria2c.exe | Select-Object -First 1
+          if (-not $exe) { throw "aria2c.exe is not in $asset" }
+          # build.ps1 looks for the engine in the project root.
+          Copy-Item $exe.FullName "$env:GITHUB_WORKSPACE\aria2c.exe" -Force
+          & $exe.FullName --version | Select-String -Pattern 'aria2 version|Libraries:'
+          if ($LASTEXITCODE -ne 0) { throw "$($exe.FullName) is not a working aria2c" }
+          Write-Host "engine: $($exe.FullName)"
+          # The licence files ride along from the same archive.
+          Get-ChildItem $dist -Recurse -File | Select-Object -ExpandProperty Name
 
       - name: Install aria2 (macOS)
         if: runner.os == 'macOS'
@@ -181,19 +205,49 @@ jobs:
       # Asset names carry no version on purpose: the release tag is the version,
       # and stable names keep .../releases/latest/download/<name> links working
       # across releases.
-      - name: Package the Windows zip
+      - name: Package the Windows zip and installer
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $stage = "$env:GITHUB_WORKSPACE\stage\Fetchora"
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
           Copy-Item build\Release\Fetchora.exe $stage
-          Copy-Item README.md, LICENSE $stage
+          Copy-Item README.md, LICENSE, THIRD-PARTY-NOTICES.md $stage
           # The repository tracks ca-bundle.crt as aria2's HTTPS trust store and
           # CMake copies it next to the executable, so a shipped build needs it.
           if (Test-Path ca-bundle.crt) { Copy-Item ca-bundle.crt $stage }
           else { Write-Host "::warning::ca-bundle.crt is not in the checkout - the zip ships without a CA bundle" }
 
+          # ------ bundled engine ------------------------------------------
+          # The engine is what a user actually downloads with, so it ships, and
+          # it is the exact binary the self-test above just validated.
+          $dist = "$env:GITHUB_WORKSPACE\aria2-dist"
+          if (-not (Test-Path $dist)) { throw "aria2-dist is missing - the 'Install aria2' step did not run" }
+          $exe = Get-ChildItem $dist -Recurse -Filter aria2c.exe | Select-Object -First 1
+          Copy-Item $exe.FullName "$stage\aria2c.exe"
+
+          # GPL-2.0 section 3 wants the source offer and the change log to travel
+          # with the binary; these are the files aria2's own archive ships.
+          foreach ($f in @('COPYING', 'LICENSE.OpenSSL', 'AUTHORS', 'ChangeLog', 'NEWS')) {
+            $src = Get-ChildItem $dist -Recurse -Filter $f | Select-Object -First 1
+            if ($src) { Copy-Item $src.FullName "$stage\aria2-$f" }
+            else { Write-Host "::warning::aria2's $f was not in the archive" }
+          }
+
+          # Record what is actually in the package instead of trusting the
+          # notice's prose: the licence table covers a set of libraries, and only
+          # this output says which of them this build links.
+          & "$stage\aria2c.exe" --version | Out-File -FilePath "$stage\ARIA2-BUILD-INFO.txt" -Encoding utf8
+          Get-Content "$stage\ARIA2-BUILD-INFO.txt" | Select-String -Pattern 'aria2 version|Libraries:|Compiler:'
+
+          # ------ licence texts -------------------------------------------
+          # third_party/ holds the texts for aria2 and everything statically
+          # linked into it, plus Qt's LGPL-3.0. They cannot be fetched at install
+          # time, so they are copied verbatim.
+          Copy-Item third_party "$stage\licenses" -Recurse
+          Get-ChildItem "$stage\licenses" -Recurse -File | Measure-Object | ForEach-Object { "licence files staged: $($_.Count)" }
+
+          # ------ Qt runtime ----------------------------------------------
           # windeployqt ships with Qt and must be called explicitly; it copies
           # the runtime DLLs, the platform plugins and the qt.conf that points
           # at them. --no-translations is safe because LanguageManager loads the
@@ -202,9 +256,32 @@ jobs:
           & "$env:QT_ROOT_DIR\bin\windeployqt.exe" --release --no-translations --no-system-d3d-compiler "$stage\Fetchora.exe"
           if ($LASTEXITCODE -ne 0) { throw "windeployqt failed" }
 
+          # The portable zip is this staging tree, engine and licences included.
           Compress-Archive -Path $stage -DestinationPath Fetchora-windows-x64.zip -Force
           Get-Item Fetchora-windows-x64.zip | Select-Object Name, Length
-          Get-ChildItem $stage | Select-Object -First 10 Name
+
+          # ------ installer -----------------------------------------------
+          # Inno Setup is not preinstalled on the runner. The zip above is
+          # already a usable artifact, so a failure here must NOT lose the
+          # release: it is reported and the job carries on with the zip only.
+          choco install innosetup --no-progress -y
+          $iscc = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
+          ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) {
+            echo "::error title=Inno Setup not found::choco install innosetup did not produce ISCC.exe; the Release will carry the portable zip only."
+            exit 1
+          }
+
+          & $iscc `
+            "/DAppVersion=$env:APP_VERSION" `
+            "/DStageDir=$stage" `
+            "/DBuildDir=$env:GITHUB_WORKSPACE\dist" `
+            "packaging\windows\fetchora.iss"
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
+
+          Get-ChildItem "$env:GITHUB_WORKSPACE\dist" | Select-Object Name, Length
 
       - name: Package the macOS disk image
         if: runner.os == 'macOS'
@@ -315,14 +392,18 @@ jobs:
 
             | Platform | Asset | Notes |
             | --- | --- | --- |
-            | Windows 10/11 (x64) | `Fetchora-windows-x64.zip` | Unpack and run `Fetchora.exe`. The Qt runtime is included. |
+            | Windows 10/11 (x64) | `Fetchora-*-windows-x64-setup.exe` | Installer. No administrator rights needed, and **aria2 is included**. |
+            | Windows 10/11 (x64), portable | `Fetchora-windows-x64.zip` | Same thing without an installer: unpack anywhere and run `Fetchora.exe`. |
             | macOS (Apple silicon or Intel) | `Fetchora-macos-*.dmg` | Open the image and drag Fetchora into Applications. |
             | Linux (x86_64) | `Fetchora-linux-*.tar.gz` | Binary, `fetchora.desktop` and the icon. |
 
-            **The engine is not bundled.** Fetchora drives `aria2c` 1.36+, which is not part of
-            this release: put `aria2c` (`aria2c.exe` on Windows) next to the executable or on
-            `PATH`. Windows ships `ca-bundle.crt` for HTTPS; on macOS and Linux the system trust
-            store is used.
+            **The Windows packages include the engine** - `aria2c.exe` 1.37.0, the official
+            upstream build, unmodified - so they work as downloaded. See `licenses/` for its
+            GPL-2.0 text and `ARIA2-BUILD-INFO.txt` for exactly what that build links.
+            **macOS and Linux do not bundle the engine.** Fetchora drives `aria2c` 1.36+;
+            install it with `brew install aria2` or your package manager. A brew- or apt-built
+            aria2 is dynamically linked against that system's own libraries, so copying just
+            the executable would produce something that cannot start elsewhere.
 
             **Linux:** the tarball is portable but not self-contained - the binary links against
             the *distribution's* Qt 6 (6.5 or newer) at runtime. Install it, for example on
