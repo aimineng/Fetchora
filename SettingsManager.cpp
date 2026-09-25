@@ -338,7 +338,7 @@ void SettingsManager::applyAutoStart(bool enable)
 
 QString SettingsManager::appTitle() const
 {
-    return QStringLiteral("Aria2 Downloader");
+    return QStringLiteral("Fetchora");
 }
 
 // ============================================================================

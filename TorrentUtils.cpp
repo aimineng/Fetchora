@@ -456,7 +456,7 @@ bool TorrentUtils::create(const QString &sourcePath, const QString &savePath, co
     }
     root.insert(QStringLiteral("comment"), comment.toUtf8());
     root.insert(QStringLiteral("created by"), (createdBy.isEmpty()
-                                                   ? QStringLiteral("Aria2 Downloader")
+                                                   ? QStringLiteral("Fetchora")
                                                    : createdBy)
                                                   .toUtf8());
     root.insert(QStringLiteral("creation date"), qint64(QDateTime::currentSecsSinceEpoch()));

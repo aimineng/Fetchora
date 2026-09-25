@@ -29,7 +29,7 @@ FluentTitleBar::FluentTitleBar(QWidget *parent)
     m_appTile->setAlignment(Qt::AlignCenter);
     m_appTile->setAttribute(Qt::WA_TransparentForMouseEvents);
 
-    m_title = new QLabel(QStringLiteral("Aria2 Downloader"), this);
+    m_title = new QLabel(QStringLiteral("Fetchora"), this);
     m_title->setAttribute(Qt::WA_TransparentForMouseEvents);
     QFont tf = FluentTheme::uiFont(14);
     tf.setWeight(QFont::DemiBold);

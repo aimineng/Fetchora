@@ -49,7 +49,7 @@ async function refresh() {
     $("upSpeed").textContent = "--";
     $("activeCount").textContent = "0";
     $("waitingCount").textContent = "0";
-    $("taskList").innerHTML = '<div class="muted">启动 Aria2 Downloader 后即可在这里查看任务。</div>';
+    $("taskList").innerHTML = '<div class="muted">启动 Fetchora 后即可在这里查看任务。</div>';
   }
 }
 

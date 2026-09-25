@@ -12,7 +12,7 @@
 
 namespace {
 
-const char *kAppName = "Aria2 Downloader";
+const char *kAppName = "Fetchora";
 const char *kAppVersion = "0.1.4";
 
 /// RFC 6455 handshake GUID.

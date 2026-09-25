@@ -1,4 +1,4 @@
-# build.ps1 - configure + build helper for the Aria2 Downloader (Qt6 / MinGW)
+# build.ps1 - configure + build helper for Fetchora (Qt6 / MinGW)
 #
 # Usage:
 #   .\build.ps1                 # incremental build (Debug)

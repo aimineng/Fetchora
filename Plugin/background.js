@@ -1,5 +1,5 @@
 /*
- * background.js - MV3 service worker for the Aria2 Downloader bridge.
+ * background.js - MV3 service worker for the Fetchora bridge.
  *
  * Two transports are supported:
  *   1. WebSocket  ws://127.0.0.1:<port>/ws   (primary: instant, bidirectional)
@@ -306,10 +306,10 @@ async function handleIntercept(item, suggest) {
 function createMenus() {
   chrome.contextMenus.removeAll(() => {
     const items = [
-      { id: 'aria2-link', title: '用 Aria2 Downloader 下载此链接', contexts: ['link'] },
-      { id: 'aria2-media', title: '用 Aria2 Downloader 下载此媒体', contexts: ['video', 'audio'] },
-      { id: 'aria2-image', title: '用 Aria2 Downloader 下载此图片', contexts: ['image'] },
-      { id: 'aria2-page', title: '用 Aria2 Downloader 下载当前页面', contexts: ['page'] },
+      { id: 'aria2-link', title: '用 Fetchora 下载此链接', contexts: ['link'] },
+      { id: 'aria2-media', title: '用 Fetchora 下载此媒体', contexts: ['video', 'audio'] },
+      { id: 'aria2-image', title: '用 Fetchora 下载此图片', contexts: ['image'] },
+      { id: 'aria2-page', title: '用 Fetchora 下载当前页面', contexts: ['page'] },
       { id: 'aria2-magnet', title: '发送选中的磁力链接', contexts: ['selection'] },
       { id: 'sep-1', type: 'separator', contexts: ['page', 'link'] },
       {
@@ -366,7 +366,7 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
       settings.interceptDownloads = !settings.interceptDownloads;
       await chrome.storage.sync.set({ interceptDownloads: settings.interceptDownloads });
       createMenus();
-      notify('Aria2 Downloader',
+      notify('Fetchora',
              settings.interceptDownloads ? '已恢复自动接管下载' : '已暂停自动接管下载');
       break;
     case 'aria2-options':
