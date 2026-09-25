@@ -111,7 +111,14 @@ if(APPLE AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app.icns")
         "${CMAKE_CURRENT_BINARY_DIR}/app.icns"
         COPYONLY)
     set_target_properties(Fetchora PROPERTIES MACOSX_BUNDLE_ICON_FILE "app.icns")
+    # `cmake -E copy_if_different` does NOT create missing directories, and CMake
+    # only creates Contents/Resources when a source file declares
+    # MACOSX_PACKAGE_LOCATION - nothing here does. Without the make_directory the
+    # POST_BUILD copy fails with "Error copying file ... No such file or
+    # directory" and the whole build stops, on macOS only.
     add_custom_command(TARGET Fetchora POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_BUNDLE_CONTENT_DIR:Fetchora>/Resources"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "${CMAKE_CURRENT_BINARY_DIR}/app.icns"
                 "$<TARGET_BUNDLE_CONTENT_DIR:Fetchora>/Resources/app.icns"
@@ -182,6 +189,9 @@ endif()
 foreach(extra IN ITEMS ${APP_ENGINE_NAME} ca-bundle.crt)
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${extra}")
         add_custom_command(TARGET Fetchora POST_BUILD
+            # Same reason as the icon above: inside a bundle Contents/Resources
+            # is not guaranteed to exist yet.
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${APP_RUNTIME_DIR}"
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     "${CMAKE_CURRENT_SOURCE_DIR}/${extra}"
                     "${APP_RUNTIME_DIR}/${extra}"

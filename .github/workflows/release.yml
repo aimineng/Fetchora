@@ -59,7 +59,10 @@ jobs:
           # build.ps1's MinGW toolchain, which Qt 6.8.3 declares as
           # qt.tools.win64_mingw1310.
           arch: win64_mingw
-          tools: 'tools_mingw,qt.tools.win64_mingw1310'
+          # Argument GROUPS separated by spaces, each <name>,<version>,<arch>.
+          # Two bare names would be read as name=tools_mingw with a nonsense
+          # version, and aqt exits 1 (this is what broke the first CI run).
+          tools: 'tools_mingw,13.1.0,win64_mingw1310'
 
       - name: Install Qt ${{ env.QT_VERSION }}
         if: runner.os != 'Windows'
@@ -134,14 +137,18 @@ jobs:
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
-            -DCMAKE_RUNTIME_OUTPUT_DIRECTORY="$PWD/dist"
+            -DCMAKE_RUNTIME_OUTPUT_DIRECTORY="$PWD/dist" \
+            -DCMAKE_BUNDLE_OUTPUT_DIRECTORY="$PWD/dist"
           cmake --build build --parallel
 
       - name: Self-test (macOS)
         if: runner.os == 'macOS'
         run: |
           set -o pipefail
-          bin="dist/Fetchora.app/Contents/MacOS/Fetchora"
+          # Locate the executable rather than assuming the bundle layout.
+          bin="$(find dist -type f -name Fetchora -perm -u+x | head -1)"
+          if [ -z "$bin" ]; then echo "::error title=No executable in dist/::$(find dist -maxdepth 3 -print | tr '\n' ' ')"; exit 1; fi
+          echo "testing $bin"
           out="$("$bin" --self-test 2>&1)"; status=$?
           printf '%s\n' "$out"
           if [ $status -ne 0 ]; then echo "::error::--self-test exited $status"; exit 1; fi
