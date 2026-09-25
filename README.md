@@ -61,7 +61,8 @@ creator, browser bridge, tray icon where the desktop provides one) is identical.
   sizes, true average speed per task.
 - **Task inspector** — overview numbers, per-file progress, connected peers, servers/URIs
   and the raw aria2 option map of the selected task.
-- **Download history** in SQLite, searchable and filterable, with one-click re-download.
+- **Download history** in SQLite, searchable and filterable, with one-click re-download and
+  a batch-selection mode for deleting several entries at once.
 - **Torrent creator** — build standards-compliant `.torrent` files (tracker tiers, web
   seeds, private flag, automatic piece length) and inspect any existing torrent.
 - **Command bar + filter chips + search**, keyboard shortcuts, tray icon with a live speed
@@ -74,6 +75,16 @@ creator, browser bridge, tray icon where the desktop provides one) is identical.
 - **JSON-RPC server** so any third-party aria2 client can drive the same engine.
 - **Single instance** — a second launch forwards its URLs to the running window.
 - **Command line** — pass URLs, magnets or `.torrent` paths directly.
+
+### Reliability
+- **The engine cannot outlive the app.** aria2c runs inside a Windows job object (and is
+  stopped explicitly on every platform), so a crash, a task-manager kill or a debugger stop
+  cannot leave an orphaned downloader behind.
+- **The engine supervises itself** — if aria2c dies while Fetchora is running it is started
+  again within a couple of seconds, and both the death and the recovery are reported.
+- **Logs with automatic housekeeping** — one file per day, split at 4 MB, pruned after
+  7 days (configurable), with a crash handler that writes a minidump and a backtrace.
+  See [Logs and crash reports](#logs-and-crash-reports).
 
 ## Screenshots
 
@@ -387,6 +398,32 @@ to the app over a local WebSocket bridge.
 3. Choose **Load unpacked** and select the `Plugin` folder.
 
 The bridge listens on `127.0.0.1:8899` by default; the port is configurable on both sides.
+
+## Logs and crash reports
+
+Fetchora keeps a log file, because "it just closed itself" is impossible to act on and a
+log line is not.
+
+| | |
+| --- | --- |
+| Where | `%LOCALAPPDATA%\Fetchora\logs` on Windows, `~/Library/Application Support/Fetchora/logs` on macOS, `~/.local/share/Fetchora/logs` on Linux (Settings → Advanced → Logs opens it) |
+| Files | `fetchora-YYYY-MM-DD.log`, one per day |
+| Contents | startup banner (version, OS, Qt, paths), engine stdout/stderr, warnings, every exit path, crash reports |
+| Rotation | a file that passes 4 MB is renamed to `fetchora-YYYY-MM-DD-HHMMSS.log` and a new one is started |
+| Cleanup | files older than 7 days are deleted at startup and once a day afterwards; the folder is also capped at 20 MB. *Days of logs to keep* changes the window |
+| Flushing | every line is flushed as it is written, so the last line before a crash is on disk |
+
+Every exit is logged with its reason, which is what makes a "flash quit" answerable:
+`forwarded to the running instance and exiting` (a second launch handing its links over),
+`window closed: hidden to the tray, still running`, `event loop finished (exit code 0)`, or
+- if it really did crash - a `[F] [crash]` block.
+
+On Windows a crash also writes `crash-YYYYMMDD-HHMMSS.dmp` (a minidump) plus the exception
+code, the module base and a backtrace of return addresses. MinGW builds emit
+`build/Release/Fetchora.map`, and the addresses in the log are offsets from that module
+base, so `addr2line -e Fetchora.exe -f -C 0x<offset>` (or a look in the map) names the
+function. Please attach the log - and the `.map` of the build you are running - to a bug
+report.
 
 ## Project layout
 

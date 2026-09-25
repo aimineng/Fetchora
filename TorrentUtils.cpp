@@ -32,6 +32,7 @@ public:
     {
         m_pos = 0;
         m_ok = true;
+        m_depth = 0;
         QVariant v = parse();
         if (consumed)
             *consumed = m_pos;
@@ -41,9 +42,27 @@ public:
     bool ok() const { return m_ok; }
 
 private:
+    /**
+     * How deeply lists and dictionaries may nest.
+     *
+     * Real torrents go four or five levels down. A crafted file - "lllll..." a
+     * few thousand deep - used to recurse until the stack ran out, which is an
+     * instant crash with no message and nothing in the log. Refusing to go
+     * deeper turns that into "this file is not a torrent".
+     */
+    static const int kMaxDepth = 64;
+
+    /// Counts one level for as long as the scope lives; every early return
+    /// unwinds it, which a manual ++/-- pair would eventually get wrong.
+    struct Depth {
+        explicit Depth(int *depth) : m_depth(depth) { ++*m_depth; }
+        ~Depth() { --*m_depth; }
+        int *m_depth;
+    };
+
     QVariant parse()
     {
-        if (m_pos >= m_data.size()) {
+        if (m_pos < 0 || m_pos >= m_data.size()) {
             m_ok = false;
             return {};
         }
@@ -88,17 +107,26 @@ private:
         }
         bool ok = false;
         const int len = m_data.mid(m_pos, colon - m_pos).toInt(&ok);
-        if (!ok || len < 0 || colon + 1 + len > m_data.size()) {
+        // The end offset is computed in 64 bit: a length near INT_MAX made
+        // "colon + 1 + len" wrap into a negative position, and the next at()
+        // then read out of bounds.
+        const qint64 end = qint64(colon) + 1 + qint64(ok ? len : 0);
+        if (!ok || len < 0 || end > m_data.size()) {
             m_ok = false;
             return {};
         }
         const QByteArray str = m_data.mid(colon + 1, len);
-        m_pos = colon + 1 + len;
+        m_pos = int(end);
         return str;
     }
 
     QVariant parseList()
     {
+        if (m_depth >= kMaxDepth) {
+            m_ok = false;
+            return {};
+        }
+        const Depth depth(&m_depth);
         ++m_pos; // 'l'
         QVariantList list;
         while (m_pos < m_data.size() && m_data.at(m_pos) != 'e') {
@@ -117,6 +145,11 @@ private:
 
     QVariant parseDict()
     {
+        if (m_depth >= kMaxDepth) {
+            m_ok = false;
+            return {};
+        }
+        const Depth depth(&m_depth);
         ++m_pos; // 'd'
         QVariantMap map;
         while (m_pos < m_data.size() && m_data.at(m_pos) != 'e') {
@@ -140,6 +173,7 @@ private:
 
     const QByteArray &m_data;
     int m_pos = 0;
+    int m_depth = 0;
     bool m_ok = true;
 };
 

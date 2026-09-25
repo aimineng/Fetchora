@@ -1,0 +1,112 @@
+#requires -Version 5.1
+<#
+    check-engine-supervision.ps1 - the engine must not outlive the app, and must
+    come back when it dies.
+
+    Three things are checked, all of them by observing real processes:
+
+      1. starting the app also starts the engine,
+      2. killing the engine makes the app start a new one,
+      3. killing the app (hard, no chance to clean up) takes the engine with it.
+
+    The third one is what an orphaned aria2c would violate: without the job object
+    in Aria2Process, a crash leaves a downloader running in the background with no
+    window to control it.
+
+    Usage (from the project root, after the build):
+        powershell -File tools\check-engine-supervision.ps1 -App build\Release\Fetchora.exe
+#>
+param(
+    [Parameter(Mandatory = $true)] [string] $App,
+    # Seconds to wait for the app to start, for the engine to come back, and for
+    # the engine to disappear. CI machines are slow, so they are generous.
+    [int] $StartupSeconds = 25,
+    [int] $RestartSeconds = 20,
+    [int] $ShutdownSeconds = 10
+)
+
+$ErrorActionPreference = 'Continue'
+
+if (-not (Test-Path $App)) { throw "no application at $App" }
+$App = (Resolve-Path $App).Path
+$appDir = Split-Path -Parent $App
+
+# aria2c next to the app is what the packaged layout looks like; without it the
+# engine is found on PATH instead, and either is fine.
+$engineName = 'aria2c'
+$engineExe = Join-Path $appDir "aria2c$([System.IO.Path]::GetExtension($App))"
+if (-not (Test-Path $engineExe)) { $engineExe = Join-Path $appDir 'aria2c' }
+if (-not (Test-Path $engineExe)) { $engineExe = $null }
+
+function Get-Engines {
+    @(Get-Process -Name $engineName -ErrorAction SilentlyContinue)
+}
+
+function Fail($message) {
+    Write-Host "FAILED: $message"
+    Write-Host '--- engine log (if the app wrote one) ---'
+    foreach ($dir in @("$env:LOCALAPPDATA\Fetchora\Fetchora\logs",
+                       "$env:APPDATA\Fetchora\logs",
+                       "$HOME/.local/share/Fetchora/logs",
+                       "$HOME/Library/Application Support/Fetchora/logs")) {
+        if (Test-Path $dir) {
+            $file = Get-ChildItem $dir -Filter 'fetchora-*.log' -ErrorAction SilentlyContinue |
+                Sort-Object LastWriteTime -Descending | Select-Object -First 1
+            if ($file) { Get-Content $file.FullName -Encoding UTF8 -Tail 40 }
+        }
+    }
+    exit 1
+}
+
+Get-Engines | Stop-Process -Force -ErrorAction SilentlyContinue
+Get-Process -Name Fetchora -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 2
+
+Write-Host "app:    $App"
+Write-Host "engine: $(if ($engineExe) { $engineExe } else { "$engineName (from PATH)" })"
+
+# ---------------------------------------------------------------- 1. it starts
+Write-Host "`n--- 1. starting the app starts the engine"
+$app = Start-Process $App -ArgumentList '--new-instance' -PassThru
+$deadline = (Get-Date).AddSeconds($StartupSeconds)
+$first = @()
+while ((Get-Date) -lt $deadline) {
+    Start-Sleep -Seconds 2
+    $first = Get-Engines
+    if ($first.Count -gt 0) { break }
+}
+if ($first.Count -eq 0) { Fail "no $engineName after $StartupSeconds s" }
+$app.Refresh()
+if ($app.HasExited) { Fail 'the app exited during startup' }
+Write-Host "ok: engine pid $($first.Id -join ',')"
+
+# ------------------------------------------------------------- 2. it comes back
+Write-Host "`n--- 2. killing the engine makes the app start a new one"
+$first | Stop-Process -Force -ErrorAction SilentlyContinue
+$deadline = (Get-Date).AddSeconds($RestartSeconds)
+$second = @()
+while ((Get-Date) -lt $deadline) {
+    Start-Sleep -Seconds 2
+    $second = @(Get-Engines | Where-Object { $first.Id -notcontains $_.Id })
+    if ($second.Count -gt 0) { break }
+}
+if ($second.Count -eq 0) { Fail "the engine did not come back within $RestartSeconds s" }
+Write-Host "ok: engine pid $($second.Id -join ',') (was $($first.Id -join ','))"
+
+# ------------------------------------------------------- 3. it dies with the app
+Write-Host "`n--- 3. killing the app hard takes the engine with it"
+Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
+$deadline = (Get-Date).AddSeconds($ShutdownSeconds)
+$left = Get-Engines
+while ((Get-Date) -lt $deadline -and $left.Count -gt 0) {
+    Start-Sleep -Seconds 2
+    $left = Get-Engines
+}
+if ($left.Count -gt 0) {
+    $left | Stop-Process -Force -ErrorAction SilentlyContinue
+    Fail "the engine ($($left.Id -join ',')) survived the app being killed"
+}
+Write-Host 'ok: no engine left behind'
+
+Write-Host "`nRESULT: engine supervision works (start, restart, no orphans)"
+exit 0

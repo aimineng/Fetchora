@@ -5,6 +5,7 @@
 #include <QVariantList>
 #include <QVariantMap>
 #include <QString>
+#include <QStringList>
 #include <QSqlDatabase>
 
 /**
@@ -41,6 +42,10 @@ public:
                                    int limit = 500) const;
 
     Q_INVOKABLE bool remove(const QString &gid);
+    /// Delete several rows at once; returns how many are gone. One transaction
+    /// and one changed() emission, so a batch delete from the history page does
+    /// not rebuild the list once per row.
+    Q_INVOKABLE int removeMany(const QStringList &gids);
     Q_INVOKABLE void clear();
     Q_INVOKABLE int prune(int keepEntries);
     Q_INVOKABLE QVariantMap statistics() const;

@@ -325,8 +325,44 @@ bool DownloadHistory::remove(const QString &gid)
     return ok;
 }
 
-void DownloadHistory::clear()
+int DownloadHistory::removeMany(const QStringList &gids)
 {
+    if (gids.isEmpty())
+        return 0;
+
+    int removed = 0;
+    if (!m_ready) {
+        for (int i = m_memoryFallback.size() - 1; i >= 0; --i) {
+            if (gids.contains(m_memoryFallback.at(i).toMap().value(QStringLiteral("gid")).toString())) {
+                m_memoryFallback.removeAt(i);
+                ++removed;
+            }
+        }
+    } else {
+        // One transaction: deleting a few hundred rows one statement at a time
+        // is what makes SQLite crawl (a commit per statement means an fsync each).
+        const bool inTransaction = m_db.transaction();
+        QSqlQuery q(m_db);
+        q.prepare(QStringLiteral("DELETE FROM downloads WHERE gid = :gid"));
+        for (const QString &gid : gids) {
+            if (gid.isEmpty())
+                continue;
+            q.bindValue(QStringLiteral(":gid"), gid);
+            if (q.exec())
+                removed += q.numRowsAffected();
+            else
+                qWarning() << "history batch delete failed:" << q.lastError().text();
+        }
+        if (inTransaction && !m_db.commit())
+            qWarning() << "history batch delete commit failed:" << m_db.lastError().text();
+    }
+
+    recount();
+    emit changed();
+    return removed;
+}
+
+void DownloadHistory::clear(){
     if (m_ready) {
         QSqlQuery q(m_db);
         q.exec(QStringLiteral("DELETE FROM downloads"));

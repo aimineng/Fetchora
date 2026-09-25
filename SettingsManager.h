@@ -80,6 +80,7 @@ public:
     Q_PROPERTY(bool checkForUpdates READ checkForUpdates WRITE setCheckForUpdates NOTIFY checkForUpdatesChanged)
     Q_PROPERTY(bool updateIncludePrerelease READ updateIncludePrerelease WRITE setUpdateIncludePrerelease NOTIFY updateIncludePrereleaseChanged)
     Q_PROPERTY(QString lastNotifiedVersion READ lastNotifiedVersion WRITE setLastNotifiedVersion NOTIFY lastNotifiedVersionChanged)
+    Q_PROPERTY(int logRetentionDays READ logRetentionDays WRITE setLogRetentionDays NOTIFY logRetentionDaysChanged)
 
     bool autoStart() const { return m_autoStart; }
     void setAutoStart(bool v);
@@ -132,6 +133,9 @@ public:
     void setUpdateIncludePrerelease(bool v);
     QString lastNotifiedVersion() const { return m_lastNotifiedVersion; }
     void setLastNotifiedVersion(const QString &v);
+    /// How long the log files are kept before the daily cleanup removes them.
+    int logRetentionDays() const { return m_logRetentionDays; }
+    void setLogRetentionDays(int v);
 
     // ===================================================== download behaviour
     Q_PROPERTY(QString userAgent READ userAgent WRITE setUserAgent NOTIFY userAgentChanged)
@@ -516,6 +520,7 @@ signals:
     void checkForUpdatesChanged();
     void updateIncludePrereleaseChanged();
     void lastNotifiedVersionChanged();
+    void logRetentionDaysChanged();
 
     void userAgentChanged();
     void refererChanged();
@@ -678,6 +683,7 @@ private:
     bool m_checkForUpdates = true;
     bool m_updateIncludePrerelease = false;
     QString m_lastNotifiedVersion;
+    int m_logRetentionDays = 7;
 
     QString m_userAgent;
     QString m_referer;

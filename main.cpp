@@ -1,5 +1,6 @@
 #include "Aria2Manager.h"
 #include "ClipboardHelper.h"
+#include "Logger.h"
 #include "NotificationManager.h"
 #include "SettingsManager.h"
 #include "TorrentUtils.h"
@@ -311,12 +312,80 @@ int runUpdateSelfTest(SettingsManager &settings)
     return 0;
 }
 
+/**
+ * The bencode decoder's own checks.
+ *
+ * It parses files nobody vouches for - a .torrent from a website, a magnet's
+ * metadata, whatever the browser extension forwards - so "reject" has to mean
+ * "return nothing", never "recurse until the stack runs out". A crafted file
+ * used to do exactly that: an instant crash with no message anywhere.
+ *
+ * Exit code 0 when every check passed, 6 otherwise.
+ */
+int runTorrentSelfTest()
+{
+    out() << "torrent self-test\n";
+    int failures = 0;
+    const auto check = [&failures](const QString &what, bool ok, const QString &detail) {
+        out() << (ok ? "  ok   " : "  FAIL ") << what;
+        if (!detail.isEmpty())
+            out() << "  (" << detail << ')';
+        out() << '\n';
+        if (!ok)
+            ++failures;
+    };
+
+    // Far deeper than any real torrent nests (four or five levels).
+    QByteArray deep;
+    deep.reserve(5000);
+    for (int i = 0; i < 5000; ++i)
+        deep += 'l';
+    const QVariant nested = Bencode::decode(deep);
+    check(QStringLiteral("a 5000-level list is refused, not followed"),
+          !nested.isValid() || nested.isNull(), QStringLiteral("depth limit"));
+
+    // An absurd length prefix used to wrap the end offset into a negative
+    // position, which the next at() then read from.
+    check(QStringLiteral("a string claiming 9999999999999999999 bytes is refused"),
+          !Bencode::decode(QByteArrayLiteral("9999999999999999999:abc")).isValid(),
+          QStringLiteral("length overflow"));
+
+    // The ordinary path still has to work: encode -> decode -> same values.
+    QVariantMap sample;
+    sample.insert(QStringLiteral("name"), QByteArrayLiteral("fetchora"));
+    sample.insert(QStringLiteral("length"), qint64(1234));
+    QVariantList files;
+    files << QByteArrayLiteral("a.txt");
+    sample.insert(QStringLiteral("files"), files);
+    const QVariant roundTrip = Bencode::decode(Bencode::encode(sample));
+    check(QStringLiteral("a normal dictionary survives encode/decode"),
+          roundTrip.toMap().value(QStringLiteral("name")).toByteArray()
+                  == QByteArrayLiteral("fetchora")
+              && roundTrip.toMap().value(QStringLiteral("length")).toLongLong() == 1234,
+          QStringLiteral("round trip"));
+
+    // And the public entry point answers instead of dying.
+    TorrentUtils torrents;
+    const QVariantMap info = torrents.inspectData(deep);
+    check(QStringLiteral("inspectData() reports the crafted file as unusable"),
+          !info.value(QStringLiteral("ok")).toBool(), QStringLiteral("ok = false"));
+
+    if (failures > 0) {
+        out() << "RESULT: " << failures << " torrent check(s) failed\n";
+        return 6;
+    }
+    out() << "RESULT: torrent decoding OK\n";
+    return 0;
+}
+
 int runSelfTest(SettingsManager &settings)
 {
     // Deterministic and engine-free, so it runs first - and on every platform,
     // including the ones that bundle no aria2c.
     if (const int updates = runUpdateSelfTest(settings); updates != 0)
         return updates;
+    if (const int torrents = runTorrentSelfTest(); torrents != 0)
+        return torrents;
 
     out() << "aria2c self-test\n";
     const QString executable = Aria2Process::locateAria2(settings.aria2Executable());
@@ -488,6 +557,10 @@ int main(int argc, char *argv[])
     // A download manager keeps running in the tray when its window closes.
     app.setQuitOnLastWindowClosed(false);
 
+    // From here on everything - Qt's own warnings, the engine's output, the
+    // crash handler - goes to the log file as well as to the terminal.
+    Logger::install();
+
     QCommandLineParser parser;
     parser.setApplicationDescription(
         QStringLiteral("Fetchora - a fluent, aria2 powered download manager"));
@@ -567,8 +640,15 @@ int main(int argc, char *argv[])
     if (parser.isSet(checkUpdatesOption))
         return runUpdateCheck(parser.isSet(prereleaseOption));
 
-    if (!parser.isSet(newInstanceOption) && notifyRunningInstance(positional, QDir::currentPath()))
+    if (!parser.isSet(newInstanceOption) && notifyRunningInstance(positional, QDir::currentPath())) {
+        // A second launch hands its links over and exits on purpose. Saying so in
+        // the log is what turns "the app closed itself instantly" into a fact the
+        // user can check.
+        Logger::line(QStringLiteral("app"),
+                     QStringLiteral("another instance is already running; handed over the request "
+                                    "and exiting (use --new-instance to force a second window)"));
         return 0;
+    }
 
     SettingsManager settings(&app);
     FluentTheme::instance()->attach(&settings);
@@ -588,6 +668,22 @@ int main(int argc, char *argv[])
     ClipboardHelper clipboard;
     TorrentUtils torrents;
     Aria2Manager aria2(&settings);
+
+    // The paths a bug report always needs, in the order they matter.
+    Logger::line(QStringLiteral("app"),
+                 QStringLiteral("downloads: %1").arg(settings.downloadDir()));
+    Logger::line(QStringLiteral("app"),
+                 QStringLiteral("engine: %1 (configured: %2)")
+                     .arg(Aria2Process::locateAria2(settings.aria2Executable()),
+                          settings.aria2Executable().isEmpty() ? QStringLiteral("auto")
+                                                               : settings.aria2Executable()));
+    // Retention is a setting; a shorter window is applied right away, so the
+    // "clean up my logs" knob does something the moment it is turned.
+    Logger::setRetentionDays(settings.logRetentionDays());
+    QObject::connect(&settings, &SettingsManager::logRetentionDaysChanged, &app, [&settings]() {
+        Logger::setRetentionDays(settings.logRetentionDays());
+        Logger::prune();
+    });
 
     // The application-wide style sheet is generated from the active theme and
     // re-applied whenever it changes; every widget restyles at once.
@@ -788,6 +884,10 @@ int main(int argc, char *argv[])
                      });
     QObject::connect(historyPage, &HistoryPage::redownloadRequested, &window,
                      [&aria2](const QString &uri) { aria2.addUri(uri); });
+    QObject::connect(historyPage, &HistoryPage::toast, &window,
+                     [toasts](const QString &text, bool isError) {
+                         toasts->push(text, isError ? ToastHost::Error : ToastHost::Success);
+                     });
 
     // ------------------------------------------------------ shell wiring
     QObject::connect(titleBar, &FluentTitleBar::minimizeRequested, &window, &QWidget::showMinimized);
@@ -979,10 +1079,16 @@ int main(int argc, char *argv[])
     // so close means quit (the engine is stopped by the app shutting down).
     QObject::connect(&window, &FluentMainWindow::closeRequested, &window,
                      [&window, &settings, trayAvailable]() {
-                         if (trayAvailable && settings.closeToTray())
+                         if (trayAvailable && settings.closeToTray()) {
+                             Logger::line(QStringLiteral("app"),
+                                          QStringLiteral("window closed: hidden to the tray, "
+                                                         "still running"));
                              window.hide();
-                         else
+                         } else {
+                             Logger::line(QStringLiteral("app"),
+                                          QStringLiteral("window closed: quitting"));
                              window.forceClose();
+                         }
                      });
 
     // ------------------------------------------------- language re-translation
@@ -1072,8 +1178,11 @@ int main(int argc, char *argv[])
         window.show();
     window.refreshNativeEffects();
 
-    if (parser.isSet(minimizedOption) || settings.startMinimized())
+    if (parser.isSet(minimizedOption) || settings.startMinimized()) {
+        Logger::line(QStringLiteral("app"),
+                     QStringLiteral("starting minimised to the tray (no window is shown)"));
         window.hide();
+    }
 
     // ---------------------------------------------------------- ui screenshot
     // Renders the real window through the real widget tree into a PNG. Used to
@@ -1087,5 +1196,10 @@ int main(int argc, char *argv[])
         });
     }
 
-    return QApplication::exec();
+    const int exitCode = QApplication::exec();
+    // The last line of a normal run: with this in the log, "it just disappeared"
+    // can be told apart from a crash, which ends in the crash handler instead.
+    Logger::line(QStringLiteral("app"),
+                 QStringLiteral("event loop finished (exit code %1)").arg(exitCode));
+    return exitCode;
 }

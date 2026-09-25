@@ -7,6 +7,10 @@
 #include <QStandardPaths>
 #include <QDebug>
 
+#ifdef Q_OS_WIN
+#  include <windows.h>
+#endif
+
 Aria2Process::Aria2Process(QObject *parent)
     : QObject(parent)
     , m_process(new QProcess(this))
@@ -27,7 +31,61 @@ Aria2Process::Aria2Process(QObject *parent)
 Aria2Process::~Aria2Process()
 {
     stop();
+    closeJob();
 }
+
+#ifdef Q_OS_WIN
+/**
+ * Keep aria2c inside a job object with JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE.
+ *
+ * QProcess only stops the child when *we* run our own shutdown code - a crash,
+ * a task-manager kill or a debugger stop all skip it, and an orphaned aria2c
+ * keeps downloading in the background. Windows closes the job handle when this
+ * process ends and kills everything inside it, which covers every one of those
+ * paths.
+ */
+void Aria2Process::adoptIntoJob()
+{
+    closeJob();
+
+    HANDLE job = CreateJobObjectW(nullptr, nullptr);
+    if (!job)
+        return;
+
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits = {};
+    limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation, &limits, sizeof(limits))) {
+        CloseHandle(job);
+        return;
+    }
+
+    const qint64 pid = m_process->processId();
+    HANDLE child = pid > 0 ? OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, FALSE, DWORD(pid))
+                           : nullptr;
+    if (!child || !AssignProcessToJobObject(job, child)) {
+        // A job that owns nothing would only leak a handle.
+        if (child)
+            CloseHandle(child);
+        CloseHandle(job);
+        return;
+    }
+    CloseHandle(child);
+    m_job = job;
+}
+
+void Aria2Process::closeJob()
+{
+    if (!m_job)
+        return;
+    // Closing the last handle to the job is what terminates its members; the
+    // explicit stop() above has already asked nicely.
+    CloseHandle(static_cast<HANDLE>(m_job));
+    m_job = nullptr;
+}
+#else
+void Aria2Process::adoptIntoJob() {}
+void Aria2Process::closeJob() {}
+#endif
 
 QString Aria2Process::locateAria2(const QString &hint)
 {
@@ -140,14 +198,26 @@ void Aria2Process::start()
 
 void Aria2Process::stop()
 {
-    if (m_process->state() == QProcess::NotRunning)
+    if (m_process->state() == QProcess::NotRunning) {
+        closeJob();
         return;
+    }
     m_intentionalStop = true;
+#ifdef Q_OS_WIN
+    // aria2c is a console program with no window: QProcess::terminate() posts a
+    // WM_CLOSE that nobody will ever receive, so waiting for it only cost four
+    // seconds on every settings change and every exit. The session was already
+    // saved over RPC by the caller.
+    m_process->kill();
+    m_process->waitForFinished(2000);
+#else
     m_process->terminate();
     if (!m_process->waitForFinished(4000)) {
         m_process->kill();
         m_process->waitForFinished(2000);
     }
+#endif
+    closeJob();
 }
 
 void Aria2Process::restart()
@@ -158,6 +228,7 @@ void Aria2Process::restart()
 
 void Aria2Process::onStarted()
 {
+    adoptIntoJob();
     emit logLine(QStringLiteral("aria2c started (pid %1)").arg(m_process->processId()), false);
     emit started();
 }

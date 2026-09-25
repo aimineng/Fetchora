@@ -52,6 +52,7 @@ set(APP_BACKEND_SOURCES
     HttpServer.cpp        HttpServer.h
     ClipboardHelper.cpp   ClipboardHelper.h
     UpdateChecker.cpp     UpdateChecker.h
+    Logger.cpp            Logger.h
     NotificationManager.cpp NotificationManager.h
 )
 
@@ -157,7 +158,9 @@ endif()
 
 # ---------------------------------------------------------------- Windows bits
 if(WIN32)
-    target_link_libraries(Fetchora PRIVATE dwmapi)
+    # dwmapi: the Mica backdrop and the rounded window corners.
+    # dbghelp: MiniDumpWriteDump() from the crash handler in Logger.cpp.
+    target_link_libraries(Fetchora PRIVATE dwmapi dbghelp)
 
     # Fold the GCC runtime into the executable: without this the app only runs
     # when the MinGW bin directory happens to be on PATH, and a distributed
@@ -169,6 +172,15 @@ if(WIN32)
             -static
         )
     endif()
+endif()
+
+# ------------------------------------------------------------- crash debugging
+# A crash handler can only report return addresses; the map file turns them back
+# into function names (see the crash section of the README). Harmless when
+# nobody ever looks at it, and the alternative is an unreadable minidump.
+if(MINGW)
+    target_link_options(Fetchora PRIVATE
+        "-Wl,-Map=${CMAKE_BINARY_DIR}/Fetchora.map")
 endif()
 
 # --------------------------------------------------------- engine + build name

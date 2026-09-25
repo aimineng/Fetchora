@@ -187,6 +187,7 @@ void SettingsManager::loadSettings()
     m_checkForUpdates = get("checkForUpdates", true).toBool();
     m_updateIncludePrerelease = get("updateIncludePrerelease", false).toBool();
     m_lastNotifiedVersion = get("lastNotifiedVersion", "").toString();
+    m_logRetentionDays = boundedInt(get("logRetentionDays", 7).toInt(), 1, 90);
 
     // ---- download behaviour ------------------------------------------------
     m_userAgent = get("userAgent", "").toString();
@@ -388,6 +389,7 @@ IMPL_SETTING(BOOL_PARAM, ShowDetailsPanel, m_showDetailsPanel, "showDetailsPanel
 IMPL_SETTING(BOOL_PARAM, CheckForUpdates, m_checkForUpdates, "checkForUpdates", checkForUpdatesChanged)
 IMPL_SETTING(BOOL_PARAM, UpdateIncludePrerelease, m_updateIncludePrerelease, "updateIncludePrerelease", updateIncludePrereleaseChanged)
 IMPL_SETTING(QSTRING_PARAM, LastNotifiedVersion, m_lastNotifiedVersion, "lastNotifiedVersion", lastNotifiedVersionChanged)
+IMPL_SETTING(INT_PARAM, LogRetentionDays, m_logRetentionDays, "logRetentionDays", logRetentionDaysChanged)
 
 // ---- download behaviour ---------------------------------------------------
 IMPL_SETTING(QSTRING_PARAM, UserAgent, m_userAgent, "userAgent", userAgentChanged)

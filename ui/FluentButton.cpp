@@ -1,6 +1,7 @@
 #include "ui/FluentButton.h"
 
 #include <QEvent>
+#include <QFocusEvent>
 #include <QFontMetrics>
 #include <QPainter>
 #include <QPainterPath>
@@ -79,6 +80,24 @@ void FluentButton::setLoading(bool loading)
         return;
     m_loading = loading;
     setEnabled(!loading);
+    update();
+}
+
+void FluentButton::focusInEvent(QFocusEvent *event)
+{
+    // Qt's focus reasons are the only place this is visible, and the distinction
+    // is what makes the ring match every other Windows app.
+    const Qt::FocusReason reason = event->reason();
+    m_focusVisible = reason == Qt::TabFocusReason || reason == Qt::BacktabFocusReason
+        || reason == Qt::ShortcutFocusReason;
+    QPushButton::focusInEvent(event);
+    update();
+}
+
+void FluentButton::focusOutEvent(QFocusEvent *event)
+{
+    m_focusVisible = false;
+    QPushButton::focusOutEvent(event);
     update();
 }
 
@@ -195,10 +214,18 @@ void FluentButton::paintEvent(QPaintEvent *)
     p.drawRoundedRect(r, radius, radius);
 
     // ------------------------------------------------------------- focus ring
-    if (hasFocus() && on && focusPolicy() != Qt::NoFocus) {
+    // Keyboard focus only: Windows and macOS draw a focus visual when the user
+    // *tabs* to a control, not after a mouse click, and a ring that follows every
+    // click on a navigation row reads as a rendering artefact.
+    //
+    // It is also drawn *inside* the button's own rect. It used to be expanded 2px
+    // outward, which a rail row's 2px margins then clipped: all that survived of
+    // the ring were two arcs at the right-hand corners.
+    if (m_focusVisible && hasFocus() && on && focusPolicy() != Qt::NoFocus) {
         p.setPen(QPen(t->textPrimary(), 2));
         p.setBrush(Qt::NoBrush);
-        p.drawRoundedRect(r.adjusted(-2, -2, 2, 2), radius + 2, radius + 2);
+        const int ringRadius = qMax(2, radius - 1);
+        p.drawRoundedRect(r.adjusted(1, 1, -1, -1), ringRadius, ringRadius);
     }
 
     // ----------------------------------------------------------------- glyph

@@ -15,13 +15,16 @@
 #include <QFont>
 #include <QFrame>
 #include <QHBoxLayout>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMessageBox>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPalette>
 #include <QScrollArea>
 #include <QSet>
+#include <QSignalBlocker>
 #include <QStyle>
 #include <QStyleOption>
 #include <QVBoxLayout>
@@ -155,10 +158,16 @@ public:
 
     QString gid() const { return m_gid; }
 
+    /// 批量选择模式下显示复选框；退出时清掉勾选状态。
+    void setSelectMode(bool on);
+    bool isChecked() const { return m_check && m_check->isChecked(); }
+    void setChecked(bool checked);
+
 protected:
     void paintEvent(QPaintEvent *event) override;
     void enterEvent(QEnterEvent *event) override;
     void leaveEvent(QEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
     void mouseDoubleClickEvent(QMouseEvent *event) override;
 
 private:
@@ -177,7 +186,9 @@ private:
     /// 决定配色的一小段指纹：状态 + 失败原因；没变就不重算样式表。
     QString m_styleKey;
     bool m_hovered = false;
+    bool m_selectMode = false;
 
+    FluentCheckBox *m_check = nullptr;
     FluentIcon *m_plate = nullptr;
     ElidedLabel *m_name = nullptr;
     ElidedLabel *m_detail = nullptr;
@@ -204,6 +215,16 @@ HistoryPage::HistoryRow::HistoryRow(HistoryPage *page, QWidget *parent)
     auto *row = new QHBoxLayout(this);
     row->setContentsMargins(18, 10, 12, 10);
     row->setSpacing(14);
+
+    // ---------------------------------------------------------- 选择复选框
+    // 只在批量选择模式下出现；隐藏时布局里不留空位，行的观感不变。
+    m_check = new FluentCheckBox(this);
+    connect(m_check, &QAbstractButton::toggled, this, [this](bool checked) {
+        if (m_selectMode)
+            m_page->setRowSelected(m_gid, checked);
+    });
+    m_check->hide();
+    row->addWidget(m_check, 0, Qt::AlignVCenter);
 
     // ------------------------------------------------------------ 图标板
     m_plate = new FluentIcon(FluentTheme::Glyph::File, 18, this);
@@ -437,8 +458,11 @@ void HistoryPage::HistoryRow::enterEvent(QEnterEvent *event)
 {
     QFrame::enterEvent(event);
     m_hovered = true;
-    m_actionBar->show();
-    m_actionBar->raise();
+    // 选择模式下整行都是可点区域，行内操作按钮让位给勾选。
+    if (!m_selectMode) {
+        m_actionBar->show();
+        m_actionBar->raise();
+    }
     update();
 }
 
@@ -452,12 +476,48 @@ void HistoryPage::HistoryRow::leaveEvent(QEvent *event)
     update();
 }
 
+void HistoryPage::HistoryRow::setSelectMode(bool on)
+{
+    if (m_selectMode == on)
+        return;
+    m_selectMode = on;
+    if (m_check) {
+        m_check->setChecked(false);
+        m_check->setVisible(on);
+    }
+    if (on)
+        m_actionBar->hide();
+    update();
+}
+
+void HistoryPage::HistoryRow::setChecked(bool checked)
+{
+    if (!m_check || m_check->isChecked() == checked)
+        return;
+    // 复选框的 toggled() 会回调页面，所以要挡住它，避免重复登记。
+    const QSignalBlocker blocker(m_check);
+    m_check->setChecked(checked);
+}
+
+void HistoryPage::HistoryRow::mousePressEvent(QMouseEvent *event)
+{
+    // 选择模式下点行内任意位置都是勾选 / 取消勾选。
+    if (m_selectMode && event->button() == Qt::LeftButton) {
+        setChecked(!isChecked());
+        m_page->setRowSelected(m_gid, isChecked());
+        event->accept();
+        return;
+    }
+    QFrame::mousePressEvent(event);
+}
+
 void HistoryPage::HistoryRow::mouseDoubleClickEvent(QMouseEvent *event)
 {
     QFrame::mouseDoubleClickEvent(event);
-    if (event->button() == Qt::LeftButton)
-        m_page->openEntryFolder(m_record.value(QStringLiteral("dir")).toString(),
-                                m_record.value(QStringLiteral("name")).toString());
+    if (m_selectMode || event->button() != Qt::LeftButton)
+        return;
+    m_page->openEntryFolder(m_record.value(QStringLiteral("dir")).toString(),
+                            m_record.value(QStringLiteral("name")).toString());
 }
 
 // ============================================================================
@@ -509,12 +569,51 @@ void HistoryPage::buildHeader()
         refresh();
     });
 
+    m_selectionBar = new QWidget(this);
+    auto *barLayout = new QHBoxLayout(m_selectionBar);
+    barLayout->setContentsMargins(14, 8, 14, 8);
+    barLayout->setSpacing(8);
+
+    m_selectionLabel = new QLabel(m_selectionBar);
+    barLayout->addWidget(m_selectionLabel);
+    barLayout->addStretch(1);
+
+    m_selectAllButton = new FluentButton(m_selectionBar);
+    m_selectAllButton->setRole(FluentButton::Subtle);
+    m_selectAllButton->setGlyph(FluentTheme::Glyph::Check);
+    barLayout->addWidget(m_selectAllButton);
+
+    m_cancelSelectButton = new FluentButton(m_selectionBar);
+    m_cancelSelectButton->setRole(FluentButton::Standard);
+    m_cancelSelectButton->setGlyph(FluentTheme::Glyph::Close);
+    barLayout->addWidget(m_cancelSelectButton);
+
+    m_deleteSelectedButton = new FluentButton(m_selectionBar);
+    m_deleteSelectedButton->setRole(FluentButton::Danger);
+    m_deleteSelectedButton->setGlyph(FluentTheme::Glyph::Delete);
+    barLayout->addWidget(m_deleteSelectedButton);
+
+    // 插在列表上方（buildList() 随后把滚动区加到后面）。
+    m_selectionBar->hide();
+    ui->listHostLayout->addWidget(m_selectionBar);
+
+    connect(m_selectAllButton, &QPushButton::clicked, this, &HistoryPage::toggleSelectAll);
+    connect(m_cancelSelectButton, &QPushButton::clicked, this, [this]() { setSelectMode(false); });
+    connect(m_deleteSelectedButton, &QPushButton::clicked, this, &HistoryPage::deleteSelected);
+
     m_refreshButton = new FluentButton(this);
     m_refreshButton->setGlyph(FluentTheme::Glyph::Refresh);
     m_refreshButton->setIconOnly(true);
     m_refreshButton->setRole(FluentButton::Subtle);
     ui->actionHostLayout->addWidget(m_refreshButton);
     connect(m_refreshButton, &QPushButton::clicked, this, &HistoryPage::refresh);
+
+    m_selectButton = new FluentButton(this);
+    m_selectButton->setGlyph(FluentTheme::Glyph::Check);
+    m_selectButton->setRole(FluentButton::Subtle);
+    m_selectButton->setCheckable(true);
+    ui->actionHostLayout->addWidget(m_selectButton);
+    connect(m_selectButton, &QPushButton::toggled, this, &HistoryPage::setSelectMode);
 }
 
 void HistoryPage::buildStatCards()
@@ -650,6 +749,112 @@ void HistoryPage::removeEntry(const QString &gid)
         history->remove(gid);   // remove() 会发 changed()，页面随即刷新
 }
 
+// ============================================================================
+//  批量选择
+// ============================================================================
+void HistoryPage::setSelectMode(bool on)
+{
+    if (m_selectMode == on)
+        return;
+    m_selectMode = on;
+
+    if (m_selectButton->isChecked() != on) {
+        const QSignalBlocker blocker(m_selectButton);
+        m_selectButton->setChecked(on);
+    }
+    if (!on)
+        m_selected.clear();
+    for (HistoryRow *row : std::as_const(m_rows))
+        row->setSelectMode(on);
+
+    m_selectionBar->setVisible(on);
+    updateSelectionUi();
+}
+
+void HistoryPage::setRowSelected(const QString &gid, bool selected)
+{
+    if (gid.isEmpty())
+        return;
+    if (selected)
+        m_selected.insert(gid);
+    else
+        m_selected.remove(gid);
+    updateSelectionUi();
+}
+
+void HistoryPage::toggleSelectAll()
+{
+    // 只作用于当前列表里可见的行：筛选状态下的“全选”不该选中看不见的记录。
+    const bool selectAll = m_selected.size() < m_rows.size();
+    m_selected.clear();
+    for (HistoryRow *row : std::as_const(m_rows)) {
+        row->setChecked(selectAll);
+        if (selectAll)
+            m_selected.insert(row->gid());
+    }
+    updateSelectionUi();
+}
+
+void HistoryPage::deleteSelected()
+{
+    if (!m_aria2 || m_selected.isEmpty())
+        return;
+    DownloadHistory *history = m_aria2->history();
+    if (!history)
+        return;
+
+    const int count = m_selected.size();
+    if (!confirm(tr("删除选中的历史记录"),
+                 tr("将从历史记录中删除选中的 %1 条记录。已经下载的文件不会被删除，"
+                    "此操作无法撤销。")
+                     .arg(count)))
+        return;
+
+    const QStringList gids(m_selected.constBegin(), m_selected.constEnd());
+    const int removed = history->removeMany(gids);   // 发一次 changed()，页面刷新
+    emit toast(removed > 0 ? tr("已删除 %1 条历史记录").arg(removed)
+                           : tr("没有可删除的记录"),
+               false);
+    setSelectMode(false);
+}
+
+void HistoryPage::updateSelectionUi()
+{
+    if (!m_selectionBar)
+        return;
+    const int count = m_selected.size();
+    m_selectionLabel->setText(tr("已选择 %1 条").arg(count));
+    m_deleteSelectedButton->setEnabled(count > 0);
+    // setText() re-measures the button, so the bar grows with the caption.
+    m_deleteSelectedButton->setText(count > 0 ? tr("删除选中 (%1)").arg(count)
+                                              : tr("删除选中"));
+    m_selectAllButton->setText(m_selected.size() >= m_rows.size() && !m_rows.isEmpty()
+                                   ? tr("取消全选")
+                                   : tr("全选"));
+}
+
+bool HistoryPage::confirm(const QString &title, const QString &message)
+{
+    return QMessageBox::question(this, title, message, QMessageBox::Yes | QMessageBox::No,
+                                 QMessageBox::No)
+        == QMessageBox::Yes;
+}
+
+void HistoryPage::keyPressEvent(QKeyEvent *event)
+{
+    // 页面级的按键：搜索框自己会消费 Delete，所以输入框里按删除键不会误删记录
+    // （QLineEdit 接受该事件，不会冒泡到这里）。
+    if (m_selectMode && (event->key() == Qt::Key_Delete || event->key() == Qt::Key_Backspace)) {
+        deleteSelected();
+        return;
+    }
+    if (m_selectMode && event->key() == Qt::Key_Escape) {
+        setSelectMode(false);
+        return;
+    }
+    QWidget::keyPressEvent(event);
+}
+
 QString HistoryPage::filterKey() const
 {
     return filterKeys().value(m_filterIndex, QStringLiteral("all"));
@@ -695,6 +900,7 @@ void HistoryPage::refresh()
             m_rows.insert(gid, row);
             m_rowsLayout->insertWidget(m_rowsLayout->count() - 1, row);
             row->show();
+            row->setSelectMode(m_selectMode);
         }
         row->setRecord(record);
     }
@@ -705,6 +911,7 @@ void HistoryPage::refresh()
             continue;
         }
         HistoryRow *row = it.value();
+        m_selected.remove(it.key());   // 记录没了，勾选也就不该留着
         m_rowsLayout->removeWidget(row);   // removeWidget() 会隐藏控件
         row->deleteLater();
         it = m_rows.erase(it);
@@ -755,6 +962,9 @@ void HistoryPage::refresh()
                                    : tr("完成或失败的任务会自动记录在这里，随时可以重新下载。"));
     m_emptyResetButton->setVisible(filtering);
 
+    // 选中计数、按钮文案里的数字都跟着列表变化。
+    updateSelectionUi();
+
     // 这里不调用 restyle()：配色只跟主题有关，行内样式由 setRecord() 按需刷新。
 }
 
@@ -784,6 +994,14 @@ void HistoryPage::retranslate()
     m_refreshButton->setTooltipText(tr("重新读取历史记录"));
     m_emptyResetButton->setText(tr("显示全部"));
     m_emptyResetButton->setTooltipText(tr("清空搜索并回到“全部”筛选"));
+
+    // ---- 批量选择 --------------------------------------------------------
+    m_selectButton->setText(m_selectMode ? tr("退出批量选择") : tr("批量选择"));
+    m_selectButton->setTooltipText(m_selectMode ? tr("退出批量选择模式")
+                                               : tr("勾选多条记录后一起删除"));
+    m_selectAllButton->setTooltipText(tr("全选或取消全选当前列表"));
+    m_cancelSelectButton->setText(tr("取消"));
+    updateSelectionUi();
 
     // ---- 行：按钮提示 + 行内文本 -----------------------------------------
     for (HistoryRow *row : std::as_const(m_rows))

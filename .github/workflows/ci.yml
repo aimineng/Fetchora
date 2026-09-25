@@ -196,6 +196,16 @@ jobs:
           Write-Host "CMake: $cmake"
           .\build.ps1 -Release -Test -QtDir "$env:QT_ROOT_DIR" -MingwDir $mingw -CMake $cmake
 
+      # The engine must not outlive the app, and must come back when it is killed.
+      # Both are invisible until they break: an orphaned aria2c keeps downloading
+      # with no window to stop it, and an engine that stays dead looks like the
+      # app ignoring every new task. This starts the real app and watches real
+      # processes, which is the only way to check either.
+      - name: Engine supervision (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .\tools\check-engine-supervision.ps1 -App build\Release\Fetchora.exe
+
       # Single-config generator, so CMAKE_BUILD_TYPE applies as written.
       #
       # The binary is forced into dist/ so every platform has one stable

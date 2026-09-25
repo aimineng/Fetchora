@@ -1,5 +1,7 @@
 #include "Aria2Manager.h"
 
+#include "Logger.h"
+
 #include <QClipboard>
 #include <QCoreApplication>
 #include <QDateTime>
@@ -97,6 +99,7 @@ Aria2Manager::Aria2Manager(SettingsManager *settings, QObject *parent)
 Aria2Manager::~Aria2Manager()
 {
     m_shuttingDown = true;
+    m_stoppingEngine = true;
     if (m_pollTimer)
         m_pollTimer->stop();
     if (m_client && m_client->isConnected())
@@ -106,6 +109,7 @@ Aria2Manager::~Aria2Manager()
     if (m_process) {
         m_process->stop();
     }
+    Logger::line(QStringLiteral("app"), QStringLiteral("shutdown complete"));
 }
 
 // ============================================================================
@@ -118,7 +122,20 @@ void Aria2Manager::initProcess()
     connect(m_process, &Aria2Process::logLine, this, &Aria2Manager::onProcessLog);
     connect(m_process, &Aria2Process::failed, this, &Aria2Manager::onProcessFailed);
     connect(m_process, &Aria2Process::started, this, &Aria2Manager::onProcessStateChanged);
-    connect(m_process, &Aria2Process::stopped, this, [this](int) { onProcessStateChanged(); });
+    connect(m_process, &Aria2Process::stopped, this, [this](int exitCode) {
+        onProcessStateChanged();
+        // Our own stops (restart, settings change, quit) are not news; anything
+        // else means the engine died under the user's feet and the restart guard
+        // is about to bring it back. Both the manager and the process itself know
+        // whether a stop was asked for - either answer is enough.
+        if (m_shuttingDown || m_stoppingEngine || m_process->lastStopWasIntentional()
+            || !m_settings->autoRestartEngine())
+            return;
+        Logger::line(QStringLiteral("engine"),
+                     QStringLiteral("aria2c exited unexpectedly (code %1); restarting").arg(exitCode),
+                     true);
+        appendEngineLog(tr("aria2 引擎意外退出（退出码 %1）。").arg(exitCode), true);
+    });
 }
 
 void Aria2Manager::initClient()
@@ -238,8 +255,10 @@ void Aria2Manager::initTimers()
     connect(m_schedulerTimer, &QTimer::timeout, this, &Aria2Manager::onSchedulerTimer);
     m_schedulerTimer->start();
 
+    // A *repeating* guard, not a one-shot: as a one-shot it fired 2.5 s after
+    // startup - while the engine was still booting, so it returned early - and
+    // never again, which is why killing aria2c left the app without an engine.
     m_restartGuard = new QTimer(this);
-    m_restartGuard->setSingleShot(true);
     m_restartGuard->setInterval(2500);
     connect(m_restartGuard, &QTimer::timeout, this, [this]() {
         if (m_shuttingDown || !m_settings->autoRestartEngine())
@@ -249,7 +268,21 @@ void Aria2Manager::initTimers()
         if (!m_process->isRunning() && m_restartAttempts < 5) {
             ++m_restartAttempts;
             appendEngineLog(tr("引擎未运行，正在重启（第 %1 次）。").arg(m_restartAttempts), true);
+            // Only the first attempt is announced: five toasts for one dead
+            // engine would be noise, and the engine log keeps the count.
+            if (m_restartAttempts == 1) {
+                m_recoveringEngine = true;
+                emit toast(tr("aria2 引擎已退出，正在自动重启…"), true);
+            }
             startEngine();
+        } else if (!m_process->isRunning() && m_restartAttempts >= 5 && m_recoveringEngine) {
+            // Stop trying, but say so: silently giving up looks like the app
+            // simply ignoring every download.
+            m_recoveringEngine = false;
+            emit toast(tr("aria2 引擎连续 %1 次启动失败，已停止自动重启。"
+                          "请在「设置 → RPC / 引擎」里检查引擎路径与参数。")
+                           .arg(m_restartAttempts),
+                       true);
         }
     });
     m_restartGuard->start();
@@ -263,6 +296,8 @@ void Aria2Manager::startEngine()
 {
     if (m_process->isRunning())
         return;
+
+    m_stoppingEngine = false;
 
     const QString exe = m_settings->aria2Executable().isEmpty()
                             ? Aria2Process::locateAria2()
@@ -365,6 +400,7 @@ void Aria2Manager::stopEngine()
         m_client->saveSession();
     m_paused = true;
     emit globalPausedChanged();
+    m_stoppingEngine = true;
     m_process->stop();
 }
 
@@ -374,14 +410,19 @@ void Aria2Manager::restartEngine()
     m_pollInFlight = false;
     m_client->setEndpoint(QStringLiteral("127.0.0.1"), quint16(m_settings->rpcListenPort()),
                           m_settings->rpcSecret());
+    m_stoppingEngine = true;
     m_process->stop();
     m_restartAttempts = 0;
+    m_recoveringEngine = false;
     QTimer::singleShot(400, this, [this]() { startEngine(); });
 }
 
 void Aria2Manager::onProcessLog(const QString &line, bool isError)
 {
     appendEngineLog(line, isError);
+    // The engine's own output is the first thing to look at after a crash, so it
+    // belongs in the log file, not only in the in-memory console.
+    Logger::line(QStringLiteral("engine"), line, isError);
 }
 
 void Aria2Manager::onProcessFailed(const QString &reason)
@@ -406,6 +447,11 @@ void Aria2Manager::onClientConnectedChanged(bool connected)
         m_restartAttempts = 0;
         setEngineError(QString());
         appendEngineLog(tr("已连接到 aria2 %1。").arg(m_client->aria2Version()), false);
+        // The engine came back after dying on its own: close that story.
+        if (m_recoveringEngine) {
+            m_recoveringEngine = false;
+            emit toast(tr("aria2 引擎已重新启动，下载可以继续了。"), false);
+        }
         refreshGlobalOptions();
         poll();
     } else {

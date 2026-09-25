@@ -350,6 +350,12 @@ private:
     int m_restartAttempts = 0;
     bool m_shuttingDown = false;
     bool m_engineErrorNotified = false;
+    /// True while we are the ones stopping the engine (restart / settings change /
+    /// quit), so an exit is not reported to the user as a crash.
+    bool m_stoppingEngine = false;
+    /// The engine died on its own and we are bringing it back: the recovery is
+    /// worth one "it is back" message.
+    bool m_recoveringEngine = false;
 
     QSet<QString> m_historyRecorded;
 };

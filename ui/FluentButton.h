@@ -48,6 +48,8 @@ public:
 
 protected:
     void changeEvent(QEvent *event) override;
+    void focusInEvent(QFocusEvent *event) override;
+    void focusOutEvent(QFocusEvent *event) override;
     void paintEvent(QPaintEvent *event) override;
 
 private:
@@ -60,6 +62,9 @@ private:
     bool m_iconOnly = false;
     bool m_compact = false;
     bool m_loading = false;
+    /// True while the focus ring should be painted: keyboard focus only, see
+    /// focusInEvent().
+    bool m_focusVisible = false;
 };
 
 #endif // FLUENTBUTTON_H

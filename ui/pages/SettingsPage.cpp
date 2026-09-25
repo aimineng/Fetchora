@@ -1,6 +1,7 @@
 #include "ui/pages/SettingsPage.h"
 
 #include "Aria2Manager.h"
+#include "Logger.h"
 #include "DownloadHistory.h"
 #include "SettingsManager.h"
 #include "ui/FluentInputs.h"
@@ -726,6 +727,21 @@ void SettingsPage::buildSections()
                                  QT_TR_NOOP("aria2c 进程的标准输出与错误输出"));
     m_rpcConsole = addConsole(page, QT_TR_NOOP("RPC 日志"),
                               QT_TR_NOOP("与 aria2 之间的 JSON-RPC 请求与响应"));
+
+    body = addGroupCard(page, QT_TR_NOOP("日志"));
+    addCaption(body, QT_TR_NOOP("程序运行日志写入下方的目录；引擎输出、崩溃报告都在里面。"),
+               "caption", QString(), true);
+    addSpinBox(body, QStringLiteral("logRetentionDays"), QT_TR_NOOP("日志保留天数"),
+               QT_TR_NOOP("超过这个天数的日志会被自动删除；单个文件超过 4 MB 也会自动切分"),
+               1, 90, tr("天"));
+    QHBoxLayout *logStrip = addButtonStrip(body, false);
+    FluentButton *openLogs = addAction(logStrip, QT_TR_NOOP("打开日志目录"),
+                                       FluentButton::Standard, FluentTheme::Glyph::Console);
+    connect(openLogs, &QPushButton::clicked, this, [this]() {
+        const QString dir = Logger::directory();
+        if (!QDesktopServices::openUrl(QUrl::fromLocalFile(dir)))
+            emit toast(tr("无法打开日志目录 %1").arg(dir), true);
+    });
 
     body = addGroupCard(page, QT_TR_NOOP("维护"));
     QHBoxLayout *maintenanceStrip = addButtonStrip(body, false);

@@ -38,6 +38,10 @@ public:
     void restart();
     void stop();
 
+    /// Whether the last stop was asked for by us. Used by the manager to tell a
+    /// crash apart from a settings change.
+    bool lastStopWasIntentional() const { return m_intentionalStop; }
+
 public slots:
     void start();
 
@@ -56,6 +60,10 @@ private slots:
 
 private:
     void emitLines(QProcess::ProcessChannel channel, bool isError);
+    /// Put the child in a job object that is killed when this process dies, so a
+    /// crash of ours cannot leave an orphaned engine behind.
+    void adoptIntoJob();
+    void closeJob();
 
     QProcess *m_process = nullptr;
     QString m_executable;
@@ -63,6 +71,9 @@ private:
     QByteArray m_stdoutBuffer;
     QByteArray m_stderrBuffer;
     bool m_intentionalStop = false;
+#ifdef Q_OS_WIN
+    void *m_job = nullptr;   ///< HANDLE of the kill-on-close job object
+#endif
 };
 
 #endif // ARIA2PROCESS_H

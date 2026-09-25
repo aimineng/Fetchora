@@ -1,0 +1,37 @@
+# English strings for the housekeeping half of the app: the engine supervisor
+# (Aria2Manager), the log file settings and the history page's batch selection.
+#
+# Format is "中文 => English"; a [Context] prefix restricts an entry to one Qt
+# context (see tools/make-translations.ps1).
+
+# ------------------------------------------------------------------ 引擎 / engine
+aria2 引擎意外退出（退出码 %1）。 => The aria2 engine exited unexpectedly (code %1).
+aria2 引擎已退出，正在自动重启… => The aria2 engine stopped; restarting it…
+aria2 引擎已重新启动，下载可以继续了。 => The aria2 engine is running again; downloads can continue.
+aria2 引擎连续 %1 次启动失败，已停止自动重启。请在「设置 → RPC / 引擎」里检查引擎路径与参数。 => The aria2 engine failed to start %1 times in a row, so automatic restarting has stopped. Check the engine path and arguments under Settings → RPC / Engine.
+
+# ------------------------------------------------------------- 日志 / logging
+日志 => Logs
+程序运行日志写入下方的目录；引擎输出、崩溃报告都在里面。 => Fetchora writes its log files to the folder below: engine output, warnings and crash reports all end up there.
+日志保留天数 => Days of logs to keep
+超过这个天数的日志会被自动删除；单个文件超过 4 MB 也会自动切分 => Older files are deleted automatically; a file that grows past 4 MB is split, so a week of logs stays a few megabytes
+打开日志目录 => Open the log folder
+无法打开日志目录 %1 => Could not open the log folder %1
+天 => days
+
+# --------------------------------------------------------- 批量选择 / batch selection
+批量选择 => Select
+退出批量选择 => Done selecting
+退出批量选择模式 => Leave batch selection mode
+勾选多条记录后一起删除 => Tick several entries and delete them together
+已选择 %1 条 => %1 selected
+全选 => Select all
+取消全选 => Clear selection
+全选或取消全选当前列表 => Select or clear every entry in the list
+删除选中 => Delete selected
+删除选中 (%1) => Delete selected (%1)
+取消 => Cancel
+删除选中的历史记录 => Delete the selected history entries
+将从历史记录中删除选中的 %1 条记录。已经下载的文件不会被删除，此操作无法撤销。 => This removes %1 selected entries from the history. Files that were already downloaded are not touched, and it cannot be undone.
+已删除 %1 条历史记录 => Deleted %1 history entries
+没有可删除的记录 => There was nothing to delete

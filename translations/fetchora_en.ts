@@ -371,12 +371,24 @@
   <context>
     <name>Aria2Manager</name>
     <message>
+      <source>aria2 引擎意外退出（退出码 %1）。</source>
+      <translation>The aria2 engine exited unexpectedly (code %1).</translation>
+    </message>
+    <message>
       <source>浏览器桥接端口 %1 无法绑定：%2</source>
       <translation>Could not bind the browser bridge port %1: %2</translation>
     </message>
     <message>
       <source>引擎未运行，正在重启（第 %1 次）。</source>
       <translation>The engine is not running. Restarting (attempt %1).</translation>
+    </message>
+    <message>
+      <source>aria2 引擎已退出，正在自动重启…</source>
+      <translation>The aria2 engine stopped; restarting it…</translation>
+    </message>
+    <message>
+      <source>aria2 引擎连续 %1 次启动失败，已停止自动重启。请在「设置 → RPC / 引擎」里检查引擎路径与参数。</source>
+      <translation>The aria2 engine failed to start %1 times in a row, so automatic restarting has stopped. Check the engine path and arguments under Settings → RPC / Engine.</translation>
     </message>
     <message>
       <source>aria2c rejected the option "%1". Clear it in Settings → Advanced, or reset the extra arguments.</source>
@@ -393,6 +405,10 @@
     <message>
       <source>已连接到 aria2 %1。</source>
       <translation>Connected to aria2 %1.</translation>
+    </message>
+    <message>
+      <source>aria2 引擎已重新启动，下载可以继续了。</source>
+      <translation>The aria2 engine is running again; downloads can continue.</translation>
     </message>
     <message>
       <source>下载完成</source>
@@ -1560,6 +1576,42 @@ Info Hash %2 · Size %3</translation>
       <translation>Failed</translation>
     </message>
     <message>
+      <source>删除选中的历史记录</source>
+      <translation>Delete the selected history entries</translation>
+    </message>
+    <message>
+      <source>将从历史记录中删除选中的 %1 条记录。已经下载的文件不会被删除，此操作无法撤销。</source>
+      <translation>This removes %1 selected entries from the history. Files that were already downloaded are not touched, and it cannot be undone.</translation>
+    </message>
+    <message>
+      <source>已删除 %1 条历史记录</source>
+      <translation>Deleted %1 history entries</translation>
+    </message>
+    <message>
+      <source>没有可删除的记录</source>
+      <translation>There was nothing to delete</translation>
+    </message>
+    <message>
+      <source>已选择 %1 条</source>
+      <translation>%1 selected</translation>
+    </message>
+    <message>
+      <source>删除选中 (%1)</source>
+      <translation>Delete selected (%1)</translation>
+    </message>
+    <message>
+      <source>删除选中</source>
+      <translation>Delete selected</translation>
+    </message>
+    <message>
+      <source>取消全选</source>
+      <translation>Clear selection</translation>
+    </message>
+    <message>
+      <source>全选</source>
+      <translation>Select all</translation>
+    </message>
+    <message>
       <source>显示 %1 / %2 条记录</source>
       <translation>Showing %1 / %2 records</translation>
     </message>
@@ -1614,6 +1666,30 @@ Info Hash %2 · Size %3</translation>
     <message>
       <source>清空搜索并回到“全部”筛选</source>
       <translation>Clear the search and return to the "All" filter.</translation>
+    </message>
+    <message>
+      <source>退出批量选择</source>
+      <translation>Done selecting</translation>
+    </message>
+    <message>
+      <source>批量选择</source>
+      <translation>Select</translation>
+    </message>
+    <message>
+      <source>退出批量选择模式</source>
+      <translation>Leave batch selection mode</translation>
+    </message>
+    <message>
+      <source>勾选多条记录后一起删除</source>
+      <translation>Tick several entries and delete them together</translation>
+    </message>
+    <message>
+      <source>全选或取消全选当前列表</source>
+      <translation>Select or clear every entry in the list</translation>
+    </message>
+    <message>
+      <source>取消</source>
+      <translation>Cancel</translation>
     </message>
   </context>
   <context>
@@ -3107,6 +3183,34 @@ Info Hash %2 · Size %3</translation>
     <message>
       <source>与 aria2 之间的 JSON-RPC 请求与响应</source>
       <translation>JSON-RPC requests and responses exchanged with aria2.</translation>
+    </message>
+    <message>
+      <source>日志</source>
+      <translation>Logs</translation>
+    </message>
+    <message>
+      <source>程序运行日志写入下方的目录；引擎输出、崩溃报告都在里面。</source>
+      <translation>Fetchora writes its log files to the folder below: engine output, warnings and crash reports all end up there.</translation>
+    </message>
+    <message>
+      <source>日志保留天数</source>
+      <translation>Days of logs to keep</translation>
+    </message>
+    <message>
+      <source>超过这个天数的日志会被自动删除；单个文件超过 4 MB 也会自动切分</source>
+      <translation>Older files are deleted automatically; a file that grows past 4 MB is split, so a week of logs stays a few megabytes</translation>
+    </message>
+    <message>
+      <source>天</source>
+      <translation>days</translation>
+    </message>
+    <message>
+      <source>打开日志目录</source>
+      <translation>Open the log folder</translation>
+    </message>
+    <message>
+      <source>无法打开日志目录 %1</source>
+      <translation>Could not open the log folder %1</translation>
     </message>
     <message>
       <source>打开配置目录</source>
