@@ -77,9 +77,11 @@ creator, browser bridge, tray icon where the desktop provides one) is identical.
 - **Command line** — pass URLs, magnets or `.torrent` paths directly.
 
 ### Reliability
-- **The engine cannot outlive the app.** aria2c runs inside a Windows job object (and is
-  stopped explicitly on every platform), so a crash, a task-manager kill or a debugger stop
-  cannot leave an orphaned downloader behind.
+- **The engine cannot outlive the app.** aria2c is started with
+  `--stop-with-process=<our pid>`, so it shuts itself down - session file and all - the
+  moment Fetchora is gone, however it went; on Windows it also runs inside a job object with
+  kill-on-close, which does not depend on the engine cooperating. A crash, a task-manager
+  kill or a debugger stop therefore cannot leave an orphaned downloader behind.
 - **The engine supervises itself** — if aria2c dies while Fetchora is running it is started
   again within a couple of seconds, and both the death and the recovery are reported.
 - **Logs with automatic housekeeping** — one file per day, split at 4 MB, pruned after

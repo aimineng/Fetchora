@@ -63,10 +63,17 @@ void Aria2Process::adoptIntoJob()
     HANDLE child = pid > 0 ? OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, FALSE, DWORD(pid))
                            : nullptr;
     if (!child || !AssignProcessToJobObject(job, child)) {
-        // A job that owns nothing would only leak a handle.
+        // A job that owns nothing would only leak a handle. This is worth a line
+        // in the log: it happens when the process already belongs to a job that
+        // forbids nesting (CI runners do exactly that), and it means
+        // --stop-with-process is now the only thing keeping the engine on a
+        // leash.
+        const DWORD error = GetLastError();
         if (child)
             CloseHandle(child);
         CloseHandle(job);
+        qWarning("could not put aria2c in a job object (error %lu); relying on "
+                 "--stop-with-process instead", error);
         return;
     }
     CloseHandle(child);
@@ -191,9 +198,26 @@ void Aria2Process::start()
         return;
     }
 
+    // Belt and braces for "the engine must not outlive the app":
+    //
+    //   * --stop-with-process makes aria2c watch *our* pid and exit by itself
+    //     when we are gone. It is the only mechanism that also covers the paths
+    //     where nothing of ours runs any more - a crash, a task-manager kill, a
+    //     debugger stop - and it works on every platform. aria2 shuts down
+    //     cleanly through it, so the session file is written on the way out.
+    //   * the job object below covers the same ground on Windows and does not
+    //     depend on the engine cooperating.
+    //
+    // Neither is enough on its own: AssignProcessToJobObject fails when the
+    // process already belongs to a job that forbids nesting (which is how CI
+    // runners and some launchers run programs), and a user-supplied aria2c may
+    // be an old build without the option.
+    QStringList args = m_arguments;
+    args << QStringLiteral("--stop-with-process=%1").arg(QCoreApplication::applicationPid());
+
     m_intentionalStop = false;
-    emit logLine(QStringLiteral("Launching: %1 %2").arg(m_executable, m_arguments.join(QLatin1Char(' '))), false);
-    m_process->start(m_executable, m_arguments);
+    emit logLine(QStringLiteral("Launching: %1 %2").arg(m_executable, args.join(QLatin1Char(' '))), false);
+    m_process->start(m_executable, args);
 }
 
 void Aria2Process::stop()
