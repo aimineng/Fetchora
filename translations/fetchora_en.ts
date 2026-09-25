@@ -399,6 +399,10 @@
       <translation>Engine error</translation>
     </message>
     <message>
+      <source>引擎已重启，已恢复 %1 个未完成的下载。</source>
+      <translation>The engine is running again and %1 unfinished download(s) were handed back to it.</translation>
+    </message>
+    <message>
       <source>Restarting aria2 with the current settings…</source>
       <translation>Restarting aria2 with the current settings…</translation>
     </message>
@@ -425,6 +429,10 @@
     <message>
       <source>未提供链接。</source>
       <translation>No link provided.</translation>
+    </message>
+    <message>
+      <source>引擎尚未就绪，已排队 %1 个任务，连接后自动开始。</source>
+      <translation>The engine is not ready yet; %1 task(s) are queued and will start as soon as it is.</translation>
     </message>
     <message>
       <source>无法添加 %1：%2</source>

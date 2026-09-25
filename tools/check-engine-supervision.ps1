@@ -22,7 +22,11 @@ param(
     # the engine to disappear. CI machines are slow, so they are generous.
     [int] $StartupSeconds = 25,
     [int] $RestartSeconds = 20,
-    [int] $ShutdownSeconds = 10
+    [int] $ShutdownSeconds = 10,
+    # Optional: a URL large enough that a download is still running when the
+    # engine is killed (tools/testsrv.js serves one). When given, a fourth check
+    # asserts that the queue survives the restart.
+    [string] $DownloadUrl = ''
 )
 
 $ErrorActionPreference = 'Continue'
@@ -70,13 +74,33 @@ function Get-AppLogTail {
 
 function Fail($message) {
     Write-Host "FAILED: $message"
+    # Stop everything first: the app writes to the redirected stderr file, and
+    # reading a file that is still open for writing blocks until the writer says
+    # something - which is how this function managed to hang a whole test run.
+    Get-Process -Name Fetchora -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Get-Engines | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 1
     Write-Host '--- application log ---'
     Get-AppLogTail | ForEach-Object { Write-Host "  $_" }
     if ($script:stderrFile -and (Test-Path $script:stderrFile)) {
         Write-Host '--- application stderr ---'
-        Get-Content $script:stderrFile | ForEach-Object { Write-Host "  $_" }
+        Get-Content $script:stderrFile -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $_" }
     }
     exit 1
+}
+
+# What the engine is working on, straight from its RPC port. Used to wait for a
+# download to actually be running before the test pulls the engine out from under
+# it - killing it before the task exists would prove nothing.
+function Get-EngineTasks {
+    $body = '{"jsonrpc":"2.0","id":"1","method":"aria2.tellActive","params":[]}'
+    try {
+        $reply = Invoke-RestMethod -Uri 'http://127.0.0.1:6800/jsonrpc' -Method Post -Body $body `
+            -ContentType 'application/json' -TimeoutSec 8
+        return @($reply.result)
+    } catch {
+        return @()
+    }
 }
 
 Get-Engines | Stop-Process -Force -ErrorAction SilentlyContinue
@@ -90,7 +114,9 @@ Write-Host "engine: $(if ($engineExe) { $engineExe } else { "$engineName (from P
 Write-Host "`n--- 1. starting the app starts the engine"
 $script:stderrFile = Join-Path ([System.IO.Path]::GetTempPath()) 'fetchora-supervision-stderr.txt'
 Remove-Item $script:stderrFile -ErrorAction SilentlyContinue
-$appProcess = Resolve-AppProcess (Start-Process $appPath -ArgumentList '--new-instance' -PassThru `
+$launchArgs = @('--new-instance')
+if ($DownloadUrl) { $launchArgs += $DownloadUrl }
+$appProcess = Resolve-AppProcess (Start-Process $appPath -ArgumentList $launchArgs -PassThru `
     -RedirectStandardError $script:stderrFile)
 $deadline = (Get-Date).AddSeconds($StartupSeconds)
 $first = @()
@@ -113,6 +139,21 @@ Write-Host "ok: engine pid $($first.Id -join ','), app pid $($appProcess.Id)"
 
 # ------------------------------------------------------------- 2. it comes back
 Write-Host "`n--- 2. killing the engine makes the app start a new one"
+if ($DownloadUrl) {
+    # Wait until the download is really running: the point of check 2b is that the
+    # engine is killed *while* it transfers something.
+    $deadline = (Get-Date).AddSeconds($StartupSeconds)
+    $running = @()
+    while ((Get-Date) -lt $deadline) {
+        $running = Get-EngineTasks
+        if ($running.Count -gt 0) { break }
+        Start-Sleep -Seconds 2
+    }
+    if ($running.Count -eq 0) { Fail 'the download never started, so there is nothing to lose' }
+    $bytesBefore = 0
+    foreach ($t in $running) { $bytesBefore += [int64]$t.completedLength }
+    Write-Host ("ok: {0} download(s) running, {1:N0} bytes in" -f $running.Count, $bytesBefore)
+}
 $first | Stop-Process -Force -ErrorAction SilentlyContinue
 $deadline = (Get-Date).AddSeconds($RestartSeconds)
 $second = @()
@@ -123,6 +164,25 @@ while ((Get-Date) -lt $deadline) {
 }
 if ($second.Count -eq 0) { Fail "the engine did not come back within $RestartSeconds s" }
 Write-Host "ok: engine pid $($second.Id -join ',') (was $($first.Id -join ','))"
+
+# ------------------------------------------------- 2b. the queue survives it
+if ($DownloadUrl) {
+    Write-Host "`n--- 2b. the download that was running came back"
+    # The restore happens within a second or two of the new engine answering; a
+    # queue that was never restored stays empty forever, so a short wait is
+    # enough and a long one would only hide a failure.
+    Start-Sleep -Seconds 8
+    $tasks = Get-EngineTasks
+    if ($tasks.Count -eq 0) {
+        Fail 'the replacement engine has no tasks: the queue was not handed back'
+    }
+    $bytes = 0
+    foreach ($t in $tasks) { $bytes += [int64]$t.completedLength }
+    if ($bytes -lt $bytesBefore) {
+        Fail ("the restored download starts from {0:N0} bytes, but {1:N0} were already down" -f $bytes, $bytesBefore)
+    }
+    Write-Host ("ok: {0} task(s) restored, {1:N0} bytes already on disk" -f $tasks.Count, $bytes)
+}
 
 # ------------------------------------------------------- 3. it dies with the app
 Write-Host "`n--- 3. killing the app hard takes the engine with it"

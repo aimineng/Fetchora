@@ -122,13 +122,32 @@ void Aria2Manager::initProcess()
     connect(m_process, &Aria2Process::logLine, this, &Aria2Manager::onProcessLog);
     connect(m_process, &Aria2Process::failed, this, &Aria2Manager::onProcessFailed);
     connect(m_process, &Aria2Process::started, this, &Aria2Manager::onProcessStateChanged);
+    connect(m_process, &Aria2Process::started, this, [this]() {
+        // A replacement engine is up: arm the hand-over. The poll (or the first
+        // successful RPC) does the rest, because that is the moment the new
+        // process is actually answering.
+        if (!m_pendingQueue.isEmpty())
+            m_restoreArmed = true;
+    });
     connect(m_process, &Aria2Process::stopped, this, [this](int exitCode) {
         onProcessStateChanged();
+        if (m_shuttingDown)
+            return;
+        // Whatever happens next, remember what was running: a fresh engine starts
+        // with an empty queue, and without this the downloads the user was
+        // watching simply disappear. The poll-time snapshot comes first because a
+        // failed poll cycle may already have erased the task list by now.
+        if (m_pendingQueue.isEmpty())
+            m_pendingQueue = m_queueSnapshot.isEmpty() ? captureQueue() : m_queueSnapshot;
+        if (!m_pendingQueue.isEmpty())
+            Logger::line(QStringLiteral("engine"),
+                         QStringLiteral("engine exit: %1 download(s) remembered for the restart")
+                             .arg(m_pendingQueue.size()));
         // Our own stops (restart, settings change, quit) are not news; anything
         // else means the engine died under the user's feet and the restart guard
         // is about to bring it back. Both the manager and the process itself know
         // whether a stop was asked for - either answer is enough.
-        if (m_shuttingDown || m_stoppingEngine || m_process->lastStopWasIntentional()
+        if (m_stoppingEngine || m_process->lastStopWasIntentional()
             || !m_settings->autoRestartEngine())
             return;
         Logger::line(QStringLiteral("engine"),
@@ -404,12 +423,78 @@ void Aria2Manager::stopEngine()
     m_process->stop();
 }
 
+QList<Aria2Manager::QueuedTask> Aria2Manager::captureQueue() const
+{
+    QList<QueuedTask> queue;
+    const QVariantList sources = m_activeList + m_waitingList;
+    for (const QVariant &value : sources) {
+        const QVariantMap task = value.toMap();
+        QueuedTask entry;
+        entry.uri = task.value(QStringLiteral("uri")).toString();
+        if (entry.uri.isEmpty()) {
+            const QStringList uris = task.value(QStringLiteral("uris")).toStringList();
+            if (!uris.isEmpty())
+                entry.uri = uris.first();
+        }
+        // A torrent added from a local .torrent file has no URI; its info hash
+        // still identifies it, and --bt-load-saved-metadata lets the new engine
+        // find the metadata and the control file again.
+        if (entry.uri.isEmpty()) {
+            const QString infoHash = task.value(QStringLiteral("infoHash")).toString();
+            if (!infoHash.isEmpty()) {
+                entry.uri = QStringLiteral("magnet:?xt=urn:btih:%1").arg(infoHash);
+                const QString name = task.value(QStringLiteral("fileName")).toString();
+                if (!name.isEmpty())
+                    entry.uri += QStringLiteral("&dn=")
+                        + QString::fromLatin1(QUrl::toPercentEncoding(name));
+            }
+        }
+        if (entry.uri.isEmpty())
+            continue;   // nothing to hand back - a metalink or a metadata-only task
+        entry.dir = task.value(QStringLiteral("dir")).toString();
+        entry.paused = task.value(QStringLiteral("status")).toString() == QLatin1String("paused");
+        queue.append(entry);
+    }
+    return queue;
+}
+
+void Aria2Manager::restoreQueue()
+{
+    const QList<QueuedTask> queue = m_pendingQueue;
+    m_pendingQueue.clear();
+    if (queue.isEmpty())
+        return;
+
+    for (const QueuedTask &task : queue) {
+        QVariantMap options;
+        if (!task.dir.isEmpty())
+            options.insert(QStringLiteral("dir"), task.dir);
+        // Resume instead of starting over: aria2 picks the partial file and its
+        // .aria2 control file back up.
+        options.insert(QStringLiteral("continue"), QStringLiteral("true"));
+        if (task.paused)
+            options.insert(QStringLiteral("pause"), QStringLiteral("true"));
+        m_client->addUri({task.uri}, options, -1, nullptr);
+    }
+
+    const QString message = tr("引擎已重启，已恢复 %1 个未完成的下载。").arg(queue.size());
+    appendEngineLog(message, false);
+    Logger::line(QStringLiteral("engine"),
+                 QStringLiteral("restored %1 download(s) after the engine restart").arg(queue.size()));
+    emit toast(message, false);
+    refreshNow();
+}
+
 void Aria2Manager::restartEngine()
 {
     appendEngineLog(tr("Restarting aria2 with the current settings…"), false);
     m_pollInFlight = false;
     m_client->setEndpoint(QStringLiteral("127.0.0.1"), quint16(m_settings->rpcListenPort()),
                           m_settings->rpcSecret());
+    // Changing a setting restarts the engine, and the downloads have to survive
+    // that just like they survive a crash.
+    if (m_pendingQueue.isEmpty())
+        m_pendingQueue = m_queueSnapshot.isEmpty() ? captureQueue() : m_queueSnapshot;
     m_stoppingEngine = true;
     m_process->stop();
     m_restartAttempts = 0;
@@ -447,14 +532,35 @@ void Aria2Manager::onClientConnectedChanged(bool connected)
         m_restartAttempts = 0;
         setEngineError(QString());
         appendEngineLog(tr("已连接到 aria2 %1。").arg(m_client->aria2Version()), false);
-        // The engine came back after dying on its own: close that story.
+        // Worth a line in the file log: "did the app notice the engine came back"
+        // is the first question when downloads stop after an engine crash.
+        Logger::line(QStringLiteral("engine"),
+                     QStringLiteral("connected to aria2 %1 (%2 download(s) waiting to be restored)")
+                         .arg(m_client->aria2Version())
+                         .arg(m_pendingQueue.size()));
+        // The engine came back after dying on its own: close that story, and give
+        // it back the downloads it was working on.
         if (m_recoveringEngine) {
             m_recoveringEngine = false;
             emit toast(tr("aria2 引擎已重新启动，下载可以继续了。"), false);
         }
+        if (m_restoreArmed || !m_pendingQueue.isEmpty()) {
+            m_restoreArmed = false;
+            restoreQueue();
+        }
+        // Anything the user asked for while the engine was away goes in now, in
+        // the order it was asked for.
+        if (!m_pendingAdds.isEmpty()) {
+            const QList<QPair<QString, QVariantMap>> queued = m_pendingAdds;
+            m_pendingAdds.clear();
+            for (const auto &item : queued)
+                addUri(item.first, item.second);
+        }
         refreshGlobalOptions();
         poll();
     } else {
+        Logger::line(QStringLiteral("engine"),
+                     QStringLiteral("lost the connection to aria2"), true);
         m_paused = false;
         emit globalPausedChanged();
     }
@@ -510,6 +616,7 @@ void Aria2Manager::poll()
 
     m_pollInFlight = true;
     m_pendingBuckets = 3;
+    m_failedBuckets = 0;
     m_newlySeen.clear();
 
     m_client->tellActive(statusKeys(), [this](const QJsonValue &result, bool isError, const QString &) {
@@ -517,6 +624,8 @@ void Aria2Manager::poll()
             const QJsonArray arr = result.toArray();
             for (const QJsonValue &v : arr)
                 applyTask(v.toObject(), QStringLiteral("active"));
+        } else {
+            ++m_failedBuckets;
         }
         finishPollCycle();
     });
@@ -526,6 +635,8 @@ void Aria2Manager::poll()
             const QJsonArray arr = result.toArray();
             for (const QJsonValue &v : arr)
                 applyTask(v.toObject(), QStringLiteral("waiting"));
+        } else {
+            ++m_failedBuckets;
         }
         finishPollCycle();
     });
@@ -535,6 +646,8 @@ void Aria2Manager::poll()
             const QJsonArray arr = result.toArray();
             for (const QJsonValue &v : arr)
                 applyTask(v.toObject(), QStringLiteral("stopped"));
+        } else {
+            ++m_failedBuckets;
         }
         finishPollCycle();
     });
@@ -604,6 +717,20 @@ void Aria2Manager::finishPollCycle()
 
     m_pollInFlight = false;
     rebuildLists();
+
+    // A successful poll against the replacement engine is the moment to give the
+    // downloads back (see m_restoreArmed).
+    if (m_restoreArmed && m_client->isConnected()) {
+        m_restoreArmed = false;
+        restoreQueue();
+    }
+
+    // Keep the last *complete* picture of what the engine was doing: this is what
+    // a replacement engine is handed back if the current one dies. A cycle with
+    // failures saw nothing because the engine is gone, not because the user
+    // cleared the list, so it must not overwrite the snapshot.
+    if (m_failedBuckets == 0)
+        m_queueSnapshot = captureQueue();
 
     // Drop tasks that aria2 no longer knows about (e.g. after removeDownloadResult).
     const QList<QString> known = m_newlySeen.values();
@@ -1099,6 +1226,20 @@ void Aria2Manager::addUri(const QString &urls, const QVariantMap &options)
     }
     if (list.isEmpty()) {
         emit toast(tr("未提供链接。"), true);
+        return;
+    }
+
+    // Nothing to send it to yet: the engine is starting up, or a restart is in
+    // progress. Queue it and say so - dropping it with "cannot add" would lose a
+    // download the user typed, and the URL often arrives before the engine is
+    // listening (the command line hands it over during startup).
+    if (!m_client->isConnected()) {
+        for (const QString &u : list) {
+            if (m_pendingAdds.size() >= 100)
+                break;
+            m_pendingAdds.append(qMakePair(u, options));
+        }
+        emit toast(tr("引擎尚未就绪，已排队 %1 个任务，连接后自动开始。").arg(list.size()), false);
         return;
     }
 

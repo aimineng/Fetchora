@@ -9,6 +9,8 @@ aria2 引擎意外退出（退出码 %1）。 => The aria2 engine exited unexpec
 aria2 引擎已退出，正在自动重启… => The aria2 engine stopped; restarting it…
 aria2 引擎已重新启动，下载可以继续了。 => The aria2 engine is running again; downloads can continue.
 aria2 引擎连续 %1 次启动失败，已停止自动重启。请在「设置 → RPC / 引擎」里检查引擎路径与参数。 => The aria2 engine failed to start %1 times in a row, so automatic restarting has stopped. Check the engine path and arguments under Settings → RPC / Engine.
+引擎已重启，已恢复 %1 个未完成的下载。 => The engine is running again and %1 unfinished download(s) were handed back to it.
+引擎尚未就绪，已排队 %1 个任务，连接后自动开始。 => The engine is not ready yet; %1 task(s) are queued and will start as soon as it is.
 
 # ------------------------------------------------------------- 日志 / logging
 日志 => Logs

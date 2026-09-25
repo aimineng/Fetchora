@@ -144,17 +144,6 @@ void FluentLineEdit::paintEvent(QPaintEvent *event)
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
 
-    if (qEnvironmentVariableIsSet("FETCHORA_DEBUG_TYPE") && !m_header.isEmpty()) {
-        QFile f(QCoreApplication::applicationDirPath() + QStringLiteral("/type.log"));
-        if (f.open(QIODevice::Append | QIODevice::Text)) {
-            QTextStream s(&f);
-            s << "[edit] header=" << m_header << " desc=" << m_description
-              << " h=" << height() << " minHint=" << minimumSizeHint().height()
-              << " sizeHint=" << sizeHint().height()
-              << " minH=" << minimumHeight() << '\n';
-        }
-    }
-
     // ---- header / description -------------------------------------------
     int y = 0;
     if (!m_header.isEmpty()) {
@@ -207,19 +196,28 @@ void FluentLineEdit::paintEvent(QPaintEvent *event)
     }
 
     // Let QLineEdit draw only the text itself.
+    //
+    // Our painter has to be finished first: a paint device can only be painted by
+    // one QPainter at a time, so the base class's own painter would fail to start
+    // and - worse - the style-sheet path inside it replaces the device's paint
+    // engine, leaving our painter pointing at the old one. The focus ring below
+    // then dereferenced that stale engine and faulted inside
+    // QPainter::setPen(), which is the crash this comment exists for.
     QStyleOptionFrame opt;
     opt.initFrom(this);
     opt.rect = QRect(f.left() + (m_glyph.isNull() ? 0 : 0), f.top(),
                      f.width(), f.height());
-    // The base class paints selection + text; it must not paint a frame.
+    p.end();
     QLineEdit::paintEvent(event);
 
     // ---- focus ring ------------------------------------------------------
     if (focus && isEnabled()) {
-        p.setPen(QPen(t->textPrimary(), 2));
-        p.setBrush(Qt::NoBrush);
-        p.drawRoundedRect(r.adjusted(-2, -2, 2, 2), FluentTheme::RadiusSmall + 2,
-                          FluentTheme::RadiusSmall + 2);
+        QPainter ring(this);
+        ring.setRenderHint(QPainter::Antialiasing);
+        ring.setPen(QPen(t->textPrimary(), 2));
+        ring.setBrush(Qt::NoBrush);
+        ring.drawRoundedRect(r.adjusted(-2, -2, 2, 2), FluentTheme::RadiusSmall + 2,
+                             FluentTheme::RadiusSmall + 2);
     }
 }
 
@@ -398,13 +396,19 @@ void FluentSpinBox::paintEvent(QPaintEvent *event)
     drawZone(upRect(), Up, FluentTheme::Glyph::ChevronUp);
     drawZone(downRect(), Down, FluentTheme::Glyph::ChevronDown);
 
+    // Same reason as FluentLineEdit: finish our painter before the base class
+    // starts its own, otherwise the focus ring below paints through an engine the
+    // style sheet has already replaced.
+    p.end();
     QSpinBox::paintEvent(event);
 
     if (focus && isEnabled()) {
-        p.setPen(QPen(t->textPrimary(), 2));
-        p.setBrush(Qt::NoBrush);
-        p.drawRoundedRect(r.adjusted(-2, -2, 2, 2), FluentTheme::RadiusSmall + 2,
-                          FluentTheme::RadiusSmall + 2);
+        QPainter ring(this);
+        ring.setRenderHint(QPainter::Antialiasing);
+        ring.setPen(QPen(t->textPrimary(), 2));
+        ring.setBrush(Qt::NoBrush);
+        ring.drawRoundedRect(r.adjusted(-2, -2, 2, 2), FluentTheme::RadiusSmall + 2,
+                             FluentTheme::RadiusSmall + 2);
     }
 }
 

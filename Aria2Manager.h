@@ -220,6 +220,20 @@ private:
     // -- browser bridge (WebSocket transport handled by HttpServer) ------------
     void onSocketStatus(const QString &requestId);
 
+    /// One entry of the queue snapshot: everything a fresh engine needs to pick a
+    /// task up again. aria2 resumes from the .aria2 control file it left behind,
+    /// so the URI is enough - no progress has to be carried across.
+    struct QueuedTask {
+        QString uri;
+        QString dir;
+        bool paused = false;
+    };
+
+    /// What the engine is working on right now, as something we can hand back.
+    QList<QueuedTask> captureQueue() const;
+    /// Hand m_pendingQueue to a freshly started engine and say so.
+    void restoreQueue();
+
 private:
     struct Task {
         QString gid;
@@ -356,6 +370,30 @@ private:
     /// The engine died on its own and we are bringing it back: the recovery is
     /// worth one "it is back" message.
     bool m_recoveringEngine = false;
+    /// Downloads that were running when the engine went away, waiting for the
+    /// replacement to be ready (see captureQueue()/restoreQueue()).
+    QList<QueuedTask> m_pendingQueue;
+    /// The same picture, refreshed by every poll cycle that came back complete.
+    ///
+    /// Taking the snapshot when the engine dies is too late: the RPC calls that
+    /// were in flight fail first, and a poll cycle that saw nothing erases every
+    /// known task - so by the time QProcess reports the exit there is nothing left
+    /// to remember.
+    QList<QueuedTask> m_queueSnapshot;
+    /// Buckets of the current poll cycle that returned an error; a cycle with
+    /// failures must not overwrite the snapshot above.
+    int m_failedBuckets = 0;
+    /// Set when a *replacement* engine has been started while m_pendingQueue is
+    /// waiting, cleared once the queue has been handed over.
+    ///
+    /// The restore cannot hang off "the client reconnected": a restarted aria2c
+    /// is listening again in well under a second, so the 4 s connection probe
+    /// never observes a disconnect and never reports a reconnection either.
+    bool m_restoreArmed = false;
+    /// Downloads the user asked for while the engine was not answering yet -
+    /// starting up, or in the middle of a restart. They are added as soon as it
+    /// is back instead of failing with a toast nobody can act on.
+    QList<QPair<QString, QVariantMap>> m_pendingAdds;
 
     QSet<QString> m_historyRecorded;
 };

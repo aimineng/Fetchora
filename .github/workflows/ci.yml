@@ -210,8 +210,15 @@ jobs:
         shell: pwsh
         run: |
           $log = Join-Path $env:RUNNER_TEMP 'engine-supervision.log'
-          & .\tools\check-engine-supervision.ps1 -App build\Release\Fetchora.exe *> $log
+          # A slow 400 MiB file, so the download is still running when the check
+          # kills the engine: that is what makes the "the queue came back" half of
+          # the test mean anything.
+          $server = Start-Process node -ArgumentList 'tools/testsrv.js', '8897', '400' -PassThru
+          Start-Sleep -Seconds 3
+          & .\tools\check-engine-supervision.ps1 -App build\Release\Fetchora.exe `
+              -DownloadUrl 'http://127.0.0.1:8897/supervision.bin' *> $log
           $status = $LASTEXITCODE
+          if ($server) { Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue }
           Get-Content $log | Write-Host
           if ($status -ne 0) {
             $tail = ((Get-Content $log -Tail 20) -join ' | ') -replace '%', '%25'

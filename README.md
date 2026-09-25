@@ -83,7 +83,10 @@ creator, browser bridge, tray icon where the desktop provides one) is identical.
   kill-on-close, which does not depend on the engine cooperating. A crash, a task-manager
   kill or a debugger stop therefore cannot leave an orphaned downloader behind.
 - **The engine supervises itself** — if aria2c dies while Fetchora is running it is started
-  again within a couple of seconds, and both the death and the recovery are reported.
+  again within a couple of seconds, and both the death and the recovery are reported. The
+  downloads it was working on are handed back to the replacement engine, which resumes them
+  from the `.aria2` control files: killing the engine mid-transfer costs a few seconds, not
+  the queue.
 - **Logs with automatic housekeeping** — one file per day, split at 4 MB, pruned after
   7 days (configurable), with a crash handler that writes a minidump and a backtrace.
   See [Logs and crash reports](#logs-and-crash-reports).
