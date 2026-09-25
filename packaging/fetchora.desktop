@@ -1,0 +1,17 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+# Ready-to-install copy of fetchora.desktop.in, for packagers who would rather
+# not run CMake (${CMAKE_PROJECT_NAME} there resolves to the value hard-coded
+# below). CMake itself installs the configured file, not this one.
+Name=Fetchora
+GenericName=Download Manager
+Comment=aria2-powered download manager
+Exec=Fetchora %u
+TryExec=Fetchora
+Icon=fetchora
+Terminal=false
+Categories=Network;FileTransfer;P2P;Qt;
+MimeType=application/x-bittorrent;application/metalink4+xml;x-scheme-handler/magnet;
+StartupNotify=true
+StartupWMClass=Fetchora

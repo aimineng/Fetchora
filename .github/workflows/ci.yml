@@ -1,0 +1,209 @@
+# Continuous integration for Fetchora.
+#
+# Builds the app in Release on the three desktop platforms the project supports
+# and runs the project's own headless self-test (`Fetchora --self-test`, see
+# README "Self-tests"): it checks every aria2c switch the settings layer
+# generates against the engine that is actually installed. That test is the
+# only automated test in the tree, so every job installs aria2 first and fails
+# if the engine is missing - a job must never pass while testing nothing.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Lets a branch be verified without pushing a commit.
+  workflow_dispatch:
+
+# CI only ever reads the repository.
+permissions:
+  contents: read
+
+# A newer push to the same ref makes the previous run pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Qt 6.8 LTS. The project only requires 6.5 (CMakeLists.txt), and 6.8.3 is
+  # the newest 6.8 patch: an LTS with long-term fixes, the version
+  # install-qt-action itself defaults to and tests, and the version whose
+  # win64_mingw package still depends on the MinGW 13.1 toolchain pinned below.
+  QT_VERSION: '6.8.3'
+
+jobs:
+  build:
+    name: Build and self-test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # One broken platform must not hide the state of the other two.
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: build/Release/Fetchora.exe
+          - os: macos-latest
+            artifact: dist/Fetchora.app
+          - os: ubuntu-latest
+            artifact: dist/Fetchora
+    steps:
+      - name: Check out the source
+        uses: actions/checkout@v5
+
+      # ------------------------------------------------------------------ Qt
+      # The app links Widgets/Network/Sql/Concurrent (archive: qtbase), Svg
+      # (qtsvg) and LinguistTools (qttools). All three archives belong to Qt's
+      # *base* installation, which is what this action installs by default, so
+      # no addon is requested: `modules:` only accepts addons such as qtcharts
+      # or qtwebengine, and asking for `qtsvg`/`qttools` there would fail the
+      # install.
+      - name: Install Qt ${{ env.QT_VERSION }} (MinGW)
+        if: runner.os == 'Windows'
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          # build.ps1 - the project's own Windows helper - is MinGW-only, and
+          # Qt's win64_mingw package declares qt.tools.win64_mingw1310 as a
+          # dependency: without that tool there is no g++ to build with.
+          arch: win64_mingw
+          tools: 'tools_mingw,qt.tools.win64_mingw1310'
+
+      - name: Install Qt ${{ env.QT_VERSION }}
+        if: runner.os != 'Windows'
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+
+      # ------------------------------------------------- engine for the tests
+      # aria2c.exe is not in the repository (it is gitignored), so the self-test
+      # has nothing to validate until the engine is installed.
+      - name: Install aria2 (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install aria2 --no-progress -y
+          if ($LASTEXITCODE -ne 0) { throw "choco install aria2 failed" }
+
+          # chocolatey exposes a *shim* in chocolatey\bin; copying that shim
+          # next to Fetchora.exe would not run the engine, so take the real
+          # binary from the package directory and prove it works first.
+          $exe = Get-ChildItem "$env:ProgramData\chocolatey\lib\aria2" -Recurse -Filter aria2c.exe -File -ErrorAction SilentlyContinue |
+                 Select-Object -First 1 -ExpandProperty FullName
+          if (-not $exe) { $exe = 'C:\Program Files\aria2\aria2c.exe' }
+          if (-not (Test-Path $exe)) { throw "aria2c.exe not found after 'choco install aria2'" }
+          & $exe --version | Select-Object -First 1
+          if ($LASTEXITCODE -ne 0) { throw "$exe is not a working aria2c" }
+
+          # build.ps1 copies an aria2c.exe found in the project root next to the
+          # executable and then runs its extra torrent/engine round trip with it.
+          Copy-Item $exe "$env:GITHUB_WORKSPACE\aria2c.exe" -Force
+          Write-Host "engine: $exe"
+
+      - name: Install aria2 (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install aria2
+          # locateAria2() looks next to the binary first and then on PATH; the
+          # .app bundle is deliberately left untouched so the release job gets a
+          # clean bundle for macdeployqt. Assert the PATH lookup will succeed.
+          command -v aria2c || { echo "::error::aria2c is not on PATH - refusing to run a self-test that tests nothing"; exit 1; }
+          aria2c --version | head -1
+
+      - name: Install aria2 and the system libraries Qt needs (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          # The xcb platform plugin links all of the libxcb-* below;
+          # libxcb-cursor0 is the one Qt 6.5 added and the one that is usually
+          # forgotten, and libgl1-mesa-dev / libsqlite3-0 are what Qt's GL and
+          # QSqlDatabase need. xvfb lets the self-test run on a real X server
+          # through that plugin instead of hiding a missing library behind the
+          # offscreen plugin.
+          sudo apt-get install -y \
+            libgl1-mesa-dev libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 \
+            libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
+            libxcb-shape0 libxcb-sync1 libxcb-xfixes0 libxcb-xinerama0 libxcb-xkb1 \
+            libdbus-1-3 libfontconfig1 libsqlite3-0 xvfb aria2
+          command -v aria2c || { echo "::error::aria2c missing after apt-get install aria2"; exit 1; }
+          command -v xvfb-run || { echo "::error::xvfb-run missing after apt-get install xvfb"; exit 1; }
+
+      # ----------------------------------------------------------------- build
+      # The Windows helper is the project's own; it configures with the MinGW
+      # generator, builds with --parallel and then runs both self-tests (the
+      # aria2c command line and the torrent round trip), throwing if
+      # "RESULT: all switches accepted" is not in the output.
+      - name: Configure, build and self-test (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tools = $env:IQTA_TOOLS
+          $mingw = Join-Path $tools 'mingw1310_64'
+          if (-not (Test-Path "$mingw\bin\g++.exe")) {
+            $found = Get-ChildItem $tools -Directory -Filter 'mingw*' -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($found) { $mingw = $found.FullName }
+          }
+          if (-not (Test-Path "$mingw\bin\g++.exe")) { throw "no MinGW toolchain under $tools" }
+          $cmake = (Get-Command cmake -ErrorAction Stop).Source
+          Write-Host "Qt:    $env:QT_ROOT_DIR"
+          Write-Host "MinGW: $mingw"
+          Write-Host "CMake: $cmake"
+          .\build.ps1 -Release -Test -QtDir "$env:QT_ROOT_DIR" -MingwDir $mingw -CMake $cmake
+
+      # Single-config generator, so CMAKE_BUILD_TYPE applies as written. The
+      # binary is forced into dist/ so every platform has one stable artifact
+      # path and the release workflow can package the same layout.
+      - name: Configure and build (macOS / Linux)
+        if: runner.os != 'Windows'
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
+            -DCMAKE_RUNTIME_OUTPUT_DIRECTORY="$PWD/dist"
+          cmake --build build --parallel
+
+      # ------------------------------------------------------------- self-test
+      # GitHub's macOS runners have a real user session, so the cocoa plugin is
+      # the honest test here - no platform override.
+      - name: Self-test (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          set -o pipefail
+          bin="dist/Fetchora.app/Contents/MacOS/Fetchora"
+          out="$("$bin" --self-test 2>&1)"; status=$?
+          printf '%s\n' "$out"
+          if [ $status -ne 0 ]; then echo "::error::--self-test exited $status"; exit 1; fi
+          if ! grep -q 'RESULT: all switches accepted' <<<"$out"; then
+            echo "::error::the installed aria2c rejected the generated command line"; exit 1
+          fi
+          echo "self-test passed: every generated aria2c switch was accepted"
+
+      # Runs on a virtual X server so the xcb plugin (and therefore the apt
+      # packages above) is exercised rather than bypassed.
+      - name: Self-test (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          # locateAria2() looks next to the executable first; putting it there
+          # also documents the layout users are told to install.
+          install -m755 "$(command -v aria2c)" dist/aria2c
+          set +e
+          out="$(xvfb-run -a dist/Fetchora --self-test 2>&1)"; status=$?
+          set -e
+          printf '%s\n' "$out"
+          if [ $status -ne 0 ]; then echo "::error::--self-test exited $status"; exit 1; fi
+          if ! grep -q 'RESULT: all switches accepted' <<<"$out"; then
+            echo "::error::the installed aria2c rejected the generated command line"; exit 1
+          fi
+          echo "self-test passed: every generated aria2c switch was accepted"
+
+      # ----------------------------------------------------------------- upload
+      # Raw build output only - the Qt runtime is deployed by release.yml, not
+      # here, so these artifacts are for inspecting a build, not for shipping.
+      - name: Upload the built artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Fetchora-${{ matrix.os }}
+          path: ${{ matrix.artifact }}
+          # An empty upload would mean the build produced nothing.
+          if-no-files-found: error

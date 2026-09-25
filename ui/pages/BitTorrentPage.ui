@@ -1,0 +1,411 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>BitTorrentPage</class>
+ <widget class="QWidget" name="BitTorrentPage">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>960</width>
+    <height>720</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>BitTorrent</string>
+  </property>
+  <layout class="QVBoxLayout" name="rootLayout">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <property name="spacing">
+    <number>14</number>
+   </property>
+
+   <!-- ===================== header + command bar ====================== -->
+   <item>
+    <layout class="QHBoxLayout" name="headerLayout">
+     <property name="spacing">
+      <number>12</number>
+     </property>
+     <item>
+      <layout class="QVBoxLayout" name="titleLayout">
+       <property name="spacing">
+        <number>2</number>
+       </property>
+       <item>
+        <widget class="QLabel" name="pageTitle">
+         <property name="text">
+          <string>BitTorrent</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="pageSubtitle">
+         <property name="text">
+          <string>0 个种子任务 · 0 个正在下载</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <spacer name="headerSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <!-- Command bar: filled in by BitTorrentPage.cpp so the buttons carry
+          glyphs and roles that a .ui file cannot express. -->
+     <item>
+      <layout class="QHBoxLayout" name="commandLayout">
+       <property name="spacing">
+        <number>8</number>
+       </property>
+      </layout>
+     </item>
+    </layout>
+   </item>
+
+   <!-- ========================= statistics =========================== -->
+   <item>
+    <layout class="QHBoxLayout" name="statLayout">
+     <property name="spacing">
+      <number>12</number>
+     </property>
+    </layout>
+   </item>
+
+   <!-- ==================== inline magnet panel ======================= -->
+   <item>
+    <widget class="QWidget" name="magnetPanel" native="true">
+     <property name="visible">
+      <bool>false</bool>
+     </property>
+     <layout class="QHBoxLayout" name="magnetLayout">
+      <property name="leftMargin">
+       <number>0</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <property name="spacing">
+       <number>8</number>
+      </property>
+      <item>
+       <widget class="FluentLineEdit" name="magnetEdit">
+        <property name="placeholderText">
+         <string>粘贴 magnet:?xt=urn:btih:... 链接</string>
+        </property>
+        <property name="clearButtonEnabled">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+
+   <!-- ========================= BT task list ========================= -->
+   <!-- The card owns its own body layout (FluentCard::body()); the widget
+        below carries the layout so that the whole section stays declarative
+        and BitTorrentPage.cpp only hands the body back to the card. -->
+   <item>
+    <widget class="FluentCard" name="tasksCard">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+       <horstretch>0</horstretch>
+       <verstretch>1</verstretch>
+      </sizepolicy>
+     </property>
+     <widget class="QWidget" name="tasksBody" native="true">
+      <layout class="QVBoxLayout" name="tasksBodyLayout">
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
+       <property name="spacing">
+        <number>10</number>
+       </property>
+       <item>
+        <layout class="QHBoxLayout" name="tasksHeaderLayout">
+         <property name="spacing">
+          <number>8</number>
+         </property>
+         <item>
+          <widget class="QLabel" name="tasksTitle">
+           <property name="text">
+            <string>种子任务</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="tasksHeaderSpacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QLabel" name="tasksCountLabel">
+           <property name="text">
+            <string>0 个</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QScrollArea" name="taskScroll">
+         <property name="frameShape">
+          <enum>QFrame::NoFrame</enum>
+         </property>
+         <property name="horizontalScrollBarPolicy">
+          <enum>Qt::ScrollBarAlwaysOff</enum>
+         </property>
+         <property name="widgetResizable">
+          <bool>true</bool>
+         </property>
+         <widget class="QWidget" name="taskContainer">
+          <layout class="QVBoxLayout" name="taskLayout">
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>8</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <property name="spacing">
+            <number>8</number>
+           </property>
+          </layout>
+         </widget>
+        </widget>
+       </item>
+       <item>
+        <widget class="QWidget" name="tasksEmpty" native="true">
+         <layout class="QVBoxLayout" name="tasksEmptyLayout">
+          <property name="leftMargin">
+           <number>0</number>
+          </property>
+          <property name="topMargin">
+           <number>28</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>20</number>
+          </property>
+          <property name="spacing">
+           <number>8</number>
+          </property>
+          <item>
+           <widget class="QLabel" name="tasksEmptyTitle">
+            <property name="text">
+             <string>暂无 BitTorrent 任务</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignCenter</set>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="tasksEmptyHint">
+            <property name="text">
+             <string>添加 .torrent 文件或磁力链接后，即可在这里查看节点、分片与文件选择</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignCenter</set>
+            </property>
+            <property name="wordWrap">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+
+   <!-- ======================== tracker editor ======================== -->
+   <item>
+    <widget class="FluentCard" name="trackerCard">
+     <widget class="QWidget" name="trackerBody" native="true">
+      <layout class="QVBoxLayout" name="trackerBodyLayout">
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
+       <property name="spacing">
+        <number>10</number>
+       </property>
+       <item>
+        <layout class="QHBoxLayout" name="trackerHeaderLayout">
+         <property name="spacing">
+          <number>8</number>
+         </property>
+         <item>
+          <widget class="QLabel" name="trackerTitle">
+           <property name="text">
+            <string>Tracker 编辑</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="trackerCountLabel">
+           <property name="text">
+            <string>共 0 个 Tracker</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="trackerHeaderSpacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QLabel" name="trackerTaskLabel">
+           <property name="text">
+            <string>任务</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="FluentComboBox" name="trackerCombo">
+           <property name="minimumSize">
+            <size>
+             <width>280</width>
+             <height>0</height>
+            </size>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QPlainTextEdit" name="trackerList">
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>96</height>
+          </size>
+         </property>
+         <property name="readOnly">
+          <bool>true</bool>
+         </property>
+         <property name="lineWrapMode">
+          <enum>QPlainTextEdit::NoWrap</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="trackerHint">
+         <property name="text">
+          <string>该任务还没有 Tracker，添加后可以更快找到其他节点</string>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="trackerInputLayout">
+         <property name="spacing">
+          <number>8</number>
+         </property>
+         <item>
+          <widget class="FluentLineEdit" name="trackerEdit">
+           <property name="placeholderText">
+            <string>添加 Tracker：udp:// 或 https:// .../announce</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>FluentCard</class>
+   <extends>QFrame</extends>
+   <header>ui/FluentWidgets.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>FluentLineEdit</class>
+   <extends>QLineEdit</extends>
+   <header>ui/FluentInputs.h</header>
+  </customwidget>
+  <customwidget>
+   <class>FluentComboBox</class>
+   <extends>QComboBox</extends>
+   <header>ui/FluentInputs.h</header>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>

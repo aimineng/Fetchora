@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>NewTaskDialog</class>
+ <widget class="QDialog" name="NewTaskDialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>640</width>
+    <height>560</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>新建下载</string>
+  </property>
+  <property name="modal">
+   <bool>true</bool>
+  </property>
+  <layout class="QVBoxLayout" name="rootLayout">
+   <property name="leftMargin">
+    <number>20</number>
+   </property>
+   <property name="topMargin">
+    <number>16</number>
+   </property>
+   <property name="rightMargin">
+    <number>20</number>
+   </property>
+   <property name="bottomMargin">
+    <number>16</number>
+   </property>
+   <property name="spacing">
+    <number>12</number>
+   </property>
+
+   <!-- ============================ header ============================ -->
+   <item>
+    <layout class="QHBoxLayout" name="headerLayout">
+     <property name="spacing">
+      <number>12</number>
+     </property>
+     <item>
+      <layout class="QVBoxLayout" name="titleLayout">
+       <property name="spacing">
+        <number>2</number>
+       </property>
+       <item>
+        <widget class="QLabel" name="titleLabel">
+         <property name="text">
+          <string>新建下载</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="subtitleLabel">
+         <property name="text">
+          <string>支持 HTTP / HTTPS / FTP、磁力链接与 .torrent 文件</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <spacer name="headerSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <!-- The close button carries a Fluent glyph and role, so it is created in
+          NewTaskDialog::buildHeader() and inserted into this layout. -->
+     <item>
+      <layout class="QHBoxLayout" name="headerActionLayout">
+       <property name="spacing">
+        <number>0</number>
+       </property>
+      </layout>
+     </item>
+    </layout>
+   </item>
+
+   <!-- ============================ divider =========================== -->
+   <item>
+    <widget class="QFrame" name="headerDivider">
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>1</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>16777215</width>
+       <height>1</height>
+      </size>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::NoFrame</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Plain</enum>
+     </property>
+     <property name="fluentRole" stdset="0">
+      <string>divider</string>
+     </property>
+    </widget>
+   </item>
+
+   <!-- =========================== url input ========================== -->
+   <item>
+    <widget class="QLabel" name="urlLabel">
+     <property name="text">
+      <string>下载链接</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPlainTextEdit" name="urlEdit">
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>140</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>16777215</width>
+       <height>140</height>
+      </size>
+     </property>
+     <property name="tabChangesFocus">
+      <bool>true</bool>
+     </property>
+     <property name="lineWrapMode">
+      <enum>QPlainTextEdit::NoWrap</enum>
+     </property>
+     <property name="placeholderText">
+      <string>每行一个链接，支持 HTTP/HTTPS/FTP、magnet: 与 ed2k:</string>
+     </property>
+    </widget>
+   </item>
+
+   <!-- Paste / torrent picker; filled by NewTaskDialog::buildUrlBox(). -->
+   <item>
+    <layout class="QHBoxLayout" name="urlActionLayout">
+     <property name="spacing">
+      <number>12</number>
+     </property>
+     <item>
+      <layout class="QHBoxLayout" name="urlButtonLayout">
+       <property name="spacing">
+        <number>8</number>
+       </property>
+      </layout>
+     </item>
+     <item>
+      <spacer name="urlActionSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+
+   <!-- ========================= save target ========================== -->
+   <!-- The read-only directory field and its browse button are inserted by
+        NewTaskDialog::buildSaveRow(). -->
+   <item>
+    <layout class="QHBoxLayout" name="saveLayout">
+     <property name="spacing">
+      <number>12</number>
+     </property>
+    </layout>
+   </item>
+
+   <!-- ======================== advanced options ====================== -->
+   <!-- The collapsible toggle and the two-column grid of Fluent inputs are
+        inserted by NewTaskDialog::buildAdvancedSection(). -->
+   <item>
+    <layout class="QHBoxLayout" name="advancedToggleLayout">
+     <property name="spacing">
+      <number>8</number>
+     </property>
+    </layout>
+   </item>
+   <item>
+    <widget class="QWidget" name="advancedPanel" native="true">
+     <layout class="QGridLayout" name="advancedGrid">
+      <property name="leftMargin">
+       <number>0</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <property name="horizontalSpacing">
+       <number>12</number>
+      </property>
+      <property name="verticalSpacing">
+       <number>10</number>
+      </property>
+     </layout>
+    </widget>
+   </item>
+
+   <item>
+    <spacer name="bodySpacer">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>20</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+
+   <!-- ============================ footer =========================== -->
+   <item>
+    <widget class="QFrame" name="footerDivider">
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>1</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>16777215</width>
+       <height>1</height>
+      </size>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::NoFrame</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Plain</enum>
+     </property>
+     <property name="fluentRole" stdset="0">
+      <string>divider</string>
+     </property>
+    </widget>
+   </item>
+   <!-- Cancel / later / download; filled by NewTaskDialog::buildFooter(). -->
+   <item>
+    <layout class="QHBoxLayout" name="footerLayout">
+     <property name="spacing">
+      <number>12</number>
+     </property>
+     <item>
+      <spacer name="footerSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="footerButtonLayout">
+       <property name="spacing">
+        <number>10</number>
+       </property>
+      </layout>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

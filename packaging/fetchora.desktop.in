@@ -1,0 +1,17 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+# Installed as an applications-menu entry by CMakeLists.txt; the executable name
+# is substituted at configure time so the two can never drift apart.
+Name=Fetchora
+GenericName=Download Manager
+Comment=aria2-powered download manager
+Exec=@CMAKE_PROJECT_NAME@ %u
+TryExec=@CMAKE_PROJECT_NAME@
+# fetchora.png is installed into the hicolor icon theme by CMakeLists.txt.
+Icon=fetchora
+Terminal=false
+Categories=Network;FileTransfer;P2P;Qt;
+MimeType=application/x-bittorrent;application/metalink4+xml;x-scheme-handler/magnet;
+StartupNotify=true
+StartupWMClass=Fetchora

@@ -1,0 +1,22 @@
+# Normalise line endings so the repository stays readable on every platform.
+* text=auto eol=lf
+
+# Windows-only build inputs keep CRLF so windres and the PowerShell scripts are
+# happy with them.
+*.ps1   text eol=crlf
+*.rc    text eol=crlf
+*.bat   text eol=crlf
+
+# Shell scripts must keep LF even if someone checks the tree out on Windows:
+# a CRLF shebang line makes the kernel look for an interpreter called "sh\r".
+*.sh    text eol=lf
+
+# Binary assets - never touched by the EOL conversion.
+*.png   binary
+*.ico   binary
+*.icns  binary
+*.exe   binary
+*.qm    binary
+
+# Linguist: the .ts catalogues are real translations, not vendored data.
+translations/*.ts linguist-language=XML

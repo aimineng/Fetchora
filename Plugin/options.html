@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Aria2 Downloader · 扩展设置</title>
+<style>
+  :root {
+    --bg: #f3f3f3; --card: #ffffff; --stroke: #e1e1e1; --text: #1a1a1a;
+    --text2: #5c5c5c; --text3: #8a8a8a; --accent: #0f6cbd;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #202020; --card: #2b2b2b; --stroke: #3a3a3a; --text: #ffffff;
+      --text2: #c5c5c5; --text3: #8b8b8b; --accent: #4cc2ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 32px 20px 60px;
+    font: 14px/1.5 "Segoe UI Variable Display", "Segoe UI", "Microsoft YaHei UI", sans-serif;
+    background: var(--bg); color: var(--text);
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 26px; font-weight: 600; margin: 0 0 4px; }
+  .lead { color: var(--text3); margin: 0 0 24px; font-size: 13px; }
+  section { margin-bottom: 26px; }
+  h2 {
+    font-size: 15px; font-weight: 600; margin: 0 0 10px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--stroke);
+  }
+  .row {
+    display: flex; align-items: center; gap: 16px;
+    background: var(--card); border: 1px solid var(--stroke);
+    border-radius: 8px; padding: 12px 16px; margin-bottom: 8px;
+  }
+  .row .info { flex: 1; min-width: 0; }
+  .row .name { font-weight: 500; }
+  .row .desc { color: var(--text3); font-size: 12px; }
+  input[type=text], input[type=number] {
+    width: 220px; padding: 7px 10px; border-radius: 4px;
+    border: 1px solid var(--stroke); background: var(--card); color: var(--text);
+    font: inherit;
+  }
+  input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .switch { position: relative; width: 40px; height: 20px; flex: none; }
+  .switch input { opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+  .track {
+    position: absolute; inset: 0; border-radius: 10px;
+    background: #d6d6d6; pointer-events: none; transition: background .15s ease;
+  }
+  .track::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+    border-radius: 50%; background: #fff; transition: transform .15s ease;
+    box-shadow: 0 1px 2px rgba(0,0,0,.25);
+  }
+  .switch input:checked + .track { background: var(--accent); }
+  .switch input:checked + .track::after { transform: translateX(20px); }
+  .actions { display: flex; gap: 10px; align-items: center; }
+  button {
+    padding: 9px 16px; border-radius: 4px; border: 1px solid var(--stroke);
+    background: var(--card); color: var(--text); font: inherit; cursor: pointer;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .save-state { color: var(--text3); font-size: 12px; }
+  code {
+    background: rgba(127,127,127,.16); padding: 1px 5px; border-radius: 3px;
+    font-family: "Cascadia Mono", Consolas, monospace; font-size: 12px;
+  }
+  ol { padding-left: 20px; color: var(--text2); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Aria2 Downloader 扩展设置</h1>
+  <p class="lead">这些选项保存在浏览器账号中，并立即生效。</p>
+
+  <section>
+    <h2>连接</h2>
+    <div class="row">
+      <div class="info">
+        <div class="name">桌面程序端口</div>
+        <div class="desc">需与「设置 → 浏览器集成 → 监听端口」保持一致，默认 8899。</div>
+      </div>
+      <input type="number" id="port" min="1024" max="65535">
+    </div>
+    <div class="row">
+      <div class="info">
+        <div class="name">使用 WebSocket 实时通道</div>
+        <div class="desc">关闭后仅使用 HTTP 接口（兼容旧版本桌面程序）。</div>
+      </div>
+      <label class="switch"><input type="checkbox" id="useWebSocket"><span class="track"></span></label>
+    </div>
+    <div class="row">
+      <div class="info">
+        <div class="name">连接状态</div>
+        <div class="desc" id="connState">正在检测…</div>
+      </div>
+      <button id="test">测试连接</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>自动接管</h2>
+    <div class="row">
+      <div class="info">
+        <div class="name">接管浏览器下载</div>
+        <div class="desc">浏览器发起下载时自动转发给 aria2，并取消浏览器自身的下载。</div>
+      </div>
+      <label class="switch"><input type="checkbox" id="interceptDownloads"><span class="track"></span></label>
+    </div>
+    <div class="row">
+      <div class="info">
+        <div class="name">最小文件体积（KB）</div>
+        <div class="desc">小于该体积的下载留给浏览器；0 表示全部接管。</div>
+      </div>
+      <input type="number" id="minSizeKB" min="0" max="1048576">
+    </div>
+    <div class="row">
+      <div class="info">
+        <div class="name">忽略的文件扩展名</div>
+        <div class="desc">逗号分隔，例如 <code>pdf,html,txt</code></div>
+      </div>
+      <input type="text" id="ignoreExtensions" placeholder="pdf,html">
+    </div>
+    <div class="row">
+      <div class="info">
+        <div class="name">忽略的站点</div>
+        <div class="desc">逗号分隔的主机名片段，例如 <code>drive.google.com</code></div>
+      </div>
+      <input type="text" id="ignoreHosts" placeholder="example.com">
+    </div>
+    <div class="row">
+      <div class="info">
+        <div class="name">发送 Referer</div>
+        <div class="desc">把来源页面一并传给 aria2，可解决部分站点的防盗链。</div>
+      </div>
+      <label class="switch"><input type="checkbox" id="sendReferer"><span class="track"></span></label>
+    </div>
+  </section>
+
+  <section>
+    <h2>通知</h2>
+    <div class="row">
+      <div class="info">
+        <div class="name">下载完成时通知</div>
+        <div class="desc">任务完成时在浏览器中弹出通知。</div>
+      </div>
+      <label class="switch"><input type="checkbox" id="notifyOnComplete"><span class="track"></span></label>
+    </div>
+  </section>
+
+  <section>
+    <h2>使用说明</h2>
+    <ol>
+      <li>启动 Aria2 Downloader 桌面程序。</li>
+      <li>在「设置 → 浏览器集成」中确认已开启浏览器集成，并记下监听端口。</li>
+      <li>把此处端口改成一致的值，点击「测试连接」应显示已连接。</li>
+      <li>右键菜单还提供「用 Aria2 Downloader 下载此链接 / 媒体 / 页面」等快捷操作。</li>
+    </ol>
+  </section>
+
+  <div class="actions">
+    <button class="primary" id="save">保存设置</button>
+    <button id="reset">恢复默认</button>
+    <span class="save-state" id="saveState"></span>
+  </div>
+</div>
+<script src="options.js"></script>
+</body>
+</html>

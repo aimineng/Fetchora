@@ -1,0 +1,457 @@
+<div align="center">
+
+<img src="resources/app-256.png" width="112" alt="Fetchora icon">
+
+# Fetchora
+
+**A fast, fluent, aria2-powered download manager for Windows, macOS and Linux.**
+
+Multi-protocol downloads · full BitTorrent client · a real Fluent 2 / WinUI 3 interface
+built with Qt 6 Widgets — and **zero QML**.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![CI](https://github.com/aimineng/Fetchora/actions/workflows/ci.yml/badge.svg)](https://github.com/aimineng/Fetchora/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/aimineng/Fetchora?include_prereleases&sort=semver)](https://github.com/aimineng/Fetchora/releases)
+[![Qt](https://img.shields.io/badge/Qt-6.5%2B-41CD52.svg)](https://www.qt.io/)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078D4.svg)](#requirements)
+[![C++](https://img.shields.io/badge/C%2B%2B-17-00599C.svg)](#build-from-source)
+
+[简体中文](README.zh-CN.md) · [Features](#features) · [Build](#build-from-source) · [Shortcuts](#keyboard-shortcuts) · [FAQ](#faq)
+
+</div>
+
+---
+
+## Why another download manager?
+
+Because the fast ones look like 2009, and the pretty ones are slow. Fetchora puts the
+battle-tested [aria2](https://aria2.github.io/) engine behind an interface that follows the
+Windows 11 design language properly: Mica material, layered surfaces, 1 px lift strokes,
+the system accent colour, Segoe Fluent Icons glyphs and Segoe UI Variable typography.
+
+Everything the engine can do is exposed. Nothing is a "coming soon" placeholder.
+
+On macOS and Linux the same interface runs on an ordinary native window — the Mica
+backdrop, the accent-colour lookup and the Fluent icon font are Windows-only, so the
+window keeps its platform frame and title bar, and the UI falls back to the platform's own
+fonts and dark-mode setting. Everything else (downloads, BitTorrent, history, torrent
+creator, browser bridge, tray icon where the desktop provides one) is identical.
+
+## Features
+
+### Downloading
+- **HTTP / HTTPS / FTP / SFTP** with multi-connection segmented transfer.
+- **BitTorrent** — magnet links, `.torrent` files, DHT, DHT6, PEX, LPD, MSE encryption,
+  metadata exchange, seeding ratio/time limits, per-task tracker editing.
+- **Metalink** (`.metalink` / `.meta4`) with automatic mirror selection.
+- **Resume** everything, including across restarts, with a persistent aria2 session.
+- **Per-task and global speed limits**, per-server connection caps, disk cache tuning.
+- **Queue management** — reorder waiting tasks (move up / down / to top), pause-all and
+  resume-all.
+- **File-level selection** for multi-file torrents.
+- **Scheduler** — start and stop the engine, and swap speed limits, on a daily window.
+
+### Interface
+- **Fluent 2 / WinUI 3** design: Mica backdrop, rounded corners, real dark/light themes,
+  system accent colour, Fluent switches, sliders, combo boxes and progress bars — all
+  hand-painted in C++ so they match the Windows 11 controls exactly.
+- **Frameless window** with a native-behaving caption bar (snap layouts, double-click to
+  maximise, drag-to-restore all work).
+- **Live statistics** — download/upload speed, active/queued/completed counters, lifetime
+  sizes, true average speed per task.
+- **Task inspector** — overview numbers, per-file progress, connected peers, servers/URIs
+  and the raw aria2 option map of the selected task.
+- **Download history** in SQLite, searchable and filterable, with one-click re-download.
+- **Torrent creator** — build standards-compliant `.torrent` files (tracker tiers, web
+  seeds, private flag, automatic piece length) and inspect any existing torrent.
+- **Command bar + filter chips + search**, keyboard shortcuts, tray icon with a live speed
+  tooltip, native toast notifications.
+- **Chinese / English** UI with instant runtime switching.
+
+### Integration
+- **Browser extension** (Manifest V3, Chromium) that hands downloads, magnets and
+  `.torrent` files to the app over a self-hosted WebSocket bridge — see [`Plugin/`](Plugin).
+- **JSON-RPC server** so any third-party aria2 client can drive the same engine.
+- **Single instance** — a second launch forwards its URLs to the running window.
+- **Command line** — pass URLs, magnets or `.torrent` paths directly.
+
+## Screenshots
+
+Captured from the real window with
+`Fetchora --page <page> --screenshot shot.png --screenshot-delay 6000`
+(`Fetchora.exe` on Windows).
+
+**Downloads, with the task inspector open**
+
+![Downloads page with the task inspector](docs/screenshots/download.png)
+
+| BitTorrent | Settings |
+| --- | --- |
+| ![BitTorrent page](docs/screenshots/bittorrent.png) | ![Settings page](docs/screenshots/settings.png) |
+
+| Create torrent | History |
+| --- | --- |
+| ![Create torrent page](docs/screenshots/createtorrent.png) | ![History page](docs/screenshots/history.png) |
+
+![About page](docs/screenshots/about.png)
+
+> `QWidget::grab()` composites a translucent (Mica) window over the desktop, which
+> lightens the capture. The screenshots above were taken with Mica disabled so the real
+> surface colours are visible; the app looks identical either way apart from the
+> background tint. `tools/capture-ui.ps1` reproduces all of them.
+
+## Requirements
+
+### Running
+| | |
+| --- | --- |
+| OS | Windows 10 1809+, macOS 12+, or a modern Linux desktop (X11 or Wayland) |
+| Engine | `aria2c` **1.36 or newer** |
+| Runtime | The Qt 6 runtime libraries (`windeployqt` on Windows, a normal package install or `macdeployqt` elsewhere) |
+
+Mica and the rounded window corners need Windows 11 22H2+; on Windows 10 the window
+simply paints its own opaque surface. On macOS and Linux the window uses the native frame
+and title bar.
+
+`aria2c` is **not** bundled with the source tree on Unix. On Windows put `aria2c.exe` next
+to `Fetchora.exe`, or install it into `PATH`. The app looks in this order: the path
+configured in Settings → RPC/引擎, the application directory (and, in a macOS bundle,
+`Contents/Resources`), `/opt/homebrew/bin`, `/usr/local/bin`, `/usr/bin`, then `PATH`.
+
+### Building
+| | |
+| --- | --- |
+| Compiler | MinGW-w64 GCC 13+ **or** MSVC 2019+ |
+| Qt | 6.5 or newer — modules `Widgets`, `Network`, `Sql`, `Svg`, `Concurrent`, `LinguistTools` |
+| CMake | 3.21 or newer |
+
+## Build from source
+
+The project builds with plain CMake on all three platforms; the helper scripts only wrap
+a configure + build + test cycle.
+
+### Prerequisites
+
+| Platform | Install |
+| --- | --- |
+| Windows | Qt 6.5+ (`Widgets`, `Network`, `Sql`, `Svg`, `Concurrent`, `LinguistTools`) and MinGW-w64 GCC 13+ **or** MSVC 2019+ |
+| macOS | `brew install qt aria2` |
+| Debian / Ubuntu | `sudo apt install build-essential cmake qt6-base-dev qt6-svg-dev libqt6sql6-sqlite aria2 ca-certificates` |
+| other Linux | the same four Qt bits under your distribution's names — `qt6-base-devel`, `qt6-svg-devel` and the Qt 6 SQLite driver |
+
+`cmake` 3.21 or newer is required everywhere. `LinguistTools` ships with the Qt base
+development package on every one of these; on Debian/Ubuntu the SQLite driver is a
+separate package (`libqt6sql6-sqlite`) that `qt6-base-dev` only recommends, and
+`qt6-svg-dev` is needed for the SVG icon plumbing.
+
+### Windows (PowerShell)
+
+```powershell
+git clone https://github.com/aimineng/Fetchora.git
+cd Fetchora
+
+# Debug build
+.\build.ps1
+
+# Release build, then launch
+.\build.ps1 -Release -Run
+
+# Release build + the headless self-tests
+.\build.ps1 -Release -Test
+
+# Release build + a portable folder with the Qt runtime
+.\build.ps1 -Release -Deploy
+```
+
+`build.ps1` assumes the default Qt install layout. Override it if yours differs:
+
+```powershell
+.\build.ps1 -Release `
+    -QtDir    "C:\Qt\6.10.3\mingw_64" `
+    -MingwDir "C:\Qt\Tools\mingw1310_64" `
+    -CMake    "C:\Qt\Tools\CMake_64\bin\cmake.exe"
+```
+
+### macOS
+
+```sh
+brew install qt aria2
+git clone https://github.com/aimineng/Fetchora.git
+cd Fetchora
+
+./build.sh              # Release build; finds Homebrew's Qt automatically
+./build.sh --test       # + the headless self-tests
+./build.sh --run        # build, then launch
+```
+
+The result is the bundle `build/Release/Fetchora.app`. To launch it from a terminal:
+
+```sh
+open build/Release/Fetchora.app
+# or, for the process's own stdout/stderr:
+build/Release/Fetchora.app/Contents/MacOS/Fetchora --self-test
+```
+
+`build.sh` asks `brew --prefix qt` for the Qt prefix. If you use the official Qt online
+installer instead, point it at the prefix yourself:
+
+```sh
+QT_PREFIX="$HOME/Qt/6.10.3/macos" ./build.sh
+```
+
+To make the bundle self-contained (Qt frameworks inside `Contents/Frameworks`):
+
+```sh
+"$(brew --prefix qt)/bin/macdeployqt" build/Release/Fetchora.app
+```
+
+`aria2` is an external program and is **not** copied into the bundle by macdeployqt;
+`build.sh` copies the Homebrew binary into `Contents/Resources/`, where the app looks for
+it. For distribution you should instead declare it as a dependency (both Homebrew and
+MacPorts ship `aria2`) or bundle a signed copy.
+
+### Linux
+
+```sh
+sudo apt install build-essential cmake qt6-base-dev qt6-svg-dev libqt6sql6-sqlite aria2 ca-certificates
+git clone https://github.com/aimineng/Fetchora.git
+cd Fetchora
+
+./build.sh              # Release build -> build/Release/Fetchora
+./build.sh --test       # + the headless self-tests
+./build.sh --run        # build, then launch
+./build.sh --install --prefix "$HOME/.local"   # desktop entry + icon + binary
+```
+
+The binary is `build/Release/Fetchora`; `build.sh` copies `aria2c` and `ca-bundle.crt`
+next to it when it can find them, so the app finds the engine without any configuration.
+
+`cmake --install` additionally installs `fetchora.desktop` into
+`<prefix>/share/applications` and `fetchora.png` into the hicolor icon theme, so the app
+shows up in the desktop's application menu. Packagers who would rather not run CMake can
+use `packaging/fetchora.desktop` as-is.
+
+A tray icon needs a StatusNotifier host (or the legacy XEmbed tray). On a desktop without
+one the app detects this, logs it, and makes **close** mean **quit** instead of hiding the
+window in a tray that does not exist.
+
+### Plain CMake
+
+```sh
+cmake -S . -B build/Release -DCMAKE_BUILD_TYPE=Release
+cmake --build build/Release --parallel
+```
+
+On Windows with MinGW, add the generator and prefix (see the PowerShell form further up).
+The executable lands in `build/Release/` as `Fetchora.exe`, `Fetchora` or `Fetchora.app`,
+and `aria2c`/`aria2c.exe` plus `ca-bundle.crt` are copied next to it automatically when
+they exist in the project root.
+
+### Self-tests
+
+```sh
+./build.sh --test          # macOS / Linux
+.\build.ps1 -Release -Test # Windows
+```
+
+This validates the two things that fail silently in a download manager:
+
+1. **The aria2c command line.** Every switch the settings layer generates is checked
+   against `aria2c --help=#all`. An unknown switch makes aria2 exit with code 28 and the
+   engine never comes up.
+2. **The bencode output.** A torrent is created from a nested directory, re-read, and the
+   info hash is compared both ways — then aria2 itself is asked to parse it.
+
+## Translations
+
+The source language is **Simplified Chinese**; English ships as a compiled catalogue.
+Switching is instant and needs no restart (Settings → 常规 → 语言, or the tray menu).
+
+```powershell
+# Re-extract the strings after changing the UI
+cmake --build build\Release --target update_translations
+# then edit translations/fetchora_en.ts and rebuild
+```
+
+To add a language: copy `translations/fetchora_en.ts` to `translations/fetchora_<code>.ts`,
+translate it, add the code to `LanguageManager::availableLanguages()` and to the `foreach`
+list in `CMakeLists.txt`. Pull requests are welcome.
+
+## Keyboard shortcuts
+
+| Shortcut | Action |
+| --- | --- |
+| `Ctrl+N` | New download |
+| `Ctrl+O` | Open a `.torrent` / `.metalink` file |
+| `F5` | Refresh now |
+| `Ctrl+,` | Open settings |
+| `Ctrl+Q` | Quit |
+| Double-click a task | Open it (complete) / pause it (active) / resume it (paused) |
+
+## Command line
+
+```
+Fetchora [options] [urls...]      # Fetchora.exe on Windows
+
+  -m, --minimized            Start hidden in the system tray
+      --maximized            Start maximized
+      --page <key>           Open on a page: download, queue, bittorrent, history,
+                             createtorrent, settings, about
+      --new-instance         Do not forward to a running instance
+      --screenshot <file>    Render the window to a PNG and exit
+      --screenshot-delay <ms>  Wait before --screenshot
+      --self-test            Validate the generated aria2c command line
+      --make-torrent <src>   Create a .torrent (with --output, --tracker)
+      --inspect-torrent <f>  Print a .torrent's contents
+  -h, --help                 Show help
+  -v, --version              Show version
+```
+
+## Browser extension
+
+`Plugin/` contains a Manifest V3 extension for Chromium browsers (Edge, Chrome, Brave,
+Vivaldi…). It intercepts downloads, magnet links and `.torrent` responses and pushes them
+to the app over a local WebSocket bridge.
+
+1. Start Fetchora and enable **设置 → 通知与集成 → 浏览器集成**.
+2. Open `edge://extensions` (or `chrome://extensions`) and turn on *Developer mode*.
+3. Choose **Load unpacked** and select the `Plugin` folder.
+
+The bridge listens on `127.0.0.1:8899` by default; the port is configurable on both sides.
+
+## Project layout
+
+```
+.
+├── main.cpp                 Entry point: shell, tray, shortcuts, CLI tools
+├── Aria2Client.*            Complete aria2 JSON-RPC client (notifications + callbacks)
+├── Aria2Process.*           aria2c child-process lifetime
+├── Aria2Manager.*           Core: task model, polling, every user operation
+├── SettingsManager.*        ~120 settings, aria2 argument + runtime option builder
+├── DownloadHistory.*        SQLite history store
+├── TorrentUtils.*           Bencode codec, torrent create / inspect / magnet
+├── HttpServer.*             Combined HTTP + hand-written RFC 6455 WebSocket bridge
+├── ui/                      The Fluent widget set (theme, chrome, controls, task list)
+│   ├── FluentTheme.*        Design tokens + generated application style sheet
+│   ├── FluentMainWindow.*   Frameless window, Mica, WM_NCHITTEST / WM_NCCALCSIZE
+│   ├── FluentButton.*       Self-painted Fluent button (6 roles)
+│   ├── FluentWidgets.*      Icon, card, info bar, stat card, progress bar, toasts
+│   ├── FluentInputs.*       Text field, spin box, switch, check/radio, slider, combo
+│   ├── FluentTitleBar.*     Caption bar
+│   ├── FluentNavigationView.* WinUI navigation pane
+│   ├── FluentTaskList.*     Task cards + the in-place updating list
+│   ├── LanguageManager.*    Runtime zh/en switching
+│   └── pages/               One .ui + .h + .cpp per screen
+├── packaging/               Linux desktop entry (fetchora.desktop + .in)
+├── Plugin/                  Chromium MV3 browser extension
+├── tools/                   Developer helpers (syntax check, screen capture, icons)
+├── translations/            Qt .ts catalogues
+├── build.ps1                Windows build helper
+└── build.sh                 macOS / Linux build helper
+```
+
+### Icons
+
+The logo has no binary source: `make-icons.ps1` draws it with `System.Drawing` and writes
+`app.ico` (compiled into the Windows executable by `version.rc`), `resources/app-<size>.png`
+and the browser-extension icons. The app also paints the same artwork at runtime with
+`QPainter` (`makeAppIcon()` in `main.cpp`), so the in-app window/tray icon is correct on
+every platform with no files involved at all.
+
+| Platform | Format | Where it comes from |
+| --- | --- | --- |
+| Windows | `.ico` | `app.ico`, referenced by `version.rc`, embedded by the resource compiler |
+| macOS | `.icns` | `app.icns`, generated from `resources/app-*.png` by `node tools/make-icns.js`, copied into `Fetchora.app/Contents/Resources` and named in `Info.plist` |
+| Linux | `.png` | `resources/app-256.png`, installed as `fetchora.png` into the hicolor theme by `cmake --install` |
+
+`tools/make-icns.js` is a plain container repackager — it writes the `icns` header and one
+PNG element per size, using the PNGs that already exist, so no artwork is invented. If
+`app.icns` is absent, CMake configures cleanly and simply leaves `CFBundleIconFile` empty,
+in which case Finder shows the generic application icon; a packager who wants a different
+one can drop any real `.icns` in as `app.icns` (or run `iconutil -c icns` on an iconset
+built from higher-resolution artwork).
+
+### How the UI is put together
+
+- **Structure lives in `.ui` files.** Every page is a `.ui` + `.h` + `.cpp` triple;
+  `AUTOUIC` generates the headers. C++ only fills in dynamic content, wires signals and
+  applies theme-dependent styling.
+- **Look lives in generated style sheets.** Colours, radii and states change at runtime
+  when the theme or the system accent changes, which a static `.ui` cannot express — so
+  `FluentTheme::applicationStyleSheet()` produces the whole application sheet and every
+  widget connects to `FluentTheme::changed`.
+- **Controls Qt cannot style are painted.** The Fluent switch knob, the slider thumb, the
+  checkbox tick, the combo chevron and the task cards are all `paintEvent` code, which is
+  what makes them match the Windows 11 controls instead of merely resembling them.
+- **The list never rebuilds.** aria2 is polled once a second; task cards are updated in
+  place so the scroll position and the selection survive every poll.
+
+## FAQ
+
+**The engine never starts.**
+Run `Fetchora --self-test` (`Fetchora.exe` on Windows). Nine times out of ten it is a
+missing `aria2c` (install it: it is a separate package on every platform), an unknown
+switch in 设置 → RPC/引擎 → 附加命令行参数, or a port that is already in use.
+
+**Mica looks washed out in screenshots.**
+`QWidget::grab()` composites the translucent window over the desktop, so the capture is
+lighter than the real window. Disable Mica in settings to see the true surface colours.
+Mica itself only exists on Windows 11 22H2+; macOS and Linux always use the opaque
+surface.
+
+**Downloads leave `.aria2` control files behind.**
+That is aria2 keeping the resume state while it seeds. Turn off seeding (or enable
+*移除控制文件*) and they are cleaned up.
+
+**Closing the window does not quit the app.**
+That is "close to tray". On a Linux desktop without a StatusNotifier host there is no tray
+to minimise into, so the app detects that and closes for real instead.
+
+**Why is there no "first launch" animation any more?**
+Removed on purpose. There is a 9-second startup grace period that shows *引擎启动中*
+instead of a red *未连接*; a status light that pulses is a distraction, not information.
+
+## Contributing
+
+Issues and pull requests are welcome. Before opening a PR:
+
+```powershell
+.\build.ps1 -Release -Test
+powershell -File tools\check-syntax.ps1 -Sources ui\pages\YourPage.cpp   # Windows only
+```
+
+```sh
+./build.sh --test
+```
+
+Please keep the two rules that make this codebase readable: **structure in `.ui`, look in
+`FluentTheme`**, and **every user-visible string inside `tr()`**.
+
+Everything platform specific follows the same rule: a `#ifdef Q_OS_WIN` block always has a
+working non-Windows path next to it, and every such choice carries a comment saying why.
+
+## Acknowledgements
+
+- [aria2](https://aria2.github.io/) — the engine that does the actual work, by Tatsuhiro Tsujikawa.
+- [Qt 6](https://www.qt.io/) — the application framework.
+- **Segoe Fluent Icons** and **Segoe UI Variable** — Microsoft's Windows 11 icon and text
+  faces, used through the system font stack.
+
+## Platform notes
+
+Where the three platforms differ, and why:
+
+| Area | Windows | macOS / Linux |
+| --- | --- | --- |
+| Window | Frameless; the app paints the caption bar and keeps the native frame for shadow, snapping and resize borders (`WM_NCCALCSIZE` / `WM_NCHITTEST` / `WM_GETMINMAXINFO`) | Ordinary native window with a normal title bar, so the window can always be moved, zoomed and closed. The in-window caption row is still drawn as a header |
+| Backdrop | Mica / Mica Alt / Acrylic through `DwmSetWindowAttribute`, rounded corners, immersive dark title bar | None (there is no Mica API); the window paints its own opaque surface, because a translucent window over the desktop would wash the palette out |
+| Accent colour | Read from `HKCU\…\DWM\AccentColor` | The built-in Fluent blue; the dark/light default comes from the palette, not the registry |
+| Fonts | Segoe UI Variable / Microsoft YaHei UI, Cascadia Mono | macOS: PingFang SC / Helvetica Neue / SF Mono. Linux: Noto Sans CJK SC / DejaVu Sans, JetBrains Mono / DejaVu Sans Mono |
+| Engine lookup | hint → app dir → `C:\Program Files\aria2` → `PATH` (`aria2c.exe`) | hint → app dir → `Contents/Resources` + `Contents/MacOS` in a bundle → `/opt/homebrew/bin` → `/usr/local/bin` → `/usr/bin` → `PATH` (`aria2c`) |
+| Tray | Always available | Only when the desktop provides a StatusNotifier host; otherwise close means quit |
+| Single instance | Per-user `QLocalServer` endpoint (named pipe) | Per-user endpoint in the runtime/temp directory; the user name is part of the key so two accounts never collide |
+| Icons | `app.ico` embedded by `version.rc` | `app.icns` in the bundle (macOS), `app-256.png` in the hicolor theme via `cmake --install` (Linux) |
+
+## License
+
+[MIT](LICENSE) © 2025 Fetchora contributors.

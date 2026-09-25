@@ -1,0 +1,168 @@
+# English translation table for Fetchora.
+#
+# One entry per line:   <Simplified Chinese source> => <English>
+# Lines starting with '#' and blank lines are ignored.
+# Apply with:  powershell -File tools\make-translations.ps1
+#
+# Chinese is the *source* language of the project, so anything missing here
+# simply stays Chinese in the English UI instead of breaking the build.
+
+# ---------------------------------------------------------------- status words
+下载中 => Downloading
+等待中 => Queued
+已暂停 => Paused
+已完成 => Completed
+失败 => Failed
+已移除 => Removed
+
+# ------------------------------------------------------------ navigation pane
+引擎已连接 => Engine connected
+引擎启动中 => Engine starting
+引擎未连接 => Engine offline
+
+# ------------------------------------------------------------------ title bar
+搜索下载 => Search downloads
+
+# --------------------------------------------------------------- task card/list
+暂停 => Pause
+继续 => Resume
+重试 => Retry
+打开文件 => Open file
+打开所在文件夹 => Open containing folder
+复制链接 => Copy link
+移除 => Remove
+未知错误 => Unknown error
+已做种 %1 => Seeded %1
+%1 个文件 => %1 files
+%1 连接 => %1 connections
+%1 种子 => %1 seeders
+剩余 %1 => %1 left
+正在获取元数据… => Fetching metadata…
+还没有下载任务 => No downloads yet
+点击“新建”或直接把链接粘贴进来 => Click "New", or paste a link anywhere
+
+# ------------------------------------------------------------------ shell / app
+正在下载 => Downloading
+队列与完成 => Queue & finished
+下载历史 => Download history
+制作种子 => Create torrent
+设置 => Settings
+关于 => About
+引擎启动中… => Engine starting…
+%1 个活动 => %1 active
+显示主窗口 => Show window
+全部暂停 => Pause all
+全部开始 => Resume all
+语言 => Language
+跟随系统 => Follow system
+退出 => Quit
+打开种子文件 => Open torrent file
+种子文件 (*.torrent *.metalink);;所有文件 (*) => Torrent files (*.torrent *.metalink);;All files (*)
+
+# --------------------------------------------------------------- downloads page
+总下载速度 => Download speed
+总上传速度 => Upload speed
+活动 / 队列 => Active / queued
+累计下载 => Total downloaded
+新建 => New
+种子 => Torrent
+新建下载 (Ctrl+N) => New download (Ctrl+N)
+刷新 (F5) => Refresh (F5)
+清除已完成记录 => Clear finished records
+显示/隐藏详情面板 => Show/hide the details pane
+全部 => All
+队列 => Queued
+BT => BT
+默认顺序 => Default order
+最快优先 => Fastest first
+体积优先 => Largest first
+正在下载 => Downloading
+失败的任务 => Failed downloads
+BitTorrent 任务 => BitTorrent downloads
+全部下载 => All downloads
+%1 个任务显示中 · 共 %2 个 => %1 shown · %2 in total
+已复制下载链接 => Link copied
+已上传 %1 => Uploaded %1
+已完成 %1 => Completed %1
+总量 %1 => Total %1
+aria2 引擎未就绪 => The aria2 engine is not ready
+队列是空的 => The queue is empty
+等待中的任务会显示在这里，可调整先后顺序 => Waiting downloads show up here
+
+# ------------------------------------------------------------ task details pane
+任务详情 => Task details
+选择左侧的任务查看完整信息 => Pick a download to see everything about it
+概要 => Overview
+文件 => Files
+[TaskDetailsPanel] 连接 => Peers
+连接 => Connections
+服务器 => Servers
+选项 => Options
+未选择任务 => No download selected
+在上方列表中选择一个任务即可查看详情 => Select a download in the list to inspect it
+隐藏详情面板 => Hide the details pane
+文件夹 => Folder
+打开 => Open
+打开已完成的文件 => Open the finished file
+在资源管理器中显示 => Reveal in Explorer
+复制下载地址 => Copy the download address
+暂停或继续 => Pause or resume
+重新开始失败的任务 => Restart a failed download
+从列表移除（不删除文件） => Remove from the list (keeps the file)
+基本信息 => Basics
+名称 => Name
+状态 => Status
+保存到 => Saved to
+类型 => Type
+信息哈希 => Info hash
+分片 => Pieces
+普通下载 => Regular download
+传输 => Transfer
+总大小 => Total size
+已下载 => Downloaded
+已上传 => Uploaded
+下载速度 => Download speed
+上传速度 => Upload speed
+平均速度 => Average speed
+剩余时间 => Time left
+连接数 => Connections
+种子 / 用户 => Seeders / peers
+%1 个种子 · %2 个连接 => %1 seeders · %2 connections
+错误信息 => Error
+文件列表 => Files
+该任务还没有可显示的文件信息 => No file information for this download yet
+%1 / %2 · %3% => %1 / %2 · %3%
+全选 => Select all
+全不选 => Select none
+应用选择 => Apply selection
+已更新文件选择 => File selection updated
+暂无连接的用户（仅 BitTorrent 任务有 Peer 信息） => No connected peers (only BitTorrent downloads have peers)
+已连接的用户 => Connected peers
+上传 %1 · 下载 %2 => Up %1 · down %2
+做种 => Seeding
+下载地址 => Download addresses
+服务器 / 镜像 => Servers / mirrors
+连接 %1 => Connection %1
+暂无服务器信息 => No server information
+aria2 选项 => aria2 options
+正在读取任务选项… => Reading the task options…
+刷新选项 => Refresh options
+
+# ------------------------------------------------------------------ misc / engine
+该页面仍在迁移中 => This page is still being migrated
+
+# ------------------------------------------------- context-only overrides
+# One Chinese word that means different things on different screens.
+[SettingsPage] 连接 => Connection
+[SettingsPage] 下载 => Downloads
+[SettingsPage] 关于 => About
+[BitTorrentPage] 连接 => Peers
+# --------------------------------------------------- navigation-sized captions
+# The navigation pane is only 236 px wide, so the page names use the short form
+# while the page titles keep the descriptive one.
+[QObject] 正在下载 => Downloads
+[QObject] 队列与完成 => Queue
+[QObject] 下载历史 => History
+[TaskDetailsPanel] 下载 => Downloading
+[TaskDetailsPanel] 做种 => Seeding
+[BitTorrentPage] 下载 => Downloading

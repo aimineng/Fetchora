@@ -1,0 +1,665 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>CreateTorrentPage</class>
+ <widget class="QWidget" name="CreateTorrentPage">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>960</width>
+    <height>720</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>创建种子</string>
+  </property>
+  <layout class="QVBoxLayout" name="rootLayout">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <property name="spacing">
+    <number>14</number>
+   </property>
+
+   <!-- ============================ header ============================ -->
+   <item>
+    <layout class="QHBoxLayout" name="headerLayout">
+     <property name="spacing">
+      <number>12</number>
+     </property>
+     <item>
+      <layout class="QVBoxLayout" name="titleLayout">
+       <property name="spacing">
+        <number>2</number>
+       </property>
+       <item>
+        <widget class="QLabel" name="pageTitle">
+         <property name="text">
+          <string>创建种子</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="pageSubtitle">
+         <property name="text">
+          <string>选择文件或文件夹，填写 Tracker 与分片参数，导出标准 .torrent 文件</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <spacer name="headerSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+
+   <!-- ===================== centred content column ==================== -->
+   <item>
+    <widget class="QScrollArea" name="scroll">
+     <property name="frameShape">
+      <enum>QFrame::NoFrame</enum>
+     </property>
+     <property name="horizontalScrollBarPolicy">
+      <enum>Qt::ScrollBarAlwaysOff</enum>
+     </property>
+     <property name="widgetResizable">
+      <bool>true</bool>
+     </property>
+     <widget class="QWidget" name="columnHost">
+      <layout class="QHBoxLayout" name="centerLayout">
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
+       <property name="spacing">
+        <number>0</number>
+       </property>
+       <item>
+        <spacer name="columnLeftSpacer">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Expanding</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QWidget" name="column" native="true">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>760</width>
+           <height>16777215</height>
+          </size>
+         </property>
+         <layout class="QVBoxLayout" name="columnLayout">
+          <property name="leftMargin">
+           <number>0</number>
+          </property>
+          <property name="topMargin">
+           <number>0</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>0</number>
+          </property>
+          <property name="spacing">
+           <number>14</number>
+          </property>
+
+          <!-- ======================= form card ====================== -->
+          <item>
+           <widget class="FluentCard" name="formCard">
+            <widget class="QWidget" name="formBody" native="true">
+             <layout class="QVBoxLayout" name="formLayout">
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>0</number>
+              </property>
+              <property name="rightMargin">
+               <number>0</number>
+              </property>
+              <property name="bottomMargin">
+               <number>0</number>
+              </property>
+              <property name="spacing">
+               <number>12</number>
+              </property>
+
+              <!-- source -->
+              <item>
+               <widget class="QLabel" name="sourceSectionLabel">
+                <property name="text">
+                 <string>源文件 · 单个文件或整个目录</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <layout class="QHBoxLayout" name="sourceLayout">
+                <property name="spacing">
+                 <number>8</number>
+                </property>
+                <item>
+                 <widget class="FluentLineEdit" name="sourceEdit">
+                  <property name="readOnly">
+                   <bool>true</bool>
+                  </property>
+                  <property name="placeholderText">
+                   <string>尚未选择源文件或文件夹</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+
+              <!-- save target -->
+              <item>
+               <widget class="QLabel" name="saveSectionLabel">
+                <property name="text">
+                 <string>保存位置</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <layout class="QHBoxLayout" name="saveLayout">
+                <property name="spacing">
+                 <number>8</number>
+                </property>
+                <item>
+                 <widget class="FluentLineEdit" name="saveEdit">
+                  <property name="readOnly">
+                   <bool>true</bool>
+                  </property>
+                  <property name="placeholderText">
+                   <string>尚未选择保存位置</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+
+              <!-- trackers -->
+              <item>
+               <widget class="QLabel" name="trackerSectionLabel">
+                <property name="text">
+                 <string>Tracker 服务器 · 每行一个</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <layout class="QHBoxLayout" name="trackerActionLayout">
+                <property name="spacing">
+                 <number>8</number>
+                </property>
+               </layout>
+              </item>
+              <item>
+               <widget class="QPlainTextEdit" name="trackerEdit">
+                <property name="minimumSize">
+                 <size>
+                  <width>0</width>
+                  <height>110</height>
+                 </size>
+                </property>
+                <property name="placeholderText">
+                 <string>udp://tracker.example.org:1337/announce</string>
+                </property>
+                <property name="lineWrapMode">
+                 <enum>QPlainTextEdit::NoWrap</enum>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="trackerHint">
+                <property name="text">
+                 <string>留空也可以生成种子，但其他用户将难以找到你的节点；建议至少添加一个公共 Tracker。</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+
+              <!-- piece size + options -->
+              <item>
+               <widget class="QLabel" name="optionSectionLabel">
+                <property name="text">
+                 <string>种子参数</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <layout class="QHBoxLayout" name="pieceLayout">
+                <property name="spacing">
+                 <number>10</number>
+                </property>
+                <item>
+                 <widget class="QLabel" name="pieceLabel">
+                  <property name="minimumSize">
+                   <size>
+                    <width>96</width>
+                    <height>0</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>分片大小</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="FluentComboBox" name="pieceCombo">
+                  <property name="minimumSize">
+                   <size>
+                    <width>180</width>
+                    <height>0</height>
+                   </size>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="pieceHint">
+                  <property name="text">
+                   <string>自动（根据体积选择 256 KiB – 16 MiB）</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <spacer name="pieceSpacer">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <widget class="FluentCheckBox" name="privateCheck">
+                <property name="text">
+                 <string>私有种子（不启用 DHT/PEX）</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="privateHint">
+                <property name="text">
+                 <string>私有种子会关闭 DHT / PEX 传播，只能通过 Tracker 获取节点</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="FluentCheckBox" name="hiddenCheck">
+                <property name="text">
+                 <string>包含隐藏文件</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="hiddenHint">
+                <property name="text">
+                 <string>扫描目录时同时收录以点开头的隐藏文件</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <layout class="QHBoxLayout" name="commentLayout">
+                <property name="spacing">
+                 <number>10</number>
+                </property>
+                <item>
+                 <widget class="QLabel" name="commentLabel">
+                  <property name="minimumSize">
+                   <size>
+                    <width>96</width>
+                    <height>0</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>备注</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="FluentLineEdit" name="commentEdit">
+                  <property name="placeholderText">
+                   <string>可留空，例如：资源说明或版本信息</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <layout class="QHBoxLayout" name="createdByLayout">
+                <property name="spacing">
+                 <number>10</number>
+                </property>
+                <item>
+                 <widget class="QLabel" name="createdByLabel">
+                  <property name="minimumSize">
+                   <size>
+                    <width>96</width>
+                    <height>0</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>创建者</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="FluentLineEdit" name="createdByEdit">
+                  <property name="text">
+                   <string>Fetchora</string>
+                  </property>
+                  <property name="placeholderText">
+                   <string>Fetchora</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <layout class="QHBoxLayout" name="webSeedLayout">
+                <property name="spacing">
+                 <number>10</number>
+                </property>
+                <item>
+                 <widget class="QLabel" name="webSeedLabel">
+                  <property name="minimumSize">
+                   <size>
+                    <width>96</width>
+                    <height>0</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>Web Seed</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="FluentLineEdit" name="webSeedEdit">
+                  <property name="placeholderText">
+                   <string>HTTP/FTP 镜像地址，多个用逗号分隔，可留空</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+
+              <!-- banners, built in CreateTorrentPage.cpp -->
+              <item>
+               <layout class="QVBoxLayout" name="formBannerLayout">
+                <property name="spacing">
+                 <number>8</number>
+                </property>
+               </layout>
+              </item>
+
+              <!-- progress + action -->
+              <item>
+               <layout class="QHBoxLayout" name="progressLayout">
+                <property name="spacing">
+                 <number>10</number>
+                </property>
+                <item>
+                 <widget class="QLabel" name="progressLabel">
+                  <property name="text">
+                   <string>就绪</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <layout class="QHBoxLayout" name="actionLayout">
+                <property name="spacing">
+                 <number>8</number>
+                </property>
+                <item>
+                 <widget class="QLabel" name="actionHint">
+                  <property name="text">
+                   <string>请先选择源文件或文件夹</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <spacer name="actionSpacer">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>40</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+               </layout>
+              </item>
+             </layout>
+            </widget>
+           </widget>
+          </item>
+
+          <!-- ====================== preview card ===================== -->
+          <item>
+           <widget class="FluentCard" name="previewCard">
+            <widget class="QWidget" name="previewBody" native="true">
+             <layout class="QVBoxLayout" name="previewLayout">
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>0</number>
+              </property>
+              <property name="rightMargin">
+               <number>0</number>
+              </property>
+              <property name="bottomMargin">
+               <number>0</number>
+              </property>
+              <property name="spacing">
+               <number>10</number>
+              </property>
+              <item>
+               <layout class="QHBoxLayout" name="previewHeaderLayout">
+                <property name="spacing">
+                 <number>8</number>
+                </property>
+                <item>
+                 <widget class="QLabel" name="previewTitle">
+                  <property name="text">
+                   <string>种子预览</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <spacer name="previewHeaderSpacer">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>40</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <widget class="QLabel" name="previewName">
+                <property name="text">
+                 <string>尚未选择种子文件</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="previewHash">
+                <property name="text">
+                 <string/>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="previewStats">
+                <property name="text">
+                 <string/>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="previewFilesTitle">
+                <property name="text">
+                 <string>文件清单</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QListWidget" name="previewFiles">
+                <property name="minimumSize">
+                 <size>
+                  <width>0</width>
+                  <height>180</height>
+                 </size>
+                </property>
+                <property name="frameShape">
+                 <enum>QFrame::NoFrame</enum>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="previewEmpty">
+                <property name="text">
+                 <string>选择一个 .torrent 文件即可查看它的名称、体积、分片、Tracker 与文件清单。</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <layout class="QVBoxLayout" name="previewBannerLayout">
+                <property name="spacing">
+                 <number>8</number>
+                </property>
+               </layout>
+              </item>
+             </layout>
+            </widget>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="columnRightSpacer">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Expanding</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>FluentCard</class>
+   <extends>QFrame</extends>
+   <header>ui/FluentWidgets.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>FluentLineEdit</class>
+   <extends>QLineEdit</extends>
+   <header>ui/FluentInputs.h</header>
+  </customwidget>
+  <customwidget>
+   <class>FluentComboBox</class>
+   <extends>QComboBox</extends>
+   <header>ui/FluentInputs.h</header>
+  </customwidget>
+  <customwidget>
+   <class>FluentCheckBox</class>
+   <extends>QCheckBox</extends>
+   <header>ui/FluentInputs.h</header>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>

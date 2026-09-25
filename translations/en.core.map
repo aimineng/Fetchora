@@ -1,0 +1,116 @@
+# English translation table for Fetchora - engine / backend layer.
+#
+# One entry per line:   <Simplified Chinese source> => <English>
+# Lines starting with '#' and blank lines are ignored.
+# Apply with:  powershell -File tools\make-translations.ps1
+#
+# Covers exactly the strings owned by the Aria2Manager, TorrentUtils,
+# Aria2Process and QObject contexts: toast / notification / InfoBar messages,
+# the aria2 error-code table, and the status words those contexts share.
+#
+# NOTE: the whole task-status family (下载中, 等待中, 已暂停, 已完成, 失败, 已移除,
+# 未知错误) is shared with Theme.qml and FluentTaskList only - this map does not
+# own it, and en.shell.map already carries the same wording for those contexts.
+
+# ------------------------------------------------- aria2 error-code descriptions
+# Shown in the task-details "error" row and in notifications. Short labels, no
+# full stop, Windows-consistent wording. Codes 1-32, see aria2ErrorMessage().
+超时 => Timed out
+资源未找到 => Resource not found
+“未找到”响应过多 => Too many "not found" responses
+下载速度过慢 => Download speed too slow
+网络问题 => Network problem
+仍有未完成的下载 => Downloads still in progress
+远端服务器不支持断点续传 => Remote server does not support resuming
+磁盘空间不足 => Not enough disk space
+分片长度与控制文件不一致 => Piece length does not match the control file
+重复任务：该文件已在下载 => Duplicate task: this file is already downloading
+重复任务：该种子已在下载 => Duplicate task: this torrent is already downloading
+文件已存在 => File already exists
+重命名失败：文件已存在 => Rename failed: the file already exists
+无法打开已存在的文件 => Could not open the existing file
+无法创建新文件或删除旧文件 => Could not create a new file or delete the old one
+文件系统错误 => File system error
+无法创建目录 => Could not create the directory
+域名解析失败 => Could not resolve the host name
+无法解析 Metalink 文档 => Could not parse the Metalink document
+FTP 命令失败 => FTP command failed
+HTTP 响应头异常 => Unexpected HTTP response header
+重定向次数过多 => Too many redirects
+HTTP 认证失败 => HTTP authentication failed
+无法解析 bencode 文件 => Could not parse the bencode file
+种子文件已损坏或缺少信息 => The torrent file is corrupt or incomplete
+磁力链接格式错误 => Invalid Magnet link
+选项错误或不被支持 => Invalid or unsupported option
+远端服务器暂时无法处理该请求 => Remote server cannot handle the request right now
+无法解析 JSON-RPC 请求 => Could not parse the JSON-RPC request
+保留项，已忽略 => Reserved code, ignored
+校验和不匹配 => Checksum mismatch
+错误 %1 => Error %1
+
+# --------------------------------------------------- notifications (titles)
+# Notification titles - the file name (and error text) follows on the next line,
+# so these stay short and take no full stop.
+下载完成 => Download complete
+下载失败 => Download failed
+下载已开始 => Download started
+
+# ----------------------------------------------------------------- engine toasts
+引擎错误 => Engine error
+引擎未运行，正在重启（第 %1 次）。 => The engine is not running. Restarting (attempt %1).
+aria2c 已崩溃。 => aria2c crashed.
+aria2c 未及时响应。 => aria2c did not respond in time.
+无法向 aria2c 写入数据。 => Could not write to aria2c.
+无法从 aria2c 读取数据。 => Could not read from aria2c.
+未知的 aria2c 进程错误。 => Unknown aria2c process error.
+未找到 aria2c，请将其放在程序目录下或加入 PATH。 => aria2c was not found. Put it next to the program or add it to PATH.
+启动 aria2c 失败（%1）。 => Could not start aria2c (%1).
+已连接到 aria2 %1。 => Connected to aria2 %1.
+无法应用运行时选项：%1 => Could not apply the runtime options: %1
+已应用引擎选项。 => Engine options applied.
+会话已保存。 => Session saved.
+浏览器桥接端口 %1 无法绑定：%2 => Could not bind the browser bridge port %1: %2
+浏览器请求失败：%1 => Browser request failed: %1
+浏览器批量添加失败：%1 => Could not add the browser batch: %1
+已从浏览器添加：%1 => Added from the browser: %1
+已从浏览器添加 %1 个下载任务。 => Added %1 downloads from the browser.
+未提供链接。 => No link provided.
+无法添加 %1：%2 => Could not add %1: %2
+已添加：%1 => Added: %1
+无法读取种子文件：%1 => Could not read the torrent file: %1
+无法添加种子：%1 => Could not add the torrent: %1
+已添加种子：%1 => Torrent added: %1
+无法读取 Metalink 文件：%1 => Could not read the Metalink file: %1
+无法添加 Metalink：%1 => Could not add the Metalink: %1
+无法添加磁力链接：%1 => Could not add the Magnet link: %1
+尚未找到文件。 => File not found yet.
+无法自动重试该种子，请重新添加种子文件或磁力链接。 => Could not retry this torrent automatically. Add the torrent file or Magnet link again.
+该任务没有可用于重试的源地址。 => This task has no source address to retry from.
+任务选项已更新。 => Task options updated.
+尚未获取信息哈希，请等待元数据下载完成。 => The info hash is not available yet. Wait for the metadata download to finish.
+已添加 Tracker。 => Tracker added.
+已移除 Tracker。 => Tracker removed.
+已暂停全部下载。 => All downloads paused.
+已开始全部下载。 => All downloads resumed.
+已清除完成记录。 => Finished records cleared.
+
+# ------------------------------------------ aria2c startup / engine restart logs
+Restarting aria2 with the current settings… => Restarting aria2 with the current settings…
+aria2c rejected the option "%1". Clear it in Settings → Advanced, or reset the extra arguments. => aria2c rejected the option "%1". Clear it in Settings → Advanced, or reset the extra arguments.
+
+# ------------------------------------------------------------ torrent creation
+正在索引… %1 个文件 => Indexing… %1 files
+校验中… %1% => Verifying… %1%
+正在校验 %1 个文件（%2） => Verifying %1 files (%2)
+种子已生成。 => Torrent created.
+源路径不存在：%1 => Source path does not exist: %1
+未指定输出路径。 => No output path specified.
+没有可分享的内容：源路径中没有文件。 => Nothing to share: the source path has no files.
+无法读取 %1 => Could not read %1
+无法写入 %1 => Could not write %1
+无法打开 %1 => Could not open %1
+不是有效的种子文件。 => Not a valid torrent file.
+缺少 info 字典。 => The info dictionary is missing.
+
+# ------------------------------------------------------------------- status word
+BitTorrent => BitTorrent

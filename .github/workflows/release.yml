@@ -1,0 +1,333 @@
+# Release automation for Fetchora.
+#
+# Pushing a v* tag (or dispatching this workflow manually with a tag) builds,
+# self-tests and packages the app on all three desktop platforms, then attaches
+# the three archives to a GitHub Release. Nothing here needs a secret: the
+# default GITHUB_TOKEN is enough (see the release job's `permissions`).
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish, e.g. v2.1 (required when dispatching from a branch)'
+        required: false
+        default: ''
+
+# Default to read-only; the release job below opts into the write scope it
+# needs to create the Release and upload assets.
+permissions:
+  contents: read
+
+env:
+  # Must match ci.yml: an artifact that CI has not validated must not ship.
+  QT_VERSION: '6.8.3'
+
+jobs:
+  build:
+    name: Package (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Publishing a partial release would be worse than publishing none.
+      fail-fast: true
+      matrix:
+        include:
+          - os: windows-latest
+            asset: Fetchora-windows-x64.zip
+          - os: macos-latest
+            # The architecture is filled in at package time by uname -m, so the
+            # glob stays correct whichever runner image macOS-latest points at.
+            asset: Fetchora-macos-*.dmg
+          - os: ubuntu-latest
+            asset: Fetchora-linux-*.tar.gz
+    steps:
+      - name: Check out the source
+        uses: actions/checkout@v5
+
+      # ------------------------------------------------------------------ Qt
+      # Same modules as ci.yml: Widgets/Network/Sql/Concurrent (qtbase), Svg
+      # (qtsvg) and LinguistTools (qttools) all live in Qt's base installation,
+      # so `modules:` stays empty - it only accepts addon modules.
+      - name: Install Qt ${{ env.QT_VERSION }} (MinGW)
+        if: runner.os == 'Windows'
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          # windeployqt and the compiler have to come from the same Qt build as
+          # build.ps1's MinGW toolchain, which Qt 6.8.3 declares as
+          # qt.tools.win64_mingw1310.
+          arch: win64_mingw
+          tools: 'tools_mingw,qt.tools.win64_mingw1310'
+
+      - name: Install Qt ${{ env.QT_VERSION }}
+        if: runner.os != 'Windows'
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+
+      # ------------------------------------------------- engine for the tests
+      - name: Install aria2 (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install aria2 --no-progress -y
+          if ($LASTEXITCODE -ne 0) { throw "choco install aria2 failed" }
+          # chocolatey's bin\aria2c.exe is a shim; the real engine is in the
+          # package directory, and build.ps1 needs a copy in the project root.
+          $exe = Get-ChildItem "$env:ProgramData\chocolatey\lib\aria2" -Recurse -Filter aria2c.exe -File -ErrorAction SilentlyContinue |
+                 Select-Object -First 1 -ExpandProperty FullName
+          if (-not $exe) { $exe = 'C:\Program Files\aria2\aria2c.exe' }
+          if (-not (Test-Path $exe)) { throw "aria2c.exe not found after 'choco install aria2'" }
+          & $exe --version | Select-Object -First 1
+          if ($LASTEXITCODE -ne 0) { throw "$exe is not a working aria2c" }
+          Copy-Item $exe "$env:GITHUB_WORKSPACE\aria2c.exe" -Force
+          Write-Host "engine: $exe"
+
+      - name: Install aria2 (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install aria2
+          # locateAria2() falls back to PATH; the bundle stays untouched so
+          # macdeployqt starts from a clean, unmodified .app.
+          command -v aria2c || { echo "::error::aria2c is not on PATH - refusing to package an untested build"; exit 1; }
+          aria2c --version | head -1
+
+      - name: Install aria2 and the system libraries Qt needs (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          # libxcb-cursor0 is the library Qt 6.5+ added to the xcb plugin and
+          # the one that is usually forgotten; libgl1-mesa-dev and libsqlite3-0
+          # cover Qt's GL and QSqlDatabase. xvfb runs the self-test through the
+          # real xcb plugin so a missing library fails here, not for a user.
+          sudo apt-get install -y \
+            libgl1-mesa-dev libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 \
+            libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
+            libxcb-shape0 libxcb-sync1 libxcb-xfixes0 libxcb-xinerama0 libxcb-xkb1 \
+            libdbus-1-3 libfontconfig1 libsqlite3-0 xvfb aria2
+          command -v aria2c || { echo "::error::aria2c missing after apt-get install aria2"; exit 1; }
+          command -v xvfb-run || { echo "::error::xvfb-run missing after apt-get install xvfb"; exit 1; }
+
+      # ----------------------------------------------------------------- build
+      - name: Configure, build and self-test (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tools = $env:IQTA_TOOLS
+          $mingw = Join-Path $tools 'mingw1310_64'
+          if (-not (Test-Path "$mingw\bin\g++.exe")) {
+            $found = Get-ChildItem $tools -Directory -Filter 'mingw*' -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($found) { $mingw = $found.FullName }
+          }
+          if (-not (Test-Path "$mingw\bin\g++.exe")) { throw "no MinGW toolchain under $tools" }
+          $cmake = (Get-Command cmake -ErrorAction Stop).Source
+          # build.ps1 -Test runs the aria2c command-line check and the torrent
+          # round trip, and throws unless "RESULT: all switches accepted" is in
+          # the output - the release must not ship an unverified binary.
+          .\build.ps1 -Release -Test -QtDir "$env:QT_ROOT_DIR" -MingwDir $mingw -CMake $cmake
+
+      - name: Configure and build (macOS / Linux)
+        if: runner.os != 'Windows'
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
+            -DCMAKE_RUNTIME_OUTPUT_DIRECTORY="$PWD/dist"
+          cmake --build build --parallel
+
+      - name: Self-test (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          set -o pipefail
+          bin="dist/Fetchora.app/Contents/MacOS/Fetchora"
+          out="$("$bin" --self-test 2>&1)"; status=$?
+          printf '%s\n' "$out"
+          if [ $status -ne 0 ]; then echo "::error::--self-test exited $status"; exit 1; fi
+          if ! grep -q 'RESULT: all switches accepted' <<<"$out"; then
+            echo "::error::the installed aria2c rejected the generated command line"; exit 1
+          fi
+          echo "self-test passed: every generated aria2c switch was accepted"
+
+      - name: Self-test (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          install -m755 "$(command -v aria2c)" dist/aria2c
+          set +e
+          out="$(xvfb-run -a dist/Fetchora --self-test 2>&1)"; status=$?
+          set -e
+          printf '%s\n' "$out"
+          if [ $status -ne 0 ]; then echo "::error::--self-test exited $status"; exit 1; fi
+          if ! grep -q 'RESULT: all switches accepted' <<<"$out"; then
+            echo "::error::the installed aria2c rejected the generated command line"; exit 1
+          fi
+          echo "self-test passed: every generated aria2c switch was accepted"
+
+      # --------------------------------------------------------------- package
+      # Asset names carry no version on purpose: the release tag is the version,
+      # and stable names keep .../releases/latest/download/<name> links working
+      # across releases.
+      - name: Package the Windows zip
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $stage = "$env:GITHUB_WORKSPACE\stage\Fetchora"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item build\Release\Fetchora.exe $stage
+          Copy-Item README.md, LICENSE $stage
+          # The repository tracks ca-bundle.crt as aria2's HTTPS trust store and
+          # CMake copies it next to the executable, so a shipped build needs it.
+          if (Test-Path ca-bundle.crt) { Copy-Item ca-bundle.crt $stage }
+          else { Write-Host "::warning::ca-bundle.crt is not in the checkout - the zip ships without a CA bundle" }
+
+          # windeployqt ships with Qt and must be called explicitly; it copies
+          # the runtime DLLs, the platform plugins and the qt.conf that points
+          # at them. --no-translations is safe because LanguageManager loads the
+          # app's own catalogue from :/i18n, never Qt's qt_*.qm, and
+          # --no-system-d3d-compiler matches build.ps1 -Deploy.
+          & "$env:QT_ROOT_DIR\bin\windeployqt.exe" --release --no-translations --no-system-d3d-compiler "$stage\Fetchora.exe"
+          if ($LASTEXITCODE -ne 0) { throw "windeployqt failed" }
+
+          Compress-Archive -Path $stage -DestinationPath Fetchora-windows-x64.zip -Force
+          Get-Item Fetchora-windows-x64.zip | Select-Object Name, Length
+          Get-ChildItem $stage | Select-Object -First 10 Name
+
+      - name: Package the macOS disk image
+        if: runner.os == 'macOS'
+        run: |
+          set -euo pipefail
+          # macdeployqt copies the Qt frameworks into the bundle and rewrites
+          # their install names; -dmg then wraps the finished bundle, writing
+          # Fetchora.dmg next to it. The app is unsigned (no certificate in CI),
+          # which the release notes call out.
+          "$QT_ROOT_DIR/bin/macdeployqt" dist/Fetchora.app -dmg
+          mv dist/Fetchora.dmg "Fetchora-macos-$(uname -m).dmg"
+          ls -l Fetchora-macos-*.dmg
+          du -sh dist/Fetchora.app
+
+      - name: Package the Linux tarball
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          name="Fetchora-linux-$(uname -m)"
+          stage="stage/$name"
+          mkdir -p "$stage"
+          # Qt on Linux is linked dynamically against the distro's Qt 6, so the
+          # tarball stays small and the release notes say what to install.
+          cp dist/Fetchora "$stage/Fetchora"
+          cp README.md LICENSE "$stage/"
+          # The icon must be named after Icon= below for a desktop environment
+          # to resolve it once the file is dropped into an icon theme.
+          cp resources/app-256.png "$stage/fetchora.png"
+          printf '%s\n' \
+            '[Desktop Entry]' \
+            'Type=Application' \
+            'Name=Fetchora' \
+            'Comment=aria2-powered download manager' \
+            'Exec=Fetchora %u' \
+            'Icon=fetchora' \
+            'Terminal=false' \
+            'Categories=Network;FileTransfer;P2P;' \
+            'MimeType=application/x-bittorrent;x-scheme-handler/magnet;' \
+            > "$stage/fetchora.desktop"
+          tar -czf "$name.tar.gz" -C stage "$name"
+          # Print the contents: an empty or wrong tarball must be obvious.
+          tar -tzf "$name.tar.gz"
+
+      - name: Upload the release asset
+        uses: actions/upload-artifact@v4
+        with:
+          name: Fetchora-${{ matrix.os }}-release
+          path: ${{ matrix.asset }}
+          # Publishing nothing for a platform must break the run, not the release.
+          if-no-files-found: error
+
+  release:
+    name: Publish the GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    # Creating a Release and uploading its assets needs the write scope; this is
+    # the only job that gets it.
+    permissions:
+      contents: write
+    steps:
+      - name: Download the packaged archives
+        uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+
+      - name: Resolve the release tag
+        id: tag
+        # Passed through env rather than interpolated into the script, so an
+        # input can never be read as shell syntax.
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          tag="$INPUT_TAG"
+          if [ -z "$tag" ] && [ "$REF_TYPE" = "tag" ]; then tag="$REF_NAME"; fi
+          if [ -z "$tag" ]; then
+            echo "::error::dispatching from a branch needs the 'tag' input (e.g. v2.1) - a release must have a tag"
+            exit 1
+          fi
+          case "$tag" in
+            v*) ;;
+            *) echo "::error::release tags must start with 'v' (got '$tag')"; exit 1 ;;
+          esac
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "publishing $tag"
+
+      - name: List what will be published
+        run: ls -l assets
+
+      - name: Create the Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: Fetchora ${{ steps.tag.outputs.tag }}
+          # generate_release_notes prepends/append the auto-generated notes to
+          # this body, so the platform caveats below always appear.
+          generate_release_notes: true
+          # A missing archive must fail the release instead of publishing two.
+          fail_on_unmatched_files: true
+          files: |
+            assets/*.zip
+            assets/*.dmg
+            assets/*.tar.gz
+          body: |
+            ### Downloads
+
+            | Platform | Asset | Notes |
+            | --- | --- | --- |
+            | Windows 10/11 (x64) | `Fetchora-windows-x64.zip` | Unpack and run `Fetchora.exe`. The Qt runtime is included. |
+            | macOS (Apple silicon or Intel) | `Fetchora-macos-*.dmg` | Open the image and drag Fetchora into Applications. |
+            | Linux (x86_64) | `Fetchora-linux-*.tar.gz` | Binary, `fetchora.desktop` and the icon. |
+
+            **The engine is not bundled.** Fetchora drives `aria2c` 1.36+, which is not part of
+            this release: put `aria2c` (`aria2c.exe` on Windows) next to the executable or on
+            `PATH`. Windows ships `ca-bundle.crt` for HTTPS; on macOS and Linux the system trust
+            store is used.
+
+            **Linux:** the tarball is portable but not self-contained - the binary links against
+            the *distribution's* Qt 6 (6.5 or newer) at runtime. Install it, for example on
+            Debian/Ubuntu:
+
+            ```sh
+            sudo apt install libqt6widgets6 libqt6network6 libqt6sql6 libqt6svg6 \
+                             libqt6concurrent6 libxcb-cursor0
+            ```
+
+            Unpack the tarball anywhere, then optionally install the launcher and icon:
+
+            ```sh
+            install -Dm644 fetchora.desktop ~/.local/share/applications/fetchora.desktop
+            install -Dm644 fetchora.png ~/.local/share/icons/hicolor/256x256/apps/fetchora.png
+            ```
+
+            **macOS:** the build is unsigned and not notarised, so Gatekeeper will warn on first
+            launch - right-click the app and choose *Open*, or run
+            `xattr -dr com.apple.quarantine /Applications/Fetchora.app`.
