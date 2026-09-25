@@ -185,49 +185,49 @@ jobs:
       # completed with exit code 2" on its own says nothing about which compile
       # or copy step broke.
       #
-      # NOTE: Actions runs this with `bash -e`, and `pipefail` plus `-e` would
-      # abort at the failing pipeline before the annotation below could run - so
-      # `-e` is switched off around each pipeline and the status captured from
-      # PIPESTATUS immediately, in the very next command.
+      # NOTE: Actions runs `run:` blocks with `bash -e`. Combined with `pipefail`
+      # that aborts at the first failing command, which is how an earlier version
+      # of this step managed to fail with no diagnostic at all. `-e` is therefore
+      # switched off for the whole step and every status is checked by hand.
       - name: Configure and build (macOS / Linux)
         if: runner.os != 'Windows'
         run: |
+          set +e
           set -o pipefail
 
-          set +e
-          cmake -S . -B build \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
-            -DCMAKE_RUNTIME_OUTPUT_DIRECTORY="$PWD/dist" \
-            -DCMAKE_BUNDLE_OUTPUT_DIRECTORY="$PWD/dist" 2>&1 | tee cmake-configure.log
-          status=${PIPESTATUS[0]}
-          set -e
-          if [ $status -ne 0 ]; then
-            echo "::error title=CMake configure failed ($status)::$(grep -i -m3 'error' cmake-configure.log | tr '\n' ' ' | cut -c1-900)"
-            exit $status
-          fi
+          {
+            cmake -S . -B build \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
+              -DCMAKE_RUNTIME_OUTPUT_DIRECTORY="$PWD/dist" \
+              -DCMAKE_BUNDLE_OUTPUT_DIRECTORY="$PWD/dist" &&
+            cmake --build build --parallel
+          } > cmake-build.log 2>&1
+          status=$?
 
-          set +e
-          cmake --build build --parallel 2>&1 | tee cmake-build.log
-          status=${PIPESTATUS[0]}
-          set -e
           if [ $status -ne 0 ]; then
             # The undefined-symbol list IS the diagnosis for a link failure, so
             # it is what goes into the annotation - "clang++: error: linker
             # command failed" on its own says nothing.
-            detail="$(grep -A8 -m1 'Undefined symbols' cmake-build.log | tr '\n' ' ')"
+            detail="$(awk '/Undefined symbols/{f=1} f&&c<14{print;c++}' cmake-build.log | tr '\n' ' ')"
             if [ -z "$detail" ]; then
-              detail="$(grep -i -m4 -E 'error|Error copying|No such file' cmake-build.log | tr '\n' ' ')"
+              detail="$(grep -i -m8 -E 'error|Error copying|duplicate symbol|ld: |framework not found|not found' cmake-build.log | tr '\n' ' ')"
             fi
             echo "::error title=Build failed ($status)::$(printf '%s' "$detail" | cut -c1-1800)"
+            echo "--- last 60 lines of the build log ---"
+            tail -60 cmake-build.log
             exit $status
           fi
 
-          # Fail here, with a useful message, rather than in the self-test step.
-          find dist -maxdepth 3 -print
-          set +e
+          echo "--- build succeeded; dist/ contains: ---"
+          if [ -d dist ]; then
+            find dist -maxdepth 3 -print
+          else
+            echo "::error title=dist/ was not created::CMake put the binary somewhere else; the self-test cannot find it."
+            exit 1
+          fi
+
           exe="$(find dist -type f -name Fetchora -perm -u+x | head -1)"
-          set -e
           if [ -z "$exe" ]; then
             echo "::error title=The build produced no executable::$(find dist -maxdepth 3 -print | tr '\n' ' ' | cut -c1-900)"
             exit 1

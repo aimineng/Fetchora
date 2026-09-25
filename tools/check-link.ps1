@@ -86,12 +86,21 @@ foreach ($obj in $objects) {
 
 # Only this project's own symbols matter: Qt and the C runtime are linked in by
 # the real build and are legitimately undefined here.
-$ours = 'Fluent|Aria2|Torrent|Download|Http|Settings|Clipboard|Notification|Language|Task|Bencode|main'
-$missing = $undefined | Where-Object { $_ -match $ours } | Where-Object { -not $defined.Contains($_) }
+#
+# The match must be CASE SENSITIVE: PowerShell's -match ignores case, so 'main'
+# would also match QMainWindow and 'Settings' would match QSettings, i.e. the
+# whole of Qt would be reported.
+$ours = 'Fluent|Aria2|TorrentUtils|DownloadHistory|HttpServer|SettingsManager|ClipboardHelper|NotificationManager|LanguageManager'
+$missing = $undefined |
+    Where-Object { $_ -notlike '__imp__*' } |
+    Where-Object { $_ -cmatch $ours } |
+    Where-Object { -not $defined.Contains($_) }
 
 if ($missing.Count -gt 0) {
     Write-Host "`n$($missing.Count) symbol(s) undefined for $Platform :" -ForegroundColor Red
-    $missing | Sort-Object | ForEach-Object { Write-Host "  $_" }
+    foreach ($m in ($missing | Sort-Object)) {
+        Write-Host ("  " + (& c++filt.exe $m))
+    }
     exit 1
 }
 Write-Host "`nno unresolved project symbols for $Platform ($($defined.Count) defined, $($undefined.Count) undefined overall)" -ForegroundColor Green
