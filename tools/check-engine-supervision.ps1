@@ -42,18 +42,27 @@ function Get-Engines {
     @(Get-Process -Name $engineName -ErrorAction SilentlyContinue)
 }
 
-function Fail($message) {
-    Write-Host "FAILED: $message"
-    Write-Host '--- engine log (if the app wrote one) ---'
+function Get-AppLogTail {
     foreach ($dir in @("$env:LOCALAPPDATA\Fetchora\Fetchora\logs",
+                       "$env:LOCALAPPDATA\Fetchora\logs",
                        "$env:APPDATA\Fetchora\logs",
                        "$HOME/.local/share/Fetchora/logs",
                        "$HOME/Library/Application Support/Fetchora/logs")) {
-        if (Test-Path $dir) {
-            $file = Get-ChildItem $dir -Filter 'fetchora-*.log' -ErrorAction SilentlyContinue |
-                Sort-Object LastWriteTime -Descending | Select-Object -First 1
-            if ($file) { Get-Content $file.FullName -Encoding UTF8 -Tail 40 }
-        }
+        if (-not (Test-Path $dir)) { continue }
+        $file = Get-ChildItem $dir -Filter 'fetchora-*.log' -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        if ($file) { return Get-Content $file.FullName -Encoding UTF8 -Tail 40 }
+    }
+    return @('(the app wrote no log file - it did not get as far as opening one)')
+}
+
+function Fail($message) {
+    Write-Host "FAILED: $message"
+    Write-Host '--- application log ---'
+    Get-AppLogTail | ForEach-Object { Write-Host "  $_" }
+    if ($script:stderrFile -and (Test-Path $script:stderrFile)) {
+        Write-Host '--- application stderr ---'
+        Get-Content $script:stderrFile | ForEach-Object { Write-Host "  $_" }
     }
     exit 1
 }
@@ -67,7 +76,10 @@ Write-Host "engine: $(if ($engineExe) { $engineExe } else { "$engineName (from P
 
 # ---------------------------------------------------------------- 1. it starts
 Write-Host "`n--- 1. starting the app starts the engine"
-$app = Start-Process $App -ArgumentList '--new-instance' -PassThru
+$script:stderrFile = Join-Path ([System.IO.Path]::GetTempPath()) 'fetchora-supervision-stderr.txt'
+Remove-Item $script:stderrFile -ErrorAction SilentlyContinue
+$app = Start-Process $App -ArgumentList '--new-instance' -PassThru `
+    -RedirectStandardError $script:stderrFile
 $deadline = (Get-Date).AddSeconds($StartupSeconds)
 $first = @()
 while ((Get-Date) -lt $deadline) {
@@ -75,7 +87,13 @@ while ((Get-Date) -lt $deadline) {
     $first = Get-Engines
     if ($first.Count -gt 0) { break }
 }
-if ($first.Count -eq 0) { Fail "no $engineName after $StartupSeconds s" }
+if ($first.Count -eq 0) {
+    $app.Refresh()
+    if ($app.HasExited) {
+        Fail "the app exited immediately (exit code $($app.ExitCode)) instead of starting the engine"
+    }
+    Fail "the app is running (pid $($app.Id)) but no $engineName appeared within $StartupSeconds s"
+}
 $app.Refresh()
 if ($app.HasExited) { Fail 'the app exited during startup' }
 Write-Host "ok: engine pid $($first.Id -join ',')"

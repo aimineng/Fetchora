@@ -201,10 +201,23 @@ jobs:
       # with no window to stop it, and an engine that stays dead looks like the
       # app ignoring every new task. This starts the real app and watches real
       # processes, which is the only way to check either.
+      #
+      # The output is echoed and, on failure, folded into the annotation: the job
+      # log needs a token to read, annotations do not, so the diagnosis has to fit
+      # in the annotation.
       - name: Engine supervision (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: .\tools\check-engine-supervision.ps1 -App build\Release\Fetchora.exe
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'engine-supervision.log'
+          & .\tools\check-engine-supervision.ps1 -App build\Release\Fetchora.exe *> $log
+          $status = $LASTEXITCODE
+          Get-Content $log | Write-Host
+          if ($status -ne 0) {
+            $tail = ((Get-Content $log -Tail 20) -join ' | ') -replace '%', '%25'
+            echo "::error title=Engine supervision failed ($status)::$tail"
+            exit $status
+          }
 
       # Single-config generator, so CMAKE_BUILD_TYPE applies as written.
       #
