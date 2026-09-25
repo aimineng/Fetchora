@@ -179,7 +179,7 @@ QSet<QString> aria2KnownOptions(const QString &executable)
  *
  * Exit code 0 when every check passed, 5 otherwise.
  */
-int runUpdateSelfTest()
+int runUpdateSelfTest(SettingsManager &settings)
 {
     out() << "update self-test\n";
     int failures = 0;
@@ -284,6 +284,25 @@ int runUpdateSelfTest()
     check(QStringLiteral("a release with no build for this platform offers nothing"),
           assetName(foreignOnly) == QLatin1String("(none)"), assetName(foreignOnly));
 
+    // ---- the settings the update UI edits ---------------------------------
+    // The Settings page edits every row by property *name*, and falls back to a
+    // raw QSettings write when no such property exists - so a renamed or missing
+    // property makes the switch silently stop reaching the running app. These are
+    // the three rows the update feature owns. Read-only: a self-test must not
+    // write to the settings it is inspecting.
+    const QStringList keys = {QStringLiteral("checkForUpdates"),
+                              QStringLiteral("updateIncludePrerelease"),
+                              QStringLiteral("lastNotifiedVersion")};
+    const QMetaObject *meta = settings.metaObject();
+    for (const QString &key : keys) {
+        const int index = meta->indexOfProperty(key.toUtf8().constData());
+        const QMetaProperty property = index >= 0 ? meta->property(index) : QMetaProperty();
+        check(QStringLiteral("SettingsManager::%1 is a readable, writable property").arg(key),
+              property.isValid() && property.isReadable() && property.isWritable(),
+              property.isValid() ? QString::fromLatin1(property.typeName())
+                                 : QStringLiteral("no such property"));
+    }
+
     if (failures > 0) {
         out() << "RESULT: " << failures << " update check(s) failed\n";
         return 5;
@@ -296,7 +315,7 @@ int runSelfTest(SettingsManager &settings)
 {
     // Deterministic and engine-free, so it runs first - and on every platform,
     // including the ones that bundle no aria2c.
-    if (const int updates = runUpdateSelfTest(); updates != 0)
+    if (const int updates = runUpdateSelfTest(settings); updates != 0)
         return updates;
 
     out() << "aria2c self-test\n";
