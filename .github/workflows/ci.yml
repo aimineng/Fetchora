@@ -66,14 +66,18 @@ jobs:
           # Qt's win64_mingw package needs the matching MinGW toolchain, and it
           # is NOT pulled in automatically.
           #
-          # The `tools` input is a list of argument GROUPS separated by spaces,
-          # each group being "<tool_name>,<tool_version>,<tool_arch>". Writing it
-          # as two comma-separated names silently becomes
-          # `aqt install-tool ... tools_mingw qt.tools.win64_mingw1310`, i.e. a
-          # tool name with a version of "qt.tools.win64_mingw1310", and aqt
-          # exits 1 - which is exactly how the first CI run failed.
+          # The `tools` input is a space-separated list of argument groups, each
+          # "<tool_name>,<tool_version>,<tool_arch>"; the action turns the commas
+          # into spaces and runs `aqt install-tool <host> <target> ...`.
+          #
+          # The tool NAME is the repository folder, and the Qt 6.8 toolchain is
+          # NOT in `tools_mingw` - that folder stops at MinGW 8.1.0. MinGW 13.1.0
+          # lives in `tools_mingw1310`
+          # (download.qt.io/.../windows_x86/desktop/tools_mingw1310/Updates.xml
+          # lists qt.tools.win64_mingw1310 13.1.0). Naming the wrong folder is
+          # what made the first two runs die inside aqtinstall.
           arch: win64_mingw
-          tools: 'tools_mingw,13.1.0,win64_mingw1310'
+          tools: 'tools_mingw1310,13.1.0,win64_mingw1310'
 
       - name: Install Qt ${{ env.QT_VERSION }}
         if: runner.os != 'Windows'
@@ -173,23 +177,33 @@ jobs:
       # itself needs authentication to read, annotations are public, and "Process
       # completed with exit code 2" on its own says nothing about which compile
       # or copy step broke.
+      #
+      # NOTE: Actions runs this with `bash -e`, and `pipefail` plus `-e` would
+      # abort at the failing pipeline before the annotation below could run - so
+      # `-e` is switched off around each pipeline and the status captured from
+      # PIPESTATUS immediately, in the very next command.
       - name: Configure and build (macOS / Linux)
         if: runner.os != 'Windows'
         run: |
           set -o pipefail
+
+          set +e
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
             -DCMAKE_RUNTIME_OUTPUT_DIRECTORY="$PWD/dist" \
             -DCMAKE_BUNDLE_OUTPUT_DIRECTORY="$PWD/dist" 2>&1 | tee cmake-configure.log
           status=${PIPESTATUS[0]}
+          set -e
           if [ $status -ne 0 ]; then
             echo "::error title=CMake configure failed ($status)::$(grep -i -m3 'error' cmake-configure.log | tr '\n' ' ' | cut -c1-900)"
             exit $status
           fi
 
+          set +e
           cmake --build build --parallel 2>&1 | tee cmake-build.log
           status=${PIPESTATUS[0]}
+          set -e
           if [ $status -ne 0 ]; then
             echo "::error title=Build failed ($status)::$(grep -i -m3 -E 'error|Error copying|No such file' cmake-build.log | tr '\n' ' ' | cut -c1-900)"
             exit $status
@@ -197,10 +211,14 @@ jobs:
 
           # Fail here, with a useful message, rather than in the self-test step.
           find dist -maxdepth 3 -print
-          if ! find dist -type f -name Fetchora -perm -u+x | grep -q .; then
+          set +e
+          exe="$(find dist -type f -name Fetchora -perm -u+x | head -1)"
+          set -e
+          if [ -z "$exe" ]; then
             echo "::error title=The build produced no executable::$(find dist -maxdepth 3 -print | tr '\n' ' ' | cut -c1-900)"
             exit 1
           fi
+          echo "built $exe"
 
       # ------------------------------------------------------------- self-test
       # GitHub's macOS runners have a real user session, so the cocoa plugin is

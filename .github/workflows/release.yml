@@ -62,7 +62,9 @@ jobs:
           # Argument GROUPS separated by spaces, each <name>,<version>,<arch>.
           # Two bare names would be read as name=tools_mingw with a nonsense
           # version, and aqt exits 1 (this is what broke the first CI run).
-          tools: 'tools_mingw,13.1.0,win64_mingw1310'
+          # Tool NAME is the repository folder: MinGW 13.1.0 lives in
+          # 	ools_mingw1310, not in 	ools_mingw (which stops at 8.1.0).
+          tools: 'tools_mingw1310,13.1.0,win64_mingw1310'
 
       - name: Install Qt ${{ env.QT_VERSION }}
         if: runner.os != 'Windows'
