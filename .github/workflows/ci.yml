@@ -13,8 +13,15 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-  # Lets a branch be verified without pushing a commit.
+  # Lets a branch be verified without pushing a commit. `package` defaults to
+  # true because someone who clicks Run wants the whole thing; the automatic runs
+  # below only package on a push to main.
   workflow_dispatch:
+    inputs:
+      package:
+        description: 'Also build the Windows installer (adds a few minutes)'
+        type: boolean
+        default: true
 
 # CI only ever reads the repository.
 permissions:
@@ -293,6 +300,41 @@ jobs:
             exit 1
           fi
           echo "self-test passed: every generated aria2c switch was accepted"
+
+      # ------------------------------------------------- per-commit packages
+      # Every push to main gets a downloadable installer, so a build can be
+      # handed to someone without cutting a release first. Pull requests do not:
+      # a PR is judged on whether it builds and passes the self-test, and
+      # packaging adds minutes (chocolatey plus LZMA2 over the whole Qt runtime)
+      # for an artifact nobody collects from a PR. workflow_dispatch can ask.
+      #
+      # The version comes from the executable's own version resource, so the file
+      # name cannot drift from what the app reports; the short commit is appended
+      # to the name only, never to the version metadata.
+      - name: Package the Windows installer
+        if: runner.os == 'Windows' && (github.event_name == 'push' || inputs.package)
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          $sha = "${{ github.sha }}".Substring(0, 7)
+          .\packaging\windows\package.ps1 `
+            -QtDir "$env:QT_ROOT_DIR" `
+            -Aria2Dist "$env:GITHUB_WORKSPACE\aria2-dist" `
+            -OutDir "$env:GITHUB_WORKSPACE\dist" `
+            -NameSuffix "-$sha"
+          if ($LASTEXITCODE -ne 0) { throw "packaging failed" }
+
+      - name: Upload the Windows packages
+        if: runner.os == 'Windows' && (github.event_name == 'push' || inputs.package)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Fetchora-windows-packages
+          # Both live in dist/, so the artifact stays flat: upload-artifact keeps
+          # the structure relative to the least common ancestor of the matches.
+          path: |
+            dist/Fetchora-windows-x64.zip
+            dist/Fetchora-*-windows-x64-setup.exe
+          if-no-files-found: error
 
       # ----------------------------------------------------------------- upload
       # Raw build output only - the Qt runtime is deployed by release.yml, not

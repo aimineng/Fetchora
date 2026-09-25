@@ -31,9 +31,6 @@ env:
   # and ARIA2-BUILD-INFO.txt keeps meaning the same thing over time.
   ARIA2_VERSION: '1.37.0'
 
-  # Used for the installer's file name and its Add/Remove Programs entry.
-  APP_VERSION: '0.1'
-
 jobs:
   build:
     name: Package (${{ matrix.os }})
@@ -207,92 +204,19 @@ jobs:
       # Asset names carry no version on purpose: the release tag is the version,
       # and stable names keep .../releases/latest/download/<name> links working
       # across releases.
+      # The packaging itself lives in packaging/windows/package.ps1, which ci.yml
+      # calls too. One implementation, two callers: an installer attached to a
+      # commit is built by the same code as one attached to a Release.
       - name: Package the Windows zip and installer
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $stage = "$env:GITHUB_WORKSPACE\stage\Fetchora"
-          New-Item -ItemType Directory -Force -Path $stage | Out-Null
-          Copy-Item build\Release\Fetchora.exe $stage
-          Copy-Item README.md, LICENSE, THIRD-PARTY-NOTICES.md $stage
-          # The repository tracks ca-bundle.crt as aria2's HTTPS trust store and
-          # CMake copies it next to the executable, so a shipped build needs it.
-          if (Test-Path ca-bundle.crt) { Copy-Item ca-bundle.crt $stage }
-          else { Write-Host "::warning::ca-bundle.crt is not in the checkout - the zip ships without a CA bundle" }
-
-          # ------ bundled engine ------------------------------------------
-          # The engine is what a user actually downloads with, so it ships, and
-          # it is the exact binary the self-test above just validated.
-          $dist = "$env:GITHUB_WORKSPACE\aria2-dist"
-          if (-not (Test-Path $dist)) { throw "aria2-dist is missing - the 'Install aria2' step did not run" }
-          $exe = Get-ChildItem $dist -Recurse -Filter aria2c.exe | Select-Object -First 1
-          Copy-Item $exe.FullName "$stage\aria2c.exe"
-
-          # GPL-2.0 section 3 wants the source offer and the change log to travel
-          # with the binary; these are the files aria2's own archive ships.
-          foreach ($f in @('COPYING', 'LICENSE.OpenSSL', 'AUTHORS', 'ChangeLog', 'NEWS')) {
-            $src = Get-ChildItem $dist -Recurse -Filter $f | Select-Object -First 1
-            if ($src) { Copy-Item $src.FullName "$stage\aria2-$f" }
-            else { Write-Host "::warning::aria2's $f was not in the archive" }
-          }
-
-          # Record what is actually in the package instead of trusting the
-          # notice's prose: the licence table covers a set of libraries, and only
-          # this output says which of them this build links.
-          & "$stage\aria2c.exe" --version | Out-File -FilePath "$stage\ARIA2-BUILD-INFO.txt" -Encoding utf8
-          Get-Content "$stage\ARIA2-BUILD-INFO.txt" | Select-String -Pattern 'aria2 version|Libraries:|Compiler:'
-
-          # ------ licence texts -------------------------------------------
-          # third_party/ holds the texts for aria2 and everything statically
-          # linked into it, plus Qt's LGPL-3.0. They cannot be fetched at install
-          # time, so they are copied verbatim.
-          Copy-Item third_party "$stage\licenses" -Recurse
-          Get-ChildItem "$stage\licenses" -Recurse -File | Measure-Object | ForEach-Object { "licence files staged: $($_.Count)" }
-
-          # ------ Qt runtime ----------------------------------------------
-          # windeployqt ships with Qt and must be called explicitly; it copies
-          # the runtime DLLs, the platform plugins and the qt.conf that points
-          # at them. --no-translations is safe because LanguageManager loads the
-          # app's own catalogue from :/i18n, never Qt's qt_*.qm, and
-          # --no-system-d3d-compiler matches build.ps1 -Deploy.
-          & "$env:QT_ROOT_DIR\bin\windeployqt.exe" --release --no-translations --no-system-d3d-compiler "$stage\Fetchora.exe"
-          if ($LASTEXITCODE -ne 0) { throw "windeployqt failed" }
-
-          # The portable zip is this staging tree, engine and licences included.
-          Compress-Archive -Path $stage -DestinationPath Fetchora-windows-x64.zip -Force
-          Get-Item Fetchora-windows-x64.zip | Select-Object Name, Length
-
-          # ------ installer -----------------------------------------------
-          # Inno Setup is not preinstalled on the runner. The zip above is
-          # already a usable artifact, so a failure here must NOT lose the
-          # release: it is reported and the job carries on with the zip only.
           choco install innosetup --no-progress -y
-          $iscc = @(
-            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
-            "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
-          ) | Where-Object { Test-Path $_ } | Select-Object -First 1
-          if (-not $iscc) {
-            echo "::error title=Inno Setup not found::choco install innosetup did not produce ISCC.exe; the Release will carry the portable zip only."
-            exit 1
-          }
-
-          & $iscc `
-            "/DAppVersion=$env:APP_VERSION" `
-            "/DStageDir=$stage" `
-            "/DBuildDir=$env:GITHUB_WORKSPACE" `
-            "packaging\windows\fetchora.iss"
-          if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
-
-          # A zero exit code only means ISCC was happy; it does not prove the
-          # file landed where the upload globs look. Ask for it by name.
-          $installer = Get-ChildItem "$env:GITHUB_WORKSPACE" -Filter 'Fetchora-*-setup.exe' -ErrorAction SilentlyContinue |
-                       Select-Object -First 1
-          if (-not $installer) {
-            $found = (Get-ChildItem "$env:GITHUB_WORKSPACE" -File | Select-Object -ExpandProperty Name) -join ', '
-            echo "::error title=ISCC produced no installer::the workspace root contains: [$found]"
-            exit 1
-          }
-          Write-Host ("installer: {0} ({1:N0} bytes)" -f $installer.Name, $installer.Length)
+          .\packaging\windows\package.ps1 `
+            -QtDir "$env:QT_ROOT_DIR" `
+            -Aria2Dist "$env:GITHUB_WORKSPACE\aria2-dist" `
+            -OutDir "$env:GITHUB_WORKSPACE"
+          if ($LASTEXITCODE -ne 0) { throw "packaging failed" }
 
       - name: Package the macOS disk image
         if: runner.os == 'macOS'
