@@ -44,13 +44,15 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            # Two artifacts: the portable zip and the Inno Setup installer.
-            # upload-artifact takes a newline-separated list of globs and only
-            # errors when nothing at all matches, so the packaging step is what
-            # guarantees both exist.
+            # Both artifacts, in the same directory. upload-artifact keeps the
+            # path structure relative to the *least common ancestor* of the
+            # matches, and download-artifact then merges that structure into
+            # assets/ - so a pair of files from different directories arrives as
+            # a subdirectory instead of a flat list. Keeping them together in the
+            # workspace root is what makes `assets/*.exe` below match.
             asset: |
               Fetchora-windows-x64.zip
-              dist/Fetchora-*-windows-x64-setup.exe
+              Fetchora-*-windows-x64-setup.exe
           - os: macos-latest
             # The architecture is filled in at package time by uname -m, so the
             # glob stays correct whichever runner image macOS-latest points at.
@@ -277,17 +279,17 @@ jobs:
           & $iscc `
             "/DAppVersion=$env:APP_VERSION" `
             "/DStageDir=$stage" `
-            "/DBuildDir=$env:GITHUB_WORKSPACE\dist" `
+            "/DBuildDir=$env:GITHUB_WORKSPACE" `
             "packaging\windows\fetchora.iss"
           if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
 
           # A zero exit code only means ISCC was happy; it does not prove the
           # file landed where the upload globs look. Ask for it by name.
-          $installer = Get-ChildItem "$env:GITHUB_WORKSPACE\dist" -Filter '*-setup.exe' -ErrorAction SilentlyContinue |
+          $installer = Get-ChildItem "$env:GITHUB_WORKSPACE" -Filter 'Fetchora-*-setup.exe' -ErrorAction SilentlyContinue |
                        Select-Object -First 1
           if (-not $installer) {
-            $found = (Get-ChildItem "$env:GITHUB_WORKSPACE\dist" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name) -join ', '
-            echo "::error title=ISCC produced no installer::dist/ contains: [$found]"
+            $found = (Get-ChildItem "$env:GITHUB_WORKSPACE" -File | Select-Object -ExpandProperty Name) -join ', '
+            echo "::error title=ISCC produced no installer::the workspace root contains: [$found]"
             exit 1
           }
           Write-Host ("installer: {0} ({1:N0} bytes)" -f $installer.Name, $installer.Length)
@@ -386,12 +388,16 @@ jobs:
         # patterns matched, so nothing complained and the installer went no
         # further than the artifact. Asserting the full set here is what turns
         # that silent drop into a failed run.
+        #
+        # This is also what caught the follow-up: an artifact's directory layout
+        # is preserved, so the installer arrived as assets/dist/... - the listing
+        # in the annotation said so, which is why it lists recursively.
         run: |
           set -euo pipefail
           missing=0
           for pattern in '*.zip' '*.exe' '*.dmg' '*.tar.gz'; do
             if ! compgen -G "assets/$pattern" > /dev/null; then
-              echo "::error title=Release asset missing ($pattern)::assets/ contains: $(ls assets | tr '\n' ' ')"
+              echo "::error title=Release asset missing ($pattern)::assets/ contains: $(find assets -type f | sort | tr '\n' ' ')"
               missing=1
             fi
           done
@@ -399,7 +405,7 @@ jobs:
             echo "refusing to publish a partial release"
             exit 1
           fi
-          ls -l assets
+          find assets -type f | sort
 
       - name: List what will be published
         run: ls -l assets
