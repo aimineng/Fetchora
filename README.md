@@ -501,6 +501,20 @@ Run `Fetchora --self-test` (`Fetchora.exe` on Windows). Nine times out of ten it
 missing `aria2c` (install it: it is a separate package on every platform), an unknown
 switch in 设置 → RPC/引擎 → 附加命令行参数, or a port that is already in use.
 
+**The window flashes and disappears.**
+Almost always the Qt runtime is missing next to the executable, so Windows refuses to load
+it and *nothing of ours runs at all* - no window, no error, no log line. That happens when
+the exe is copied out of a deployed folder, or run from a build tree whose Qt DLLs were
+never deployed. It cannot happen with the packaged builds, and `cmake --build` deploys the
+DLLs automatically now; `.\build.ps1 -Release -Deploy` does the same by hand. If the app
+does start and then closes, the log says why: a second launch
+(`another instance is already running`), closing to the tray, or a crash (a `[crash]`
+block). See [Logs and crash reports](#logs-and-crash-reports).
+
+**Downloads disappear from the list while the window is closed.**
+They have not: the engine keeps downloading, and closing the window only hides it. The tray
+icon shows the live speed, and *Show* brings the window back.
+
 **Mica looks washed out in screenshots.**
 `QWidget::grab()` composites the translucent window over the desktop, so the capture is
 lighter than the real window. Disable Mica in settings to see the true surface colours.

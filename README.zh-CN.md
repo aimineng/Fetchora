@@ -439,6 +439,14 @@ Windows 上崩溃还会写出 `crash-YYYYMMDD-HHMMSS.dmp`（minidump），以及
 （各平台都需要单独安装）、设置 → RPC/引擎 → 附加命令行参数 里有 aria2 不认识的开关，
 或者端口被占用。
 
+**窗口一闪就没了。**
+几乎都是可执行文件旁边缺少 Qt 运行库：Windows 直接拒绝加载它，于是**我们自己的代码
+一行都没跑**——没有窗口、没有报错、日志里也没有任何记录。把 exe 从部署好的目录里单独
+拷出来、或者跑一个从没部署过 Qt DLL 的构建目录，都会这样。官方打包的版本不会，而且
+现在 `cmake --build` 会自动把 DLL 部署过去，`.\build.ps1 -Release -Deploy` 也能手动做。
+如果程序确实启动了然后自己关掉，日志里会写明原因：第二次启动（`another instance is
+already running`）、关闭到托盘、或者崩溃（一段 `[crash]` 记录）。见[日志与崩溃报告](#日志与崩溃报告)。
+
 **截图里的 Mica 看起来很淡。**
 `QWidget::grab()` 会把半透明窗口与桌面合成，所以截图比真实窗口更亮。在设置里关掉
 Mica 就能看到真实的表面颜色。Mica 只存在于 Windows 11 22H2+，macOS 与 Linux 始终
