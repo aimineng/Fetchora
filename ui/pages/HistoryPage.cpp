@@ -91,51 +91,6 @@ QString errorText(const QVariantMap &record)
     return Aria2Manager::aria2ErrorMessage(code);
 }
 
-/**
- * ElidedLabel - 按当前宽度省略的 QLabel。
- *
- * 文件名和路径必须省略，而 QLabel 自己不省略；这里在 paintEvent 里用
- * fontMetrics() 现算，所以行宽变化时不需要重新排版。
- */
-class ElidedLabel : public QLabel
-{
-public:
-    explicit ElidedLabel(QWidget *parent = nullptr)
-        : QLabel(parent)
-    {
-        setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
-        setMinimumWidth(1);
-    }
-
-    void setElideMode(Qt::TextElideMode mode) { m_mode = mode; }
-    void setFullText(const QString &text)
-    {
-        m_full = text;
-        setToolTip(text);
-        update();
-    }
-    QString fullText() const { return m_full; }
-
-protected:
-    void paintEvent(QPaintEvent *) override
-    {
-        if (m_full.isEmpty())
-            return;
-        QPainter painter(this);
-        QStyleOption opt;
-        opt.initFrom(this);
-        // 和 QLabel 一样走 QStyle，这样样式表里的 color / 禁用态都能生效。
-        style()->drawItemText(&painter, rect(), int(alignment()) | Qt::TextSingleLine,
-                              opt.palette, isEnabled(),
-                              fontMetrics().elidedText(m_full, m_mode, width()),
-                              QPalette::WindowText);
-    }
-
-private:
-    QString m_full;
-    Qt::TextElideMode m_mode = Qt::ElideMiddle;
-};
-
 } // namespace
 
 // ============================================================================

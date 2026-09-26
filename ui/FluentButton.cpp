@@ -206,12 +206,37 @@ void FluentButton::paintEvent(QPaintEvent *)
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
 
+    // A checkable button that is checked is a *selected* row (the settings rail).
+    // It used to be drawn by a tinted wrapper widget behind the button, which put
+    // two nested rounded rectangles on screen as soon as the pointer hovered the
+    // row: the wrapper's tint and the button's own hover fill. One element, one
+    // pill, and the hover fill still shows on top of it.
+    const bool selected = isCheckable() && isChecked() && on;
+    if (selected) {
+        const QColor accent = t->accent();
+        fill = QColor(accent.red(), accent.green(), accent.blue(), t->isDark() ? 56 : 36);
+        stroke = Qt::transparent;
+        fg = t->textPrimary();
+        if (!pressed && !hovered)
+            fill = QColor(accent.red(), accent.green(), accent.blue(), t->isDark() ? 56 : 36);
+        else if (hovered && !pressed)
+            fill = QColor(accent.red(), accent.green(), accent.blue(), t->isDark() ? 74 : 48);
+    }
+
     // ------------------------------------------------------------- background
     const QRectF r = QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5);
     const int radius = m_compact ? FluentTheme::RadiusSmall : FluentTheme::RadiusMedium;
     p.setPen(stroke.alpha() == 0 ? Qt::NoPen : QPen(stroke, 1));
     p.setBrush(fill);
     p.drawRoundedRect(r, radius, radius);
+
+    // The accent bar that marks the selected row, inside the pill rather than as a
+    // separate wrapper border.
+    if (selected) {
+        p.setPen(Qt::NoPen);
+        p.setBrush(t->accent());
+        p.drawRoundedRect(QRectF(r.left() + 1, r.top() + 5, 3, r.height() - 10), 1.5, 1.5);
+    }
 
     // ------------------------------------------------------------- focus ring
     // Keyboard focus only: Windows and macOS draw a focus visual when the user

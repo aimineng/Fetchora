@@ -1,6 +1,7 @@
 #include "ui/pages/BitTorrentPage.h"
 
 #include "Aria2Manager.h"
+#include "TorrentUtils.h"
 #include "ui/FluentButton.h"
 #include "ui/FluentInputs.h"
 #include "ui/FluentTheme.h"
@@ -10,11 +11,18 @@
 #include <QComboBox>
 #include <QCursor>
 #include <QEnterEvent>
+#include <QFile>
+#include <QFileDialog>
 #include <QFont>
 #include <QFrame>
 #include <QHBoxLayout>
+#include <QInputDialog>
 #include <QLabel>
+#include <QMessageBox>
 #include <QMouseEvent>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
 #include <QPainter>
 #include <QPlainTextEdit>
 #include <QPushButton>
@@ -517,9 +525,12 @@ void BitTorrentPage::buildCommandBar()
     connect(m_addTorrentButton, &QPushButton::clicked, this, &BitTorrentPage::torrentPickerRequested);
     connect(m_magnetButton, &QPushButton::clicked, this, &BitTorrentPage::toggleMagnetPanel);
     connect(m_magnetSubmitButton, &QPushButton::clicked, this, &BitTorrentPage::submitMagnet);
-    connect(ui->magnetEdit, &QLineEdit::returnPressed, this, &BitTorrentPage::submitMagnet);
-    connect(ui->magnetEdit, &QLineEdit::textChanged, this, [this](const QString &text) {
-        m_magnetSubmitButton->setEnabled(!text.trimmed().isEmpty());
+    // The field is a QPlainTextEdit so a long magnet link wraps instead of
+    // scrolling out of sight; Enter still submits (Shift+Enter inserts a line).
+    ui->magnetEdit->setProperty("fluentRole", "textArea");
+    ui->magnetEdit->installEventFilter(this);
+    connect(ui->magnetEdit, &QPlainTextEdit::textChanged, this, [this]() {
+        m_magnetSubmitButton->setEnabled(!ui->magnetEdit->toPlainText().trimmed().isEmpty());
     });
     connect(m_pauseAllButton, &QPushButton::clicked, this, [this]() {
         if (m_aria2)
@@ -587,6 +598,17 @@ void BitTorrentPage::buildTrackerEditor()
     m_trackerRemoveButton->setRole(FluentButton::Subtle);
     ui->trackerInputLayout->addWidget(m_trackerRemoveButton);
 
+    // Tracker lists are shared as files (or as a URL to one), not typed in one by
+    // one - so importing a list is the normal way to fill this in.
+    m_trackerImportButton = new FluentButton(this);
+    m_trackerImportButton->setGlyph(FluentTheme::Glyph::OpenFile);
+    m_trackerImportButton->setText(tr("导入列表"));
+    m_trackerImportButton->setRole(FluentButton::Subtle);
+    m_trackerImportButton->setTooltipText(
+        tr("从一个文件或一个网址导入 Tracker 列表：每行一个地址，非 Tracker 的行会被忽略"));
+    ui->trackerInputLayout->addWidget(m_trackerImportButton);
+
+    connect(m_trackerImportButton, &QPushButton::clicked, this, &BitTorrentPage::importTrackers);
     connect(m_trackerAddButton, &QPushButton::clicked, this, &BitTorrentPage::addTrackerFromInput);
     connect(m_trackerRemoveButton, &QPushButton::clicked, this,
             &BitTorrentPage::removeSelectedTracker);
@@ -647,13 +669,40 @@ void BitTorrentPage::toggleMagnetPanel()
 
 void BitTorrentPage::submitMagnet()
 {
-    const QString text = ui->magnetEdit->text().trimmed();
-    if (text.isEmpty() || !m_aria2)
+    // Several links at once is the normal case: each non-empty line goes in.
+    QStringList magnets;
+    const QStringList lines = ui->magnetEdit->toPlainText().split(QRegularExpression(QStringLiteral("[\\r\\n]+")),
+                                                                  Qt::SkipEmptyParts);
+    for (const QString &line : lines) {
+        const QString trimmed = line.trimmed();
+        if (trimmed.startsWith(QLatin1String("magnet:"), Qt::CaseInsensitive))
+            magnets << trimmed;
+    }
+    if (magnets.isEmpty() || !m_aria2) {
+        if (!magnets.isEmpty() == false && !lines.isEmpty())
+            emit toast(tr("没有找到 magnet: 开头的链接"), true);
         return;
-    m_aria2->addMagnet(text);
+    }
+    for (const QString &magnet : std::as_const(magnets))
+        m_aria2->addMagnet(magnet);
     ui->magnetEdit->clear();
     ui->magnetPanel->hide();
-    emit toast(tr("已添加磁力链接"), false);
+    emit toast(tr("已添加 %1 个磁力链接").arg(magnets.size()), false);
+}
+
+bool BitTorrentPage::eventFilter(QObject *watched, QEvent *event)
+{
+    // Enter submits from the magnet field, Shift+Enter inserts a newline: a
+    // multi-line field otherwise swallows the key the user expects to confirm with.
+    if (watched == ui->magnetEdit && event->type() == QEvent::KeyPress) {
+        auto *key = static_cast<QKeyEvent *>(event);
+        if ((key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter)
+            && !(key->modifiers() & Qt::ShiftModifier)) {
+            submitMagnet();
+            return true;
+        }
+    }
+    return QWidget::eventFilter(watched, event);
 }
 
 // --------------------------------------------------------------------- rows
@@ -758,6 +807,119 @@ void BitTorrentPage::addTrackerFromInput()
         m_aria2->addTrackers(gid, QStringList{url});
     ui->trackerEdit->clear();
     emit toast(tr("已添加 Tracker"), false);
+}
+
+void BitTorrentPage::importTrackers()
+{
+    if (trackerGid().isEmpty()) {
+        emit toast(tr("请先选择一个种子任务"), true);
+        return;
+    }
+    QMessageBox box(this);
+    box.setWindowTitle(tr("导入 Tracker 列表"));
+    box.setText(tr("从哪里读取 Tracker 列表？\n每行一个地址；不是 Tracker 的内容会被忽略。"));
+    QPushButton *fromFile = box.addButton(tr("本地文件…"), QMessageBox::AcceptRole);
+    QPushButton *fromUrl = box.addButton(tr("网址…"), QMessageBox::ActionRole);
+    box.addButton(tr("取消"), QMessageBox::RejectRole);
+    box.exec();
+    if (box.clickedButton() == fromFile)
+        importTrackersFromFile();
+    else if (box.clickedButton() == fromUrl)
+        importTrackersFromUrl();
+}
+
+void BitTorrentPage::importTrackersFromFile()
+{
+    const QString path = QFileDialog::getOpenFileName(
+        this, tr("选择 Tracker 列表文件"), QString(),
+        tr("文本文件 (*.txt *.list *.md);;所有文件 (*)"));
+    if (path.isEmpty())
+        return;
+
+    QFile file(path);
+    // The size check is in the parser as well; this one avoids reading a 4 GB file
+    // into memory just to find out it is not a tracker list.
+    if (!file.open(QIODevice::ReadOnly)) {
+        emit toast(tr("无法读取 %1").arg(path), true);
+        return;
+    }
+    const QByteArray data = file.read(TrackerList::kMaxBytes + 1);
+    file.close();
+
+    const TrackerList::ParseResult parsed = TrackerList::parse(data);
+    if (parsed.binary) {
+        emit toast(tr("这个文件看起来不是文本（可能是种子、压缩包或程序），已忽略"), true);
+        return;
+    }
+    if (parsed.truncated) {
+        emit toast(tr("文件太大，已忽略"), true);
+        return;
+    }
+    applyImportedTrackers(parsed.trackers, parsed.rejected, QFileInfo(path).fileName());
+}
+
+void BitTorrentPage::importTrackersFromUrl()
+{
+    bool ok = false;
+    const QString url = QInputDialog::getText(this, tr("从网址导入 Tracker"),
+                                              tr("列表地址（http 或 https）"),
+                                              QLineEdit::Normal, QString(), &ok)
+                            .trimmed();
+    if (!ok || url.isEmpty())
+        return;
+    if (!url.startsWith(QLatin1String("http://"), Qt::CaseInsensitive)
+        && !url.startsWith(QLatin1String("https://"), Qt::CaseInsensitive)) {
+        emit toast(tr("只支持 http 或 https 地址"), true);
+        return;
+    }
+
+    auto *nam = new QNetworkAccessManager(this);
+    QNetworkRequest request{QUrl(url)};
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                         QNetworkRequest::NoLessSafeRedirectPolicy);
+    request.setTransferTimeout(15000);
+    QNetworkReply *reply = nam->get(request);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, url, nam]() {
+        reply->deleteLater();
+        nam->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) {
+            emit toast(tr("下载列表失败：%1").arg(reply->errorString()), true);
+            return;
+        }
+        const QByteArray data = reply->readAll();
+        const TrackerList::ParseResult parsed = TrackerList::parse(data);
+        if (parsed.binary) {
+            emit toast(tr("这个地址返回的不是文本列表，已忽略"), true);
+            return;
+        }
+        if (parsed.truncated) {
+            emit toast(tr("列表太大或条目过多，已忽略"), true);
+            return;
+        }
+        applyImportedTrackers(parsed.trackers, parsed.rejected, QUrl(url).host());
+    });
+}
+
+void BitTorrentPage::applyImportedTrackers(const QStringList &trackers, int rejected,
+                                           const QString &source)
+{
+    const QString gid = trackerGid();
+    if (gid.isEmpty()) {
+        emit toast(tr("请先选择一个种子任务"), true);
+        return;
+    }
+    if (trackers.isEmpty()) {
+        // Nothing usable: say what was looked at rather than failing silently.
+        emit toast(tr("%1 里没有找到 Tracker 地址（已跳过 %2 行）").arg(source).arg(rejected), true);
+        return;
+    }
+    if (m_aria2)
+        m_aria2->addTrackers(gid, trackers);
+    emit toast(tr("已从 %1 导入 %2 个 Tracker，跳过 %3 行")
+                   .arg(source)
+                   .arg(trackers.size())
+                   .arg(rejected),
+               false);
 }
 
 void BitTorrentPage::removeSelectedTracker()

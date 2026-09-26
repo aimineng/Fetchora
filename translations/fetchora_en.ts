@@ -499,12 +499,12 @@
       <translation>Task options updated.</translation>
     </message>
     <message>
-      <source>尚未获取信息哈希，请等待元数据下载完成。</source>
-      <translation>The info hash is not available yet. Wait for the metadata download to finish.</translation>
+      <source>没有可添加的 Tracker 地址。</source>
+      <translation>There is no tracker address to add.</translation>
     </message>
     <message>
-      <source>已添加 Tracker。</source>
-      <translation>Tracker added.</translation>
+      <source>已添加 %1 个 Tracker。</source>
+      <translation>Added %1 tracker(s).</translation>
     </message>
     <message>
       <source>已移除 Tracker。</source>
@@ -741,6 +741,10 @@
       <translation>Paste a magnet:?xt=urn:btih:... link.</translation>
     </message>
     <message>
+      <source>粘贴 magnet:?xt=urn:btih:... 链接（可多行）</source>
+      <translation>Paste magnet:?xt=urn:btih:... links (several lines are fine)</translation>
+    </message>
+    <message>
       <source>种子任务</source>
       <translation>Torrent tasks</translation>
     </message>
@@ -845,8 +849,20 @@
       <translation>Remove selected</translation>
     </message>
     <message>
-      <source>已添加磁力链接</source>
-      <translation>Magnet link added</translation>
+      <source>导入列表</source>
+      <translation>Import list</translation>
+    </message>
+    <message>
+      <source>从一个文件或一个网址导入 Tracker 列表：每行一个地址，非 Tracker 的行会被忽略</source>
+      <translation>Import a tracker list from a file or a URL: one address per line; anything that is not a tracker is ignored</translation>
+    </message>
+    <message>
+      <source>没有找到 magnet: 开头的链接</source>
+      <translation>No link starting with magnet: was found</translation>
+    </message>
+    <message>
+      <source>已添加 %1 个磁力链接</source>
+      <translation>Added %1 magnet link(s)</translation>
     </message>
     <message>
       <source>该任务还没有 Info Hash，请等待元数据</source>
@@ -871,6 +887,80 @@
     <message>
       <source>已添加 Tracker</source>
       <translation>Tracker added</translation>
+    </message>
+    <message>
+      <source>导入 Tracker 列表</source>
+      <translation>Import tracker list</translation>
+    </message>
+    <message>
+      <source>从哪里读取 Tracker 列表？
+每行一个地址；不是 Tracker 的内容会被忽略。</source>
+      <translation>Where should the tracker list come from?
+One address per line; anything that is not a tracker is ignored.</translation>
+    </message>
+    <message>
+      <source>本地文件…</source>
+      <translation>Local file…</translation>
+    </message>
+    <message>
+      <source>网址…</source>
+      <translation>URL…</translation>
+    </message>
+    <message>
+      <source>取消</source>
+      <translation>Cancel</translation>
+    </message>
+    <message>
+      <source>选择 Tracker 列表文件</source>
+      <translation>Choose a tracker list file</translation>
+    </message>
+    <message>
+      <source>文本文件 (*.txt *.list *.md);;所有文件 (*)</source>
+      <translation>Text files (*.txt *.list *.md);;All files (*)</translation>
+    </message>
+    <message>
+      <source>无法读取 %1</source>
+      <translation>Could not read %1</translation>
+    </message>
+    <message>
+      <source>这个文件看起来不是文本（可能是种子、压缩包或程序），已忽略</source>
+      <translation>That file does not look like text (it may be a torrent, an archive or a program); ignored</translation>
+    </message>
+    <message>
+      <source>文件太大，已忽略</source>
+      <translation>The file is too large; ignored</translation>
+    </message>
+    <message>
+      <source>从网址导入 Tracker</source>
+      <translation>Import trackers from a URL</translation>
+    </message>
+    <message>
+      <source>列表地址（http 或 https）</source>
+      <translation>List address (http or https)</translation>
+    </message>
+    <message>
+      <source>只支持 http 或 https 地址</source>
+      <translation>Only http or https addresses are supported</translation>
+    </message>
+    <message>
+      <source>下载列表失败：%1</source>
+      <translation>Could not download the list: %1</translation>
+    </message>
+    <message>
+      <source>这个地址返回的不是文本列表，已忽略</source>
+      <translation>That address did not return a text list; ignored</translation>
+    </message>
+    <message>
+      <source>列表太大或条目过多，已忽略</source>
+      <translation>The list is too large or has too many entries; ignored</translation>
+    </message>
+    <message>
+      <source>%1 里没有找到 Tracker 地址（已跳过 %2 行）</source>
+      <translation>No tracker addresses found in %1 (%2 line(s) skipped)</translation>
+    </message>
+    <message>
+      <source>已从 %1 导入 %2 个 Tracker，跳过 %3 行</source>
+      <translation>Imported %2 tracker(s) from %1, skipped %3 line(s)</translation>
     </message>
     <message>
       <source>请先在列表中选择要移除的 Tracker</source>
@@ -1321,8 +1411,16 @@ Info Hash %2 · Size %3</translation>
       <translation>Restart engine</translation>
     </message>
     <message>
-      <source>已复制下载链接</source>
-      <translation>Link copied</translation>
+      <source>已复制下载链接：%1</source>
+      <translation>Copied the download link: %1</translation>
+    </message>
+    <message>
+      <source>已复制「%1」的链接：%2</source>
+      <translation>Copied the link of “%1”: %2</translation>
+    </message>
+    <message>
+      <source>这个任务已经不在了，无法复制链接</source>
+      <translation>That task is gone, so there is no link to copy</translation>
     </message>
     <message>
       <source>总下载速度</source>
@@ -2797,8 +2895,8 @@ Info Hash %2 · Size %3</translation>
       <translation>Extra Trackers</translation>
     </message>
     <message>
-      <source>为所有种子附加的 Tracker 地址，以逗号分隔</source>
-      <translation>Tracker addresses added to every torrent, separated by commas.</translation>
+      <source>每行一个或用逗号分隔；留空则使用内置的公共 Tracker 列表</source>
+      <translation>One per line or comma-separated; leave it empty to use the built-in public tracker list</translation>
     </message>
     <message>
       <source>DHT 入口</source>
@@ -3376,10 +3474,6 @@ Info Hash %2 · Size %3</translation>
       <translation>Overview</translation>
     </message>
     <message>
-      <source>文件</source>
-      <translation>Files</translation>
-    </message>
-    <message>
       <source>连接</source>
       <translation>Peers</translation>
     </message>
@@ -3444,10 +3538,6 @@ Info Hash %2 · Size %3</translation>
       <translation>Hide the details pane</translation>
     </message>
     <message>
-      <source>已复制下载链接</source>
-      <translation>Link copied</translation>
-    </message>
-    <message>
       <source>基本信息</source>
       <translation>Basics</translation>
     </message>
@@ -3496,6 +3586,18 @@ Info Hash %2 · Size %3</translation>
       <translation>Transfer</translation>
     </message>
     <message>
+      <source>这个任务没有可复制的链接</source>
+      <translation>This task has no link to copy</translation>
+    </message>
+    <message>
+      <source>已复制下载链接：%1</source>
+      <translation>Copied the download link: %1</translation>
+    </message>
+    <message>
+      <source>已复制「%1」的链接：%2</source>
+      <translation>Copied the link of “%1”: %2</translation>
+    </message>
+    <message>
       <source>总大小</source>
       <translation>Total size</translation>
     </message>
@@ -3538,34 +3640,6 @@ Info Hash %2 · Size %3</translation>
     <message>
       <source>错误信息</source>
       <translation>Error</translation>
-    </message>
-    <message>
-      <source>文件列表</source>
-      <translation>Files</translation>
-    </message>
-    <message>
-      <source>该任务还没有可显示的文件信息</source>
-      <translation>No file information for this download yet</translation>
-    </message>
-    <message>
-      <source>%1 / %2 · %3%</source>
-      <translation>%1 / %2 · %3%</translation>
-    </message>
-    <message>
-      <source>全选</source>
-      <translation>Select all</translation>
-    </message>
-    <message>
-      <source>全不选</source>
-      <translation>Select none</translation>
-    </message>
-    <message>
-      <source>应用选择</source>
-      <translation>Apply selection</translation>
-    </message>
-    <message>
-      <source>已更新文件选择</source>
-      <translation>File selection updated</translation>
     </message>
     <message>
       <source>暂无连接的用户（仅 BitTorrent 任务有 Peer 信息）</source>

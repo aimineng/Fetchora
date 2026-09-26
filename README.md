@@ -42,7 +42,13 @@ creator, browser bridge, tray icon where the desktop provides one) is identical.
 ### Downloading
 - **HTTP / HTTPS / FTP / SFTP** with multi-connection segmented transfer.
 - **BitTorrent** — magnet links, `.torrent` files, DHT, DHT6, PEX, LPD, MSE encryption,
-  metadata exchange, seeding ratio/time limits, per-task tracker editing.
+  metadata exchange, seeding ratio/time limits, per-task trackers.
+- **A tracker list that works out of the box.** A magnet link carries no trackers of its
+  own, and DHT alone finds no peers on every network — a magnet that finds no peer never
+  even gets its metadata. Fetchora hands every magnet a built-in list of public trackers
+  (replaceable in Settings → BitTorrent) and can import a list from a **file or a URL**:
+  each line is checked before it is used, and a file that is not a tracker list (a torrent,
+  an archive, an executable) is recognised and refused rather than parsed.
 - **Metalink** (`.metalink` / `.meta4`) with automatic mirror selection.
 - **Resume** everything, including across restarts, with a persistent aria2 session.
 - **Download the same link twice** — a file that was already downloaded gets a second
@@ -50,7 +56,9 @@ creator, browser bridge, tray icon where the desktop provides one) is identical.
 - **Per-task and global speed limits**, per-server connection caps, disk cache tuning.
 - **Queue management** — reorder waiting tasks (move up / down / to top), pause-all and
   resume-all.
-- **File-level selection** for multi-file torrents.
+- **Per-file progress and selection** for multi-file torrents (in the API: the inspector's
+  own file tab was removed, since for an ordinary download it listed a single row that the
+  header already shows).
 - **Scheduler** — start and stop the engine, and swap speed limits, on a daily window.
 
 ### Interface
@@ -61,8 +69,9 @@ creator, browser bridge, tray icon where the desktop provides one) is identical.
   maximise, drag-to-restore all work).
 - **Live statistics** — download/upload speed, active/queued/completed counters, lifetime
   sizes, true average speed per task.
-- **Task inspector** — overview numbers, per-file progress, connected peers, servers/URIs
-  and the raw aria2 option map of the selected task.
+- **Task inspector** — overview numbers, connected peers, servers/URIs and the raw aria2
+  option map of the selected task. Every value is elided to the pane's width with the full
+  text in its tooltip, so dragging the splitter never re-wraps (and never flashes) the pane.
 - **Download history** in SQLite, searchable and filterable, with one-click re-download and
   a batch-selection mode for deleting several entries at once.
 - **Torrent creator** — build standards-compliant `.torrent` files (tracker tiers, web
@@ -395,7 +404,7 @@ Fetchora [options] [urls...]      # Fetchora.exe on Windows
       --maximized            Start maximized
       --page <key>           Open on a page: download, bittorrent, history,
                              createtorrent, settings, about
-      --detail <section>     Open the task inspector on a section: overview, files,
+      --detail <section>     Open the task inspector on a section: overview,
                              peers, servers, options
       --new-instance         Do not forward to a running instance
       --screenshot <file>    Render the window to a PNG and exit

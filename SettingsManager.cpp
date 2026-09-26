@@ -10,6 +10,32 @@
 #include <QRegularExpression>
 #include <QStandardPaths>
 
+namespace {
+
+/**
+ * Trackers that ship with the app.
+ *
+ * A magnet link carries no trackers of its own, and aria2's DHT alone found no
+ * peers at all on the networks this was tested on (a magnet that never finds a
+ * peer never downloads - it just sits there at 0 B with no connection). These are
+ * long-lived public trackers; the user can replace the whole list in
+ * Settings → BitTorrent, where an empty field means "use these".
+ */
+const char *const kDefaultTrackers[] = {
+    "udp://tracker.opentrackr.org:1337/announce",
+    "udp://open.tracker.cl:1337/announce",
+    "udp://open.demonii.com:1337/announce",
+    "udp://tracker.torrent.eu.org:451/announce",
+    "udp://exodus.desync.com:6969/announce",
+    "udp://tracker.dler.org:6969/announce",
+    "udp://opentracker.io:6969/announce",
+    "udp://open.stealth.si:80/announce",
+    "udp://tracker.openbittorrent.com:6969/announce",
+    "udp://tracker.tiny-vps.com:6969/announce",
+};
+
+} // namespace
+
 // ============================================================================
 //  Boilerplate reduction
 //
@@ -212,10 +238,15 @@ void SettingsManager::loadSettings()
     m_saveSessionInterval = boundedInt(get("saveSessionInterval", 60).toInt(), 0, 86400);
     m_sessionFile = get("sessionFile", appData + "/aria2.session").toString();
     m_btExternalIp = get("btExternalIp", "").toString();
+    // Empty means "use the list that ships with the app" - see effectiveTrackers().
     m_btTracker = get("btTracker", "").toString();
     m_dhtEntryPoint = get("dhtEntryPoint", "").toString();
     m_dhtEntryPoint6 = get("dhtEntryPoint6", "").toString();
-    m_dhtFilePath = get("dhtFilePath", "").toString();
+    // Our own file rather than aria2's default (~/.cache/aria2/dht.dat): that one
+    // is shared with every other aria2 build on the machine, and a table written by
+    // a different version made aria2 log "Failed to load DHT routing table" and
+    // start from an empty table on every launch.
+    m_dhtFilePath = get("dhtFilePath", appData + "/dht.dat").toString();
     m_btSaveMetadataFile = get("btSaveMetadataFile", "").toString();
 
     // ---- throughput --------------------------------------------------------
@@ -519,6 +550,28 @@ IMPL_SETTING(INT_PARAM, DhtEntryPointInterval, m_dhtEntryPointInterval, "dhtEntr
 IMPL_SETTING(INT_PARAM, DhtMessageTimeout, m_dhtMessageTimeout, "dhtMessageTimeout", dhtMessageTimeoutChanged)
 IMPL_SETTING(QSTRING_PARAM, BtExternalIp, m_btExternalIp, "btExternalIp", btExternalIpChanged)
 IMPL_SETTING(QSTRING_PARAM, BtTracker, m_btTracker, "btTracker", btTrackerChanged)
+
+QStringList SettingsManager::builtInTrackers()
+{
+    QStringList list;
+    for (const char *tracker : kDefaultTrackers)
+        list << QString::fromLatin1(tracker);
+    return list;
+}
+
+QStringList SettingsManager::effectiveTrackers() const
+{
+    // The field accepts one tracker per line or a comma-separated list, because
+    // that is how tracker lists are published.
+    QStringList configured;
+    for (const QString &part : m_btTracker.split(QRegularExpression(QStringLiteral("[\\s,]+")),
+                                                 Qt::SkipEmptyParts)) {
+        const QString trimmed = part.trimmed();
+        if (!trimmed.isEmpty())
+            configured << trimmed;
+    }
+    return configured.isEmpty() ? builtInTrackers() : configured;
+}
 IMPL_SETTING(QSTRING_PARAM, DhtEntryPoint, m_dhtEntryPoint, "dhtEntryPoint", dhtEntryPointChanged)
 IMPL_SETTING(QSTRING_PARAM, DhtEntryPoint6, m_dhtEntryPoint6, "dhtEntryPoint6", dhtEntryPoint6Changed)
 IMPL_SETTING(QSTRING_PARAM, DhtFilePath, m_dhtFilePath, "dhtFilePath", dhtFilePathChanged)
@@ -820,10 +873,9 @@ QStringList SettingsManager::buildAria2Arguments() const
     addNum(QStringLiteral("bt-tracker-timeout"), m_btTrackerTimeout);
     if (m_btTrackerInterval > 0)
         addNum(QStringLiteral("bt-tracker-interval"), m_btTrackerInterval);
-    if (!m_btExternalIp.isEmpty())
+    if (m_btExternalIp.isEmpty() == false)
         add(QStringLiteral("bt-external-ip"), m_btExternalIp);
-    if (!m_btTracker.isEmpty())
-        add(QStringLiteral("bt-tracker"), m_btTracker);
+    add(QStringLiteral("bt-tracker"), effectiveTrackers().join(QLatin1Char(',')));
 
     addNum(QStringLiteral("dht-message-timeout"), m_dhtMessageTimeout);
     if (!m_dhtEntryPoint.isEmpty())

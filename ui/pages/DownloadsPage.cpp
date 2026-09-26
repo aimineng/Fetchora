@@ -102,12 +102,20 @@ DownloadsPage::DownloadsPage(Aria2Manager *aria2, QWidget *parent)
         const QVariantList tasks = m_aria2->tasks();
         for (const QVariant &v : tasks) {
             const QVariantMap t = v.toMap();
-            if (t.value(QStringLiteral("gid")).toString() == gid) {
-                m_aria2->copyToClipboard(t.value(QStringLiteral("uri")).toString());
-                emit toast(tr("已复制下载链接"), false);
-                return;
-            }
+            if (t.value(QStringLiteral("gid")).toString() != gid)
+                continue;
+            const QString uri = t.value(QStringLiteral("uri")).toString();
+            m_aria2->copyToClipboard(uri);
+            // Say what was copied. "Copied the link" without saying whose link made
+            // "why did I get a magnet when I clicked on the HTTP download?" a
+            // question the app could not answer.
+            const QString name = t.value(QStringLiteral("fileName")).toString();
+            emit toast(name.isEmpty() ? tr("已复制下载链接：%1").arg(uri)
+                                      : tr("已复制「%1」的链接：%2").arg(name, uri),
+                       false);
+            return;
         }
+        emit toast(tr("这个任务已经不在了，无法复制链接"), true);
     });
 
     wireManager();

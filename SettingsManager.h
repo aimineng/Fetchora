@@ -398,6 +398,13 @@ public:
     void setBtExternalIp(const QString &v);
     QString btTracker() const { return m_btTracker; }
     void setBtTracker(const QString &v);
+    /// The tracker list actually used: what the user configured, or the built-in
+    /// list when that field is empty. A magnet link carries no trackers of its own
+    /// and aria2's DHT alone is not enough to find peers everywhere, so "no
+    /// trackers at all" would mean "a magnet that never downloads".
+    QStringList effectiveTrackers() const;
+    /// The list that ships with the app (see SettingsManager.cpp).
+    static QStringList builtInTrackers();
     QString dhtEntryPoint() const { return m_dhtEntryPoint; }
     void setDhtEntryPoint(const QString &v);
     QString dhtEntryPoint6() const { return m_dhtEntryPoint6; }

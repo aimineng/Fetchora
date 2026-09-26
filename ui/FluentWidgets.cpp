@@ -9,6 +9,8 @@
 #include <QPainterPath>
 #include <QParallelAnimationGroup>
 #include <QPropertyAnimation>
+#include <QStyle>
+#include <QStyleOption>
 #include <QTimer>
 #include <QVBoxLayout>
 
@@ -450,6 +452,50 @@ void StatCard::restyle()
     setStyleSheet(QStringLiteral("StatCard { background: %1; border: 1px solid %2; border-radius: %3px; }")
                       .arg(t->card().name(QColor::HexRgb), t->strokeSubtle().name(QColor::HexRgb))
                       .arg(FluentTheme::RadiusLarge));
+}
+
+// ============================================================================
+//  ElidedLabel
+// ============================================================================
+ElidedLabel::ElidedLabel(QWidget *parent)
+    : QLabel(parent)
+{
+    // Ignored horizontally: the label never asks for room, it uses what it gets.
+    setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
+    setMinimumWidth(1);
+}
+
+void ElidedLabel::setFullText(const QString &text)
+{
+    if (m_full == text)
+        return;
+    m_full = text;
+    // The full text has to stay reachable: the label cannot show all of it.
+    setToolTip(text);
+    update();
+}
+
+void ElidedLabel::setElideMode(Qt::TextElideMode mode)
+{
+    if (m_mode == mode)
+        return;
+    m_mode = mode;
+    update();
+}
+
+void ElidedLabel::paintEvent(QPaintEvent *)
+{
+    if (m_full.isEmpty())
+        return;
+    QPainter painter(this);
+    QStyleOption opt;
+    opt.initFrom(this);
+    // Painted through QStyle like QLabel does, so a style sheet's colour and the
+    // disabled state keep working.
+    style()->drawItemText(&painter, rect(), int(alignment()) | Qt::TextSingleLine,
+                          opt.palette, isEnabled(),
+                          fontMetrics().elidedText(m_full, m_mode, width()),
+                          QPalette::WindowText);
 }
 
 // ============================================================================

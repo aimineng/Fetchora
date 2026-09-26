@@ -114,11 +114,26 @@
        <number>8</number>
       </property>
       <item>
-       <widget class="FluentLineEdit" name="magnetEdit">
-        <property name="placeholderText">
-         <string>粘贴 magnet:?xt=urn:btih:... 链接</string>
+       <!-- Multi-line on purpose: a magnet link is far longer than any window is
+            wide, and a single-line field hides most of it while the user checks
+            that it pasted correctly. Enter submits, Shift+Enter adds a line. -->
+       <widget class="QPlainTextEdit" name="magnetEdit">
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>62</height>
+         </size>
         </property>
-        <property name="clearButtonEnabled">
+        <property name="maximumSize">
+         <size>
+          <width>16777215</width>
+          <height>62</height>
+         </size>
+        </property>
+        <property name="placeholderText">
+         <string>粘贴 magnet:?xt=urn:btih:... 链接（可多行）</string>
+        </property>
+        <property name="tabChangesFocus">
          <bool>true</bool>
         </property>
        </widget>

@@ -370,6 +370,54 @@ int runTorrentSelfTest()
     check(QStringLiteral("inspectData() reports the crafted file as unusable"),
           !info.value(QStringLiteral("ok")).toBool(), QStringLiteral("ok = false"));
 
+    // ---- tracker lists ---------------------------------------------------
+    // Importing a tracker list means parsing a file the user picked, and users pick
+    // the wrong file. None of these may crash, and none may produce a "tracker"
+    // that is really a line out of a video or an executable.
+    const TrackerList::ParseResult text = TrackerList::parse(QByteArrayLiteral(
+        "# my trackers\r\n"
+        "udp://tracker.opentrackr.org:1337/announce\n"
+        "https://tracker.example.org/announce, udp://[2001:db8::1]:6969/announce\n"
+        "not a tracker at all\n"
+        "magnet:?xt=urn:btih:0000000000000000000000000000000000000000\n"
+        "<a href=\"http://tracker.example.org/announce\">click</a>\n"
+        "udp://tracker.opentrackr.org:1337/announce\n"));
+    check(QStringLiteral("a text list yields exactly the tracker URLs"),
+          text.trackers.size() == 3
+              && text.trackers.at(0) == QLatin1String("udp://tracker.opentrackr.org:1337/announce")
+              && text.trackers.at(1) == QLatin1String("https://tracker.example.org/announce")
+              && text.trackers.at(2) == QLatin1String("udp://[2001:db8::1]:6969/announce"),
+          QStringLiteral("%1 kept, %2 rejected").arg(text.trackers.size()).arg(text.rejected));
+
+    // A magnet URI is not a tracker, and neither is an .exe dressed up as a list.
+    QByteArray binary("\x4d\x5a\x90\x00\x03\x00\x00\x00\x04\x00\x00\x00\xff\xff\x00\x00", 16);
+    binary.append(QByteArray(4096, '\0'));
+    const TrackerList::ParseResult blob = TrackerList::parse(binary);
+    check(QStringLiteral("a binary file is refused instead of parsed"),
+          blob.binary && blob.trackers.isEmpty(), QStringLiteral("binary = true"));
+
+    const TrackerList::ParseResult torrentFile =
+        TrackerList::parse(QByteArrayLiteral("d8:announce35:udp://tracker.example.org:6969/announce4:infod4:name4:testee"));
+    check(QStringLiteral("a .torrent is recognised as such, not mined for URLs"),
+          torrentFile.binary && torrentFile.trackers.isEmpty(), QStringLiteral("bencode refused"));
+
+    const TrackerList::ParseResult huge =
+        TrackerList::parse(QByteArray(TrackerList::kMaxBytes + 1, 'u'));
+    check(QStringLiteral("an oversized file is refused before parsing"),
+          huge.truncated && huge.trackers.isEmpty(), QStringLiteral("size cap"));
+
+    QByteArray many;
+    for (int i = 0; i < 2000; ++i)
+        many += QByteArrayLiteral("udp://tracker.example.org:6969/announce\n");
+    const TrackerList::ParseResult capped = TrackerList::parse(many);
+    check(QStringLiteral("thousands of duplicates collapse to one entry"),
+          capped.trackers.size() == 1, QStringLiteral("%1 entries").arg(capped.trackers.size()));
+
+    check(QStringLiteral("the built-in tracker list is not empty"),
+          !SettingsManager::builtInTrackers().isEmpty()
+              && SettingsManager::builtInTrackers().first().startsWith(QLatin1String("udp://")),
+          QStringLiteral("%1 trackers").arg(SettingsManager::builtInTrackers().size()));
+
     if (failures > 0) {
         out() << "RESULT: " << failures << " torrent check(s) failed\n";
         return 6;
@@ -590,7 +638,7 @@ int main(int argc, char *argv[])
                                   QStringLiteral("key"));
     QCommandLineOption detailSectionOption(QStringLiteral("detail"),
                                            QStringLiteral("Section of the task inspector to open "
-                                                          "(overview, files, peers, servers, options)."),
+                                                          "(overview, peers, servers, options)."),
                                            QStringLiteral("section"));
     QCommandLineOption newInstanceOption(QStringLiteral("new-instance"),
                                          QStringLiteral("Do not forward to a running instance."));
@@ -720,6 +768,10 @@ int main(int argc, char *argv[])
     window.setCaptionHeight(FluentTheme::captionHeight());
     window.setWindowTitle(QString::fromLatin1(kAppName));
     window.resize(1240, 800);
+    // Below this the panes start squeezing their content: the navigation rail plus
+    // a usable task list, the inspector's minimum width and the stat cards need
+    // roughly this much, and a window smaller than that only ever looks broken.
+    window.setMinimumSize(1000, 640);
 
     // ------------------------------------------------------------- shell
     // Title bar on top, navigation pane + page stack below.
@@ -775,6 +827,10 @@ int main(int argc, char *argv[])
     downloadsHost->addWidget(detailsPanel);
     downloadsHost->setStretchFactor(0, 5);
     downloadsHost->setStretchFactor(1, 4);
+    // The list stays wide enough for a task row (name + progress + speed) and the
+    // inspector keeps its own minimum, so dragging the splitter cannot squash
+    // either of them into an unreadable column.
+    downloadsPage->setMinimumWidth(420);
     detailsPanel->setVisible(settings.showDetailsPanel());
 
     // One page for every task, with the status chips and the search above it. A
@@ -1189,9 +1245,8 @@ int main(int argc, char *argv[])
     // only other way to choose one, and a script cannot click.
     if (parser.isSet(detailSectionOption)) {
         static const QHash<QString, int> detailSections = {
-            {QStringLiteral("overview"), 0}, {QStringLiteral("files"), 1},
-            {QStringLiteral("peers"), 2},    {QStringLiteral("servers"), 3},
-            {QStringLiteral("options"), 4},
+            {QStringLiteral("overview"), 0}, {QStringLiteral("peers"), 1},
+            {QStringLiteral("servers"), 2},  {QStringLiteral("options"), 3},
         };
         const QString wanted = parser.value(detailSectionOption).trimmed().toLower();
         const auto it = detailSections.constFind(wanted);
@@ -1199,7 +1254,7 @@ int main(int argc, char *argv[])
             detailsPanel->setVisible(true);
             detailsPanel->setSection(it.value());
         } else {
-            qWarning() << "--detail:" << wanted << "is not one of overview, files, peers, servers, options";
+            qWarning() << "--detail:" << wanted << "is not one of overview, peers, servers, options";
         }
     }
 

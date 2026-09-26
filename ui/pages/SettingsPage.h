@@ -150,6 +150,8 @@ private:
     Ui::SettingsPage *ui = nullptr;
     SettingsManager *m_settings = nullptr;
     Aria2Manager *m_aria2 = nullptr;
+    /// Keeps the rail rows exclusive: the checked one is the open section.
+    class QButtonGroup *m_railGroup = nullptr;
 
     QVector<Field> m_fields;
     QVector<Section> m_sections;

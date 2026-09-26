@@ -18,6 +18,43 @@ bool looksValid(const QByteArray &data);
 }
 
 /**
+ * TrackerList - pull tracker URLs out of whatever the user handed over.
+ *
+ * Tracker lists are shared as plain text, as one URL per line, comma-separated,
+ * or pasted out of a web page - and sometimes the file is not a tracker list at
+ * all (a video, an archive, an HTML page, a .torrent). Nothing here executes or
+ * trusts the content: it is scanned as text, only lines that look like tracker
+ * announce URLs survive, and the result is capped.
+ */
+namespace TrackerList {
+
+/// How many trackers are accepted from one import (a longer list is truncated).
+constexpr int kMaxTrackers = 500;
+/// Anything larger than this is refused before it is parsed.
+constexpr int kMaxBytes = 4 * 1024 * 1024;
+
+struct ParseResult {
+    QStringList trackers;   ///< deduplicated, in the order they were found
+    int lines = 0;          ///< candidate lines seen
+    int rejected = 0;       ///< lines that were not tracker URLs
+    bool truncated = false; ///< the input was larger than kMaxBytes
+    bool binary = false;    ///< the input is not text at all and was ignored
+};
+
+/// True when `line` is a tracker announce URL this app will hand to aria2.
+bool looksLikeTracker(const QString &line);
+
+/**
+ * Parse `data` (a file's bytes or an HTTP response body).
+ *
+ * Binary input is detected and ignored rather than parsed; no exceptions are
+ * thrown and no allocation is proportional to a hostile file's size.
+ */
+ParseResult parse(const QByteArray &data, int limit = kMaxTrackers);
+
+} // namespace TrackerList
+
+/**
  * TorrentUtils - create, inspect and convert .torrent files.
  *
  * Backed by a real bencode implementation, so the produced files are fully

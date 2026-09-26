@@ -210,15 +210,12 @@ void FluentLineEdit::paintEvent(QPaintEvent *event)
     p.end();
     QLineEdit::paintEvent(event);
 
-    // ---- focus ring ------------------------------------------------------
-    if (focus && isEnabled()) {
-        QPainter ring(this);
-        ring.setRenderHint(QPainter::Antialiasing);
-        ring.setPen(QPen(t->textPrimary(), 2));
-        ring.setBrush(Qt::NoBrush);
-        ring.drawRoundedRect(r.adjusted(-2, -2, 2, 2), FluentTheme::RadiusSmall + 2,
-                             FluentTheme::RadiusSmall + 2);
-    }
+    // Focus is shown the Fluent way - the border above switches to controlStroke
+    // and the underline to the accent colour, both already drawn. There used to be
+    // a 2px ring in textPrimary() here, which in the dark theme is white: it read
+    // as a stray white edge around every focused field, and it was also the code
+    // that faulted inside QPainter::setPen() when the base class's style-sheet path
+    // had replaced the paint engine.
 }
 
 void FluentLineEdit::focusInEvent(QFocusEvent *event)
@@ -397,19 +394,10 @@ void FluentSpinBox::paintEvent(QPaintEvent *event)
     drawZone(downRect(), Down, FluentTheme::Glyph::ChevronDown);
 
     // Same reason as FluentLineEdit: finish our painter before the base class
-    // starts its own, otherwise the focus ring below paints through an engine the
-    // style sheet has already replaced.
+    // starts its own. The focus ring that used to follow is gone with the one in
+    // FluentLineEdit - the border and the accent underline already say "focused".
     p.end();
     QSpinBox::paintEvent(event);
-
-    if (focus && isEnabled()) {
-        QPainter ring(this);
-        ring.setRenderHint(QPainter::Antialiasing);
-        ring.setPen(QPen(t->textPrimary(), 2));
-        ring.setBrush(Qt::NoBrush);
-        ring.drawRoundedRect(r.adjusted(-2, -2, 2, 2), FluentTheme::RadiusSmall + 2,
-                             FluentTheme::RadiusSmall + 2);
-    }
 }
 
 void FluentSpinBox::mouseMoveEvent(QMouseEvent *event)
@@ -531,7 +519,9 @@ void FluentSwitch::paintEvent(QPaintEvent *)
     p.drawEllipse(knobRect);
 
     if (hasFocus() && isEnabled()) {
-        p.setPen(QPen(t->textPrimary(), 2));
+        // A soft accent outline, not the white one this used to draw: white read
+        // as a rendering artefact around the control.
+        p.setPen(QPen(QColor(t->accent().red(), t->accent().green(), t->accent().blue(), 150), 2));
         p.setBrush(Qt::NoBrush);
         p.drawRoundedRect(track.adjusted(-3, -3, 3, 3), h / 2.0 + 3, h / 2.0 + 3);
     }
@@ -601,7 +591,7 @@ void FluentCheckBox::paintEvent(QPaintEvent *)
     }
 
     if (hasFocus() && isEnabled()) {
-        p.setPen(QPen(t->textPrimary(), 2));
+        p.setPen(QPen(QColor(t->accent().red(), t->accent().green(), t->accent().blue(), 150), 2));
         p.setBrush(Qt::NoBrush);
         p.drawRoundedRect(ind.adjusted(-3, -3, 3, 3), FluentTheme::RadiusSmall + 3,
                           FluentTheme::RadiusSmall + 3);
@@ -681,7 +671,7 @@ void FluentRadioButton::paintEvent(QPaintEvent *)
     }
 
     if (hasFocus() && isEnabled()) {
-        p.setPen(QPen(t->textPrimary(), 2));
+        p.setPen(QPen(QColor(t->accent().red(), t->accent().green(), t->accent().blue(), 150), 2));
         p.setBrush(Qt::NoBrush);
         p.drawEllipse(ind.adjusted(-3, -3, 3, 3));
     }

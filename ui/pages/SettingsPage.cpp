@@ -11,6 +11,7 @@
 #include "ui/pages/ui_SettingsPage.h"
 
 #include <QAbstractButton>
+#include <QButtonGroup>
 #include <QComboBox>
 #include <QCoreApplication>
 #include <QDesktopServices>
@@ -538,7 +539,7 @@ void SettingsPage::buildSections()
 
     body = addGroupCard(page, QT_TR_NOOP("Tracker 与 DHT"));
     addLineEdit(body, QStringLiteral("btTracker"), QT_TR_NOOP("附加 Tracker"),
-                QT_TR_NOOP("为所有种子附加的 Tracker 地址，以逗号分隔"));
+                QT_TR_NOOP("每行一个或用逗号分隔；留空则使用内置的公共 Tracker 列表"));
     addLineEdit(body, QStringLiteral("dhtEntryPoint"), QT_TR_NOOP("DHT 入口"),
                 QT_TR_NOOP("加入 DHT 网络使用的入口节点 host:port"));
     addLineEdit(body, QStringLiteral("dhtEntryPoint6"), QT_TR_NOOP("DHT 入口 6"),
@@ -816,24 +817,35 @@ QVBoxLayout *SettingsPage::addSectionPage(const char *title, const char *subtitl
     section.glyph = glyph;
     section.rowName = QStringLiteral("settingsRailRow%1").arg(index);
 
-    // Rail row: a tinted wrapper around a Subtle FluentButton. FluentButton
-    // paints itself from its role, so the "selected" tint is applied to the
-    // wrapper - that is also what makes restyle() able to recolour it.
+    // Rail row: just a container for the button. The selected tint lives on the
+    // button itself now (FluentButton draws a checked row as a filled pill), so the
+    // wrapper must stay transparent - it used to paint a second rounded rectangle
+    // behind the button, which is the "box inside a box" this replaced.
     auto *row = new QWidget(ui->railNavHost);
     row->setObjectName(section.rowName);
     row->setAttribute(Qt::WA_StyledBackground, true);
+    row->setStyleSheet(QStringLiteral("QWidget#%1 { background: transparent; border: none; }")
+                           .arg(section.rowName));
     // A fixed height, and a stretch after the last row (added in buildSections):
     // without both, filtering the rail left the remaining rows stretched over the
     // whole column instead of staying the height of a navigation item.
     row->setFixedHeight(FluentTheme::controlHeight() + 8);
     auto *rowLayout = new QHBoxLayout(row);
-    rowLayout->setContentsMargins(2, 2, 2, 2);
+    rowLayout->setContentsMargins(0, 0, 0, 0);
     rowLayout->setSpacing(0);
 
     auto *button = new FluentButton(row);
     button->setRole(FluentButton::Subtle);
     button->setGlyph(glyph);
     button->setText(tr(title));
+    // Checkable, in an exclusive group: "which section is open" is a selection, and
+    // a plain button had no way to show one.
+    button->setCheckable(true);
+    if (!m_railGroup) {
+        m_railGroup = new QButtonGroup(this);
+        m_railGroup->setExclusive(true);
+    }
+    m_railGroup->addButton(button, index);
     rowLayout->addWidget(button, 1);
     ui->railNavLayout->addWidget(row);
     connect(button, &QPushButton::clicked, this, [this, index]() { setSection(index); });
@@ -1539,12 +1551,12 @@ void SettingsPage::restyle()
     const int current = ui->sectionStack ? ui->sectionStack->currentIndex() : 0;
     for (int i = 0; i < m_sections.size(); ++i) {
         const Section &section = m_sections.at(i);
-        if (!section.railRow)
+        if (!section.railButton)
             continue;
-        const QString sheet = railRowStyle(theme, i == current, section.rowName);
-        // setStyleSheet() re-polishes the widget, so only do it on a change.
-        if (section.railRow->styleSheet() != sheet)
-            section.railRow->setStyleSheet(sheet);
+        // Only the button carries the selection state; setChecked() repaints it and
+        // does nothing when it is already the checked one.
+        if (section.railButton->isChecked() != (i == current))
+            section.railButton->setChecked(i == current);
     }
     if (ui->pageSubtitle) {
         ui->pageSubtitle->setStyleSheet(

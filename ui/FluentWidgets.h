@@ -161,6 +161,36 @@ private:
 };
 
 /**
+ * ElidedLabel - a label that shortens its text to fit instead of growing or
+ * wrapping.
+ *
+ * The task inspector is a resizable pane full of values (paths, URLs, aria2
+ * options). A wrapping label re-wraps on every pixel of a splitter drag, which
+ * changes its height, which re-lays-out the whole section - that is what made the
+ * pane flash while it was being resized. This elides in paintEvent(), so a width
+ * change costs a repaint and nothing else, and the full text stays one hover away.
+ */
+class ElidedLabel : public QLabel
+{
+    Q_OBJECT
+public:
+    explicit ElidedLabel(QWidget *parent = nullptr);
+
+    /// The text to show; what is painted is this, shortened to the label's width.
+    void setFullText(const QString &text);
+    QString fullText() const { return m_full; }
+    /// Defaults to Qt::ElideMiddle, which keeps both ends of a path readable.
+    void setElideMode(Qt::TextElideMode mode);
+
+protected:
+    void paintEvent(QPaintEvent *event) override;
+
+private:
+    QString m_full;
+    Qt::TextElideMode m_mode = Qt::ElideMiddle;
+};
+
+/**
  * FluentProgressBar - WinUI progress bar with optional segmented track
  * (used for multi-file torrents) and an indeterminate mode.
  */

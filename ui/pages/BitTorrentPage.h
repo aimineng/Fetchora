@@ -40,6 +40,8 @@ signals:
 
 protected:
     void changeEvent(QEvent *event) override;
+    /// Enter in the magnet field submits instead of inserting a newline.
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     /// One BitTorrent row. Declared here so the page can own them; defined in
@@ -70,8 +72,13 @@ private:
     void openRowFolder(const QString &gid);
     void removeRow(const QString &gid);
 
-    void addTrackerFromInput();
-    void removeSelectedTracker();
+    void addTrackerFromInput();    void removeSelectedTracker();
+    /// Pick a list from a file or a URL, parse it and hand the trackers over.
+    void importTrackers();
+    void importTrackersFromFile();
+    void importTrackersFromUrl();
+    /// Adds `trackers` to the selected task and reports what was used/ignored.
+    void applyImportedTrackers(const QStringList &trackers, int rejected, const QString &source);
 
     QVariantMap taskFor(const QString &gid) const;
     /// Trackers of one task; Aria2Manager publishes them as "trackers".
@@ -90,6 +97,7 @@ private:
     FluentButton *m_refreshButton = nullptr;
     FluentButton *m_trackerAddButton = nullptr;
     FluentButton *m_trackerRemoveButton = nullptr;
+    FluentButton *m_trackerImportButton = nullptr;
 
     FluentIcon *m_tasksIcon = nullptr;
     FluentIcon *m_emptyIcon = nullptr;

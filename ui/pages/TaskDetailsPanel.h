@@ -56,28 +56,28 @@ protected:
     void changeEvent(QEvent *event) override;
 
 private:
-    enum Section { Overview = 0, Files, Peers, Servers, Options, SectionCount };
+    // The "文件" tab was removed: for an ordinary download it listed a single row
+    // (the file itself, already shown in the header) and it cost a whole tab.
+    enum Section { Overview = 0, Peers, Servers, Options, SectionCount };
 
     /// One "caption  value" pair in one of the overview grids. Created on first
     /// use and then only ever given new text.
     struct FieldRow {
         QLabel *caption = nullptr;
-        QLabel *value = nullptr;
+        class ElidedLabel *value = nullptr;
         const char *captionText = nullptr;
         QString text;               ///< what the value label currently says
         bool wanted = false;        ///< visibility requested by the last update
     };
 
-    /// One row of a list section (a file, a peer, a server…). Rows are pooled per
-    /// key and reused across refreshes.
+    /// One row of a list section (a peer, a server…). Rows are pooled per key and
+    /// reused across refreshes.
     struct Row {
         QString key;
         QWidget *widget = nullptr;
-        QLabel *primary = nullptr;
-        QLabel *secondary = nullptr;
+        class ElidedLabel *primary = nullptr;
+        class ElidedLabel *secondary = nullptr;
         QLabel *trailing = nullptr;
-        FluentProgressBar *bar = nullptr;
-        FluentCheckBox *check = nullptr;
         bool seen = false;          ///< touched during the current refresh pass
     };
 
@@ -94,7 +94,6 @@ private:
     /// Now only the text inside the rows changes; the widget tree stays put.
     void buildSkeleton();
     void updateOverview();
-    void updateFiles();
     void updatePeers();
     void updateServers();
     void updateOptions();
@@ -108,11 +107,8 @@ private:
     /// Sets a field's text, skipping work (and the repaint) when it is unchanged.
     void setField(const QString &id, const QString &text);
     void setFieldVisible(const QString &id, bool visible);
-    QLabel *fieldLabel(const QString &id) const;
-    /// The pooled row for `key`, created (with a checkbox+bar for file rows) if
-    /// this is the first time it is seen.
-    Row *rowFor(QList<Row> &rows, const QString &key, QVBoxLayout *into,
-                bool withCheckAndBar = false);
+    /// The pooled row for `key`, created if this is the first time it is seen.
+    Row *rowFor(QList<Row> &rows, const QString &key, QVBoxLayout *into);
     /// Fills one list row; the tint colours the trailing label.
     static void fillRow(Row &row, const QString &primary, const QString &secondary,
                         const QString &trailing, const QColor &tint);
@@ -166,13 +162,6 @@ private:
     QHash<QString, FieldRow> m_fields;
     QHash<QString, int> m_fieldRows;
 
-    // Files
-    QVBoxLayout *m_filesBody = nullptr;
-    QList<Row> m_fileRows;
-    QWidget *m_filesCard = nullptr;
-    QWidget *m_filesActions = nullptr;
-    QLabel *m_filesEmpty = nullptr;
-
     // Peers
     QVBoxLayout *m_peersBody = nullptr;
     QList<Row> m_peerRows;
@@ -196,10 +185,6 @@ private:
     QStringList m_optionOrder;
     QWidget *m_optionsCard = nullptr;
     QLabel *m_optionsEmpty = nullptr;
-
-    // file selection state, kept between refreshes
-    QStringList m_selectedFiles;
-    bool m_filesLoaded = false;
 };
 
 #endif // TASKDETAILSPANEL_H

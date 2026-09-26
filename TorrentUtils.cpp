@@ -11,6 +11,114 @@
 #include <QUrl>
 
 // ============================================================================
+//  Tracker lists
+// ============================================================================
+namespace TrackerList {
+
+bool looksLikeTracker(const QString &line)
+{
+    const QString trimmed = line.trimmed();
+    if (trimmed.size() < 12 || trimmed.size() > 2048)
+        return false;
+    if (trimmed.contains(QLatin1Char(' ')) || trimmed.contains(QLatin1Char('\t')))
+        return false;
+    // Quoted entries turn up in copied JSON/YAML lists.
+    QString value = trimmed;
+    if (value.startsWith(QLatin1Char('"')) || value.startsWith(QLatin1Char('\'')))
+        value = value.mid(1);
+    if (value.endsWith(QLatin1Char('"')) || value.endsWith(QLatin1Char('\'')))
+        value.chop(1);
+    value = value.trimmed();
+
+    static const QStringList schemes = {
+        QStringLiteral("udp"), QStringLiteral("http"), QStringLiteral("https"),
+        QStringLiteral("ws"),  QStringLiteral("wss"),
+    };
+    const int colon = value.indexOf(QStringLiteral("://"));
+    if (colon <= 0)
+        return false;
+    if (!schemes.contains(value.left(colon).toLower()))
+        return false;
+
+    // The rest has to look like host[:port][/path] - no quotes, no angle brackets,
+    // no markup that came along with a pasted web page.
+    const QString rest = value.mid(colon + 3);
+    if (rest.isEmpty())
+        return false;
+    for (const QChar &c : rest) {
+        if (c.isSpace() || c == QLatin1Char('<') || c == QLatin1Char('>') || c == QLatin1Char('"')
+            || c == QLatin1Char('\'') || c == QLatin1Char('\\') || c == QLatin1Char('`'))
+            return false;
+    }
+    const QUrl url(value);
+    return url.isValid() && !url.host().isEmpty();
+}
+
+ParseResult parse(const QByteArray &data, int limit)
+{
+    ParseResult result;
+    if (data.isEmpty())
+        return result;
+
+    if (data.size() > kMaxBytes) {
+        // Refused, not truncated mid-way: a 200 MB "tracker list" is not one.
+        result.truncated = true;
+        return result;
+    }
+
+    // Binary detection: a NUL byte, or control bytes that no text file contains.
+    // This is what keeps "I picked the wrong file" from turning into a parser run
+    // over a video or an executable.
+    const int probe = qMin(data.size(), 4096);
+    int suspicious = 0;
+    for (int i = 0; i < probe; ++i) {
+        const char c = data.at(i);
+        if (c == '\0')
+            suspicious += 4;
+        else if (static_cast<unsigned char>(c) < 0x09)
+            ++suspicious;
+    }
+    if (suspicious > probe / 8) {
+        result.binary = true;
+        return result;
+    }
+
+    // A .torrent file starts with "d8:announce" - it is a torrent, not a list, and
+    // its binary pieces would otherwise be scanned as text.
+    if (data.startsWith("d8:announce") || data.startsWith("d4:info")) {
+        result.binary = true;
+        return result;
+    }
+
+    const QString text = QString::fromUtf8(data);
+    // Split on every separator tracker lists are published with, then filter.
+    static const QRegularExpression separators(QStringLiteral("[\\s,;\\[\\]{}()]+"));
+    const QStringList candidates = text.split(separators, Qt::SkipEmptyParts);
+    for (const QString &candidate : candidates) {
+        ++result.lines;
+        if (!looksLikeTracker(candidate)) {
+            ++result.rejected;
+            continue;
+        }
+        QString value = candidate.trimmed();
+        if (value.startsWith(QLatin1Char('"')) || value.startsWith(QLatin1Char('\'')))
+            value = value.mid(1);
+        if (value.endsWith(QLatin1Char('"')) || value.endsWith(QLatin1Char('\'')))
+            value.chop(1);
+        if (result.trackers.contains(value))
+            continue;
+        if (result.trackers.size() >= qMax(1, limit)) {
+            result.truncated = true;
+            break;
+        }
+        result.trackers << value;
+    }
+    return result;
+}
+
+} // namespace TrackerList
+
+// ============================================================================
 //  Bencode codec
 // ============================================================================
 namespace {

@@ -1406,7 +1406,18 @@ void Aria2Manager::addMetalinkFile(const QString &filePath, const QVariantMap &o
 
 void Aria2Manager::addMagnet(const QString &magnet, const QVariantMap &options)
 {
-    m_client->addUri({magnet}, options, -1, [this](const QJsonValue &, bool isError, const QString &err) {
+    QVariantMap taskOptions = options;
+    // --bt-tracker does not apply to a magnet link (its URI carries the tracker
+    // list instead), so the same list has to be handed over as a per-task option
+    // at add time. Without it the task relies on DHT alone, and a magnet that
+    // finds no peer never even gets its metadata.
+    if (!taskOptions.contains(QStringLiteral("bt-tracker"))) {
+        const QStringList trackers = m_settings->effectiveTrackers();
+        if (!trackers.isEmpty())
+            taskOptions.insert(QStringLiteral("bt-tracker"), trackers.join(QLatin1Char(',')));
+    }
+    // The magnet's announce list is what the tracker UI shows, so ask for it.
+    m_client->addUri({magnet}, taskOptions, -1, [this](const QJsonValue &, bool isError, const QString &err) {
         if (isError) {
             emit toast(tr("无法添加磁力链接：%1").arg(err), true);
             return;
@@ -1999,44 +2010,40 @@ void Aria2Manager::selectTaskFiles(const QString &gid, const QStringList &fileIn
 
 void Aria2Manager::addTrackers(const QString &gid, const QStringList &trackers)
 {
-    m_client->getBtMetaInfo(gid, [this, trackers](const QJsonValue &result, bool isError, const QString &) {
-        if (isError)
-            return;
-        const QString infoHashB64 = result.toObject().value(QStringLiteral("infoHash")).toString();
-        if (infoHashB64.isEmpty()) {
-            emit toast(tr("尚未获取信息哈希，请等待元数据下载完成。"), true);
-            return;
-        }
-        QByteArray hash = QByteArray::fromBase64(infoHashB64.toLatin1());
-        if (hash.isEmpty())
-            hash = QByteArray::fromHex(infoHashB64.toLatin1());
-        m_client->addBtTracker(hash, trackers, [this](const QJsonValue &, bool isError, const QString &err) {
-            if (isError) {
-                emit toast(err, true);
-                return;
-            }
-            emit toast(tr("已添加 Tracker。"), false);
-        });
-    });
+    const Task *task = findTask(gid);
+    if (!task)
+        return;
+
+    // aria2 has no "add a tracker" call: the list is an option, and changeOption
+    // replaces it. (The previous implementation used aria2.addBtTracker and
+    // aria2.getBtMetaInfo, neither of which exists - aria2 answers HTTP 400 - so
+    // adding a tracker silently did nothing at all.)
+    QStringList merged = task->trackerUrls;
+    for (const QString &tracker : trackers) {
+        const QString trimmed = tracker.trimmed();
+        if (!trimmed.isEmpty() && !merged.contains(trimmed))
+            merged << trimmed;
+    }
+    if (merged.isEmpty()) {
+        emit toast(tr("没有可添加的 Tracker 地址。"), true);
+        return;
+    }
+
+    applyTaskOptions(gid, {{QStringLiteral("bt-tracker"), merged.join(QLatin1Char(','))}});
+    emit toast(tr("已添加 %1 个 Tracker。").arg(merged.size() - task->trackerUrls.size()), false);
 }
 
 void Aria2Manager::removeTracker(const QString &gid, const QString &tracker)
 {
-    m_client->getBtMetaInfo(gid, [this, tracker](const QJsonValue &result, bool isError, const QString &) {
-        if (isError)
-            return;
-        const QString infoHashB64 = result.toObject().value(QStringLiteral("infoHash")).toString();
-        QByteArray hash = QByteArray::fromBase64(infoHashB64.toLatin1());
-        if (hash.isEmpty())
-            hash = QByteArray::fromHex(infoHashB64.toLatin1());
-        m_client->removeBtTracker(hash, tracker, [this](const QJsonValue &, bool isError, const QString &err) {
-            if (isError) {
-                emit toast(err, true);
-                return;
-            }
-            emit toast(tr("已移除 Tracker。"), false);
-        });
-    });
+    const Task *task = findTask(gid);
+    if (!task)
+        return;
+    QStringList remaining = task->trackerUrls;
+    remaining.removeAll(tracker.trimmed());
+    // changeOption replaces the list, so an emptied list has to be sent as an
+    // empty value rather than skipped.
+    applyTaskOptions(gid, {{QStringLiteral("bt-tracker"), remaining.join(QLatin1Char(','))}});
+    emit toast(tr("已移除 Tracker。"), false);
 }
 
 // ============================================================================

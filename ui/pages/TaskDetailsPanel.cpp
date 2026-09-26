@@ -102,7 +102,7 @@ void TaskDetailsPanel::buildTabs()
 {
     struct Spec { const char *caption; };
     const QList<Spec> specs = {
-        {QT_TR_NOOP("概要")}, {QT_TR_NOOP("文件")}, {QT_TR_NOOP("连接")},
+        {QT_TR_NOOP("概要")}, {QT_TR_NOOP("连接")},
         {QT_TR_NOOP("服务器")}, {QT_TR_NOOP("选项")},
     };
     for (int i = 0; i < specs.size(); ++i) {
@@ -165,8 +165,17 @@ void TaskDetailsPanel::buildCommands()
             return;
         const QVariantMap detail = m_aria2->taskDetail();
         const QString uri = detail.value(QStringLiteral("uri")).toString();
+        if (uri.isEmpty()) {
+            emit toast(tr("这个任务没有可复制的链接"), true);
+            return;
+        }
         m_aria2->copyToClipboard(uri);
-        emit toast(tr("已复制下载链接"), false);
+        // Naming the task matters: this button copies the *inspected* task, which
+        // is not necessarily the row the pointer is over.
+        const QString name = detail.value(QStringLiteral("fileName")).toString();
+        emit toast(name.isEmpty() ? tr("已复制下载链接：%1").arg(uri)
+                                  : tr("已复制「%1」的链接：%2").arg(name, uri),
+                   false);
     });
     connect(m_pauseButton, &QPushButton::clicked, this, [this]() {
         if (!m_aria2 || m_gid.isEmpty())
@@ -245,8 +254,8 @@ QLabel *TaskDetailsPanel::field(const QString &id, QGridLayout *grid, const char
     m_captionLabels << row.caption;
     m_captions << caption;
 
-    row.value = new QLabel(grid->parentWidget());
-    row.value->setWordWrap(true);
+    // Elided rather than wrapped - see rowFor().
+    row.value = new ElidedLabel(grid->parentWidget());
     row.value->setTextInteractionFlags(Qt::TextSelectableByMouse);
     if (mono)
         row.value->setFont(FluentTheme::monoFont());
@@ -258,17 +267,12 @@ QLabel *TaskDetailsPanel::field(const QString &id, QGridLayout *grid, const char
 void TaskDetailsPanel::setField(const QString &id, const QString &text)
 {
     auto it = m_fields.find(id);
-    if (it == m_fields.end() || it->value->text() == text)
+    if (it == m_fields.end() || it->text == text)
         // Identical text: not touching the label means no repaint at all, which
         // is the whole point - most values do not change between two polls.
         return;
-    it->value->setText(text);
-}
-
-QLabel *TaskDetailsPanel::fieldLabel(const QString &id) const
-{
-    const auto it = m_fields.constFind(id);
-    return it == m_fields.constEnd() ? nullptr : it->value;
+    it->text = text;
+    it->value->setFullText(text);
 }
 
 void TaskDetailsPanel::setFieldVisible(const QString &id, bool visible)
@@ -284,7 +288,7 @@ void TaskDetailsPanel::setFieldVisible(const QString &id, bool visible)
 }
 
 TaskDetailsPanel::Row *TaskDetailsPanel::rowFor(QList<Row> &rows, const QString &key,
-                                                QVBoxLayout *into, bool withCheckAndBar)
+                                                QVBoxLayout *into)
 {
     for (Row &row : rows) {
         if (row.key == key)
@@ -298,29 +302,18 @@ TaskDetailsPanel::Row *TaskDetailsPanel::rowFor(QList<Row> &rows, const QString 
     layout->setContentsMargins(2, 4, 2, 4);
     layout->setSpacing(10);
 
-    if (withCheckAndBar) {
-        auto *check = new FluentCheckBox(row.widget);
-        layout->addWidget(check);
-        row.check = check;
-    }
-
     auto *text = new QWidget(row.widget);
     auto *textLayout = new QVBoxLayout(text);
     textLayout->setContentsMargins(0, 0, 0, 0);
     textLayout->setSpacing(2);
 
-    row.primary = new QLabel(text);
-    row.primary->setWordWrap(true);
-    row.secondary = new QLabel(text);
+    // Elided, not wrapped: a wrapped row changes its height with the pane's width,
+    // and that is what made the inspector flash while the splitter was dragged.
+    row.primary = new ElidedLabel(text);
+    row.secondary = new ElidedLabel(text);
     row.secondary->setProperty(kCaptionRole, kCaptionValue);
     textLayout->addWidget(row.primary);
     textLayout->addWidget(row.secondary);
-
-    if (withCheckAndBar) {
-        row.bar = new FluentProgressBar(text);
-        row.bar->setBarHeight(3);
-        textLayout->addWidget(row.bar);
-    }
 
     row.trailing = new QLabel(row.widget);
 
@@ -335,10 +328,8 @@ TaskDetailsPanel::Row *TaskDetailsPanel::rowFor(QList<Row> &rows, const QString 
 void TaskDetailsPanel::fillRow(Row &row, const QString &primary, const QString &secondary,
                                const QString &trailing, const QColor &tint)
 {
-    if (row.primary->text() != primary)
-        row.primary->setText(primary);
-    if (row.secondary->text() != secondary)
-        row.secondary->setText(secondary);
+    row.primary->setFullText(primary);
+    row.secondary->setFullText(secondary);
     if (row.trailing->text() != trailing)
         row.trailing->setText(trailing);
     const QString colour = QStringLiteral("QLabel { color: %1; }").arg(tint.name());
@@ -436,61 +427,6 @@ void TaskDetailsPanel::buildSkeleton()
     m_errorLabel->setWordWrap(true);
     error->addWidget(m_errorLabel);
     m_errorCard->hide();
-
-    // ---- 文件 -------------------------------------------------------------
-    content = m_sectionContent.value(Files);
-    root = qobject_cast<QVBoxLayout *>(content->layout());
-
-    m_filesEmpty = new QLabel(tr("该任务还没有可显示的文件信息"), content);
-    m_filesEmpty->setProperty(kCaptionRole, kCaptionValue);
-    m_captionLabels << m_filesEmpty;
-    m_captions << QT_TR_NOOP("该任务还没有可显示的文件信息");
-    root->insertWidget(root->count() - 1, m_filesEmpty);
-
-    QVBoxLayout *filesCard = addCard(root, QT_TR_NOOP("文件列表"));
-    m_filesBody = filesCard;
-    m_filesCard = filesCard->parentWidget();
-
-    auto *actions = new QWidget(content);
-    m_filesActions = actions;
-    auto *actionLayout = new QHBoxLayout(actions);
-    actionLayout->setContentsMargins(0, 0, 0, 0);
-    actionLayout->setSpacing(8);
-
-    auto *all = new FluentButton(tr("全选"), actions);
-    all->setRole(FluentButton::Subtle);
-    all->setCompact(true);
-    auto *none = new FluentButton(tr("全不选"), actions);
-    none->setRole(FluentButton::Subtle);
-    none->setCompact(true);
-    auto *apply = new FluentButton(tr("应用选择"), actions);
-    apply->setRole(FluentButton::Accent);
-    apply->setCompact(true);
-
-    connect(all, &QPushButton::clicked, this, [this]() {
-        m_selectedFiles.clear();
-        for (const Row &row : std::as_const(m_fileRows))
-            m_selectedFiles << row.key;
-        m_filesLoaded = true;
-        refresh();
-    });
-    connect(none, &QPushButton::clicked, this, [this]() {
-        m_selectedFiles.clear();
-        m_filesLoaded = true;
-        refresh();
-    });
-    connect(apply, &QPushButton::clicked, this, [this]() {
-        if (m_aria2 && !m_gid.isEmpty()) {
-            m_aria2->selectTaskFiles(m_gid, m_selectedFiles);
-            emit toast(tr("已更新文件选择"), false);
-        }
-    });
-
-    actionLayout->addWidget(all);
-    actionLayout->addWidget(none);
-    actionLayout->addStretch(1);
-    actionLayout->addWidget(apply);
-    root->insertWidget(root->count() - 1, actions);
 
     // ---- 连接 -------------------------------------------------------------
     content = m_sectionContent.value(Peers);
@@ -627,73 +563,6 @@ void TaskDetailsPanel::updateOverview()
     m_errorLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; }").arg(t->critical().name()));
 }
 
-void TaskDetailsPanel::updateFiles()
-{
-    const QVariantList files = m_aria2
-                                   ? m_aria2->taskDetail().value(QStringLiteral("files")).toList()
-                                   : QVariantList();
-    const bool hasTask = !m_gid.isEmpty() && m_aria2 && !m_aria2->taskDetail().isEmpty();
-
-    m_filesEmpty->setVisible(hasTask && files.isEmpty());
-    m_filesCard->setVisible(hasTask && !files.isEmpty());
-    m_filesActions->setVisible(hasTask && !files.isEmpty());
-    if (!hasTask) {
-        for (Row &row : m_fileRows)
-            row.widget->hide();
-        return;
-    }
-
-    for (const QVariant &v : files) {
-        const QVariantMap f = v.toMap();
-        const int index = f.value(QStringLiteral("index")).toInt();
-        const QString key = QString::number(index);
-        const qint64 length = f.value(QStringLiteral("length")).toLongLong();
-        const qint64 done = f.value(QStringLiteral("completedLength")).toLongLong();
-        const double pct = length > 0 ? double(done) * 100.0 / double(length) : 0.0;
-        const QString path = f.value(QStringLiteral("path")).toString();
-        const QString name = f.value(QStringLiteral("name")).toString();
-
-        Row *row = rowFor(m_fileRows, key, m_filesBody, true);
-        row->seen = true;
-        row->widget->show();
-
-        if (row->primary->text() != elide(name))
-            row->primary->setText(elide(name));
-        if (row->primary->toolTip() != path)
-            row->primary->setToolTip(path);
-        const QString meta = tr("%1 / %2 · %3%")
-                                 .arg(FluentTheme::formatSize(double(done)),
-                                      FluentTheme::formatSize(double(length)))
-                                 .arg(int(pct));
-        if (row->secondary->text() != meta)
-            row->secondary->setText(meta);
-
-        // The check box is the one widget whose state the user changes: while a
-        // selection is pending it is the source of truth, not the task data.
-        const bool checked = m_filesLoaded ? m_selectedFiles.contains(key)
-                                           : f.value(QStringLiteral("selected")).toBool();
-        if (row->check && row->check->isChecked() != checked) {
-            const QSignalBlocker blocker(row->check);
-            row->check->setChecked(checked);
-        }
-        if (row->check && !row->check->property("wired").toBool()) {
-            row->check->setProperty("wired", true);
-            const QString fileIndex = key;
-            connect(row->check, &QCheckBox::toggled, this, [this, fileIndex](bool on) {
-                if (on && !m_selectedFiles.contains(fileIndex))
-                    m_selectedFiles << fileIndex;
-                else if (!on)
-                    m_selectedFiles.removeAll(fileIndex);
-                m_filesLoaded = true;
-            });
-        }
-        if (row->bar)
-            row->bar->setValue(pct);
-    }
-
-    hideUnseen(m_fileRows);
-}
-
 void TaskDetailsPanel::updatePeers()
 {
     const QVariantList peers = m_aria2
@@ -798,12 +667,9 @@ void TaskDetailsPanel::updateOptions()
                 created.caption = new QLabel(key, m_optionsCard);
                 created.caption->setProperty(kCaptionRole, kCaptionValue);
                 created.caption->setFont(FluentTheme::monoFont());
-                created.value = new QLabel(m_optionsCard);
+                created.value = new ElidedLabel(m_optionsCard);
                 created.value->setFont(FluentTheme::monoFont());
                 created.value->setTextInteractionFlags(Qt::TextSelectableByMouse);
-                // Wrapping would let a long value change the row height, and with
-                // it the layout of everything below it.
-                created.value->setWordWrap(false);
                 it = m_optionFields.insert(key, created);
             }
             m_optionsGrid->addWidget(it->caption, row, 0);
@@ -842,12 +708,7 @@ void TaskDetailsPanel::updateOptions()
 // ============================================================================
 void TaskDetailsPanel::setGid(const QString &gid)
 {
-    const bool changed = (m_gid != gid);
     m_gid = gid;
-    if (changed) {
-        m_selectedFiles.clear();
-        m_filesLoaded = false;
-    }
     if (m_aria2 && !gid.isEmpty() && m_section == Options)
         m_aria2->fetchTaskOptions(gid);
     refresh();
@@ -919,7 +780,6 @@ void TaskDetailsPanel::refresh()
     // flashing, and the scroll position is never disturbed.
     switch (m_section) {
     case Overview: updateOverview(); break;
-    case Files:    updateFiles(); break;
     case Peers:    updatePeers(); break;
     case Servers:  updateServers(); break;
     case Options:  updateOptions(); break;
@@ -963,7 +823,7 @@ void TaskDetailsPanel::changeEvent(QEvent *event)
 
     ui->retranslateUi(this);
     // Tabs, buttons and cards are built in C++: rebuild their captions.
-    static const char *tabCaptions[SectionCount] = {"概要", "文件", "连接", "服务器", "选项"};
+    static const char *tabCaptions[SectionCount] = {"概要", "连接", "服务器", "选项"};
     for (int i = 0; i < m_tabs.size(); ++i)
         m_tabs.at(i)->setText(tr(tabCaptions[i]));
 

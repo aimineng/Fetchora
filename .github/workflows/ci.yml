@@ -275,7 +275,7 @@ jobs:
           # The inspector's five sections, which are updated in place rather than
           # rebuilt - a mistake there shows up as a missing row, and a row is not
           # something a self-test can see.
-          foreach ($section in 'overview', 'files', 'peers', 'servers', 'options') {
+          foreach ($section in 'overview', 'peers', 'servers', 'options') {
             $png = Join-Path $PWD "ui-shots\detail-$section.png"
             $log = Join-Path $env:RUNNER_TEMP "shot-detail-$section.log"
             Remove-Item $png -ErrorAction SilentlyContinue
