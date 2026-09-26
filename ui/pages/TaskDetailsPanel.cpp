@@ -744,8 +744,14 @@ void TaskDetailsPanel::refresh()
     }
 
     content->setUpdatesEnabled(updates);
-    if (scroll)
+    if (scroll) {
+        // Let the new rows decide the content size before restoring the position:
+        // the scroll bar's range follows the layout, and a value set against a
+        // stale range is simply clamped away.
+        if (auto *layout = qobject_cast<QVBoxLayout *>(content->layout()))
+            layout->activate();
         scroll->verticalScrollBar()->setValue(scrollPos);
+    }
 }
 
 // ============================================================================
