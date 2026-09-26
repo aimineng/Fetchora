@@ -206,6 +206,42 @@ cd Fetchora
     -CMake    "C:\Qt\Tools\CMake_64\bin\cmake.exe"
 ```
 
+### Signing, and Windows refusing to start your build
+
+```powershell
+.\build.ps1 -Release -Sign -SignPfx C:\certs\fetchora.pfx -SignPassword secret
+# or: $env:FETCHORA_SIGN_PFX / $env:FETCHORA_SIGN_PASSWORD
+```
+
+Without a certificate the switch prints why it did nothing and the build is unchanged —
+nothing here is required to develop.
+
+The switch exists because of a Windows 11 feature that looks like a broken project:
+starting a freshly linked, unsigned `Fetchora.exe` can fail with
+
+> 进程启动失败：应用程序控制策略已阻止此文件。
+> (The command could not be started. An Application Control policy has blocked this file.)
+
+That is **Smart App Control**, not Fetchora. It asks Microsoft's Intelligent Security Graph
+about the *file hash* before letting a process start, and for an unsigned binary nobody has
+ever seen, the answer is "no". Consequences worth knowing:
+
+* The verdict is per hash, so the same source built twice with different flags gets two
+  different verdicts — "it ran yesterday, today it is blocked" is normal. Rebuilding changes
+  the hash and gives you another roll.
+* **Evaluate** mode does not help either; it still blocks unsigned binaries. Only **Off**
+  does (Windows Security → App & browser control → Smart App Control). Microsoft has said
+  the "you must reinstall Windows to turn it back on" warning no longer applies; on older
+  builds re-enabling means setting `HKLM\SYSTEM\CurrentControlSet\Control\CI\Policy\VerifiedAndReputablePolicyState`
+  back to `1` (0 = off, 2 = evaluate).
+* A self-signed certificate changes nothing: SAC checks reputation, and it does not know you.
+* A certificate with reputation (Azure Trusted Signing, or an OV/EV code-signing cert) is the
+  durable answer, and it also keeps SmartScreen quiet for the installers you publish.
+* For a hash you want to keep using, Microsoft reviews submissions:
+  <https://www.microsoft.com/en-us/wdsi/filesubmission> (pick *Software developer*).
+
+`aria2c.exe` is usually unaffected: the official upstream build has reputation already.
+
 ### macOS
 
 ```sh

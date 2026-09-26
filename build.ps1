@@ -7,6 +7,8 @@
 #   .\build.ps1 -Run            # build, then launch the app
 #   .\build.ps1 -Test           # build, then run the headless self-tests
 #   .\build.ps1 -Deploy         # build, then windeployqt into a portable folder
+#   .\build.ps1 -Release -Sign -SignPfx C:\certs\fetchora.pfx
+#                               # build, then code-sign the executable
 #
 # The MinGW and Qt bin directories MUST be on PATH: g++ launches cc1plus/as/ld
 # as child processes and those need the GCC runtime DLLs next to the driver.
@@ -17,6 +19,20 @@ param(
     [switch]$Test,
     [switch]$Deploy,
     [switch]$Release,
+    # Code signing, for binaries that leave this machine. Windows' Smart App
+    # Control refuses to start an unsigned executable it has never seen before
+    # ("应用程序控制策略已阻止此文件"), and SmartScreen warns about unsigned
+    # installers; a certificate with reputation removes both. A self-signed one
+    # does not help: SAC asks the Intelligent Security Graph about the file, and
+    # "signed by nobody in particular" is not an answer it accepts.
+    #
+    #   .\build.ps1 -Release -Sign -SignPfx C:\certs\fetchora.pfx -SignPassword secret
+    #
+    # The same values can come from the environment (FETCHORA_SIGN_PFX /
+    # FETCHORA_SIGN_PASSWORD), which is also how CI passes them.
+    [switch]$Sign,
+    [string]$SignPfx = $env:FETCHORA_SIGN_PFX,
+    [string]$SignPassword = $env:FETCHORA_SIGN_PASSWORD,
     [string]$QtDir = "D:\Qt\6.10.3\mingw_64",
     [string]$MingwDir = "D:\Qt\Tools\mingw1310_64",
     [string]$CMake = "D:\Qt\Tools\CMake_64\bin\cmake.exe"
@@ -154,4 +170,41 @@ if ($Deploy) {
 if ($Run) {
     Write-Host "Launching ..." -ForegroundColor Green
     Start-Process -FilePath $Exe -WorkingDirectory $BuildDir
+}
+
+# ------------------------------------------------------------------ sign
+# Inert without a certificate: the build stays exactly as it was, and the reason
+# is printed instead of leaving a silently unsigned binary behind.
+if ($Sign) {
+    if (-not (Test-Path $SignPfx)) {
+        Write-Host "Not signing: no certificate at '$SignPfx'." -ForegroundColor Yellow
+        Write-Host "  Pass -SignPfx <file.pfx> (with -SignPassword), or set FETCHORA_SIGN_PFX." -ForegroundColor Yellow
+    } else {
+        $signtool = (Get-Command signtool.exe -ErrorAction SilentlyContinue).Source
+        if (-not $signtool) {
+            # The Windows SDK puts it here, under a version directory that changes
+            # with every SDK, so it is searched rather than hard-coded.
+            $kits = "${env:ProgramFiles(x86)}\Windows Kits\10\bin"
+            if (Test-Path $kits) {
+                $signtool = Get-ChildItem $kits -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue |
+                    Where-Object { $_.FullName -match '\\x64\\' } |
+                    Select-Object -First 1 -ExpandProperty FullName
+            }
+        }
+        if (-not $signtool) {
+            Write-Host "Not signing: signtool.exe not found (install the Windows SDK, or run from a developer prompt)." -ForegroundColor Yellow
+        } else {
+            Write-Host "Signing $Exe ..." -ForegroundColor Cyan
+            $signArgs = @('sign', '/fd', 'SHA256', '/td', 'SHA256',
+                          '/tr', 'http://timestamp.digicert.com', '/f', $SignPfx)
+            if ($SignPassword) { $signArgs += @('/p', $SignPassword) }
+            $signArgs += $Exe
+            & $signtool @signArgs
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "Signing failed with exit code $LASTEXITCODE." -ForegroundColor Red
+            } else {
+                Write-Host "Signed: $((Get-AuthenticodeSignature $Exe).Status)" -ForegroundColor Green
+            }
+        }
+    }
 }

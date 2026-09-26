@@ -181,6 +181,39 @@ cd Fetchora
     -CMake    "C:\Qt\Tools\CMake_64\bin\cmake.exe"
 ```
 
+### 代码签名，以及 Windows 拒绝启动你刚编译的程序
+
+```powershell
+.\build.ps1 -Release -Sign -SignPfx C:\certs\fetchora.pfx -SignPassword 口令
+# 也可以设置环境变量 FETCHORA_SIGN_PFX / FETCHORA_SIGN_PASSWORD
+```
+
+没有证书时这个开关只会说明"为什么没签"，构建结果和以前完全一样，本地开发不需要它。
+
+它存在的原因是 Windows 11 的一个特性，看起来很像"项目坏了"：直接启动刚链接出来、
+没有签名的 `Fetchora.exe`，可能得到
+
+> 进程启动失败：应用程序控制策略已阻止此文件。
+
+这是 **Smart App Control（智能应用控制）**，不是 Fetchora 的问题。它在进程启动前拿
+**文件哈希**去问微软的智能安全图谱，一个没人见过的未签名程序，答案就是"不允许"。
+几个值得知道的推论：
+
+* 判定是按哈希来的，同一份源码换个编译参数就是另一个哈希、另一个判定——
+  "昨天还能跑，今天就被拦"是正常现象；重新编译会换一个哈希，等于再抽一次签。
+* **评估**模式同样会拦未签名程序，只有**关闭**才行（Windows 安全中心 → 应用和浏览器
+  控制 → 智能应用控制）。微软已说明"必须重装系统才能再打开"的提示不再成立；老版本上
+  重新打开需要把
+  `HKLM\SYSTEM\CurrentControlSet\Control\CI\Policy\VerifiedAndReputablePolicyState`
+  改回 `1`（0 = 关闭，2 = 评估）。
+* 自签名证书没有任何用处：SAC 看的是信誉，而它不认识你。
+* 有信誉的证书（Azure Trusted Signing，或 OV/EV 代码签名证书）才是长久之计，
+  顺便也让发布出去的安装包不再触发 SmartScreen 警告。
+* 想继续用某个被拦的哈希，可以提交给微软复核：
+  <https://www.microsoft.com/en-us/wdsi/filesubmission>（选 *Software developer*）。
+
+`aria2c.exe` 一般不受影响：官方发布的副本本身已经有信誉。
+
 ### macOS
 
 ```sh
