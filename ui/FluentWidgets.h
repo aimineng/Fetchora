@@ -137,8 +137,18 @@ public:
     /// 0..100, or negative to hide the bar.
     void setProgress(double progress);
 
+protected:
+    void resizeEvent(QResizeEvent *event) override;
+
 private:
     void restyle();
+    /// Shrink the number until it fits the card.
+    ///
+    /// The four cards share the width of the list column, so with the inspector
+    /// open each one is only ~150 px wide - and "10.75 MB/s" at the role's 26 px
+    /// simply does not fit. It used to be clipped mid-unit ("10.75 M"), which
+    /// reads as a wrong number rather than a tight layout.
+    void fitValueFont();
 
     FluentIcon *m_glyph = nullptr;
     QLabel *m_value = nullptr;
@@ -147,6 +157,7 @@ private:
     class FluentProgressBar *m_bar = nullptr;
     QColor m_tint;
     double m_progress = -1;
+    int m_valueFontSize = 26;
 };
 
 /**

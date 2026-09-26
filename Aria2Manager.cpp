@@ -487,6 +487,45 @@ QString Aria2Manager::uniqueOutputName(const QString &uri, const QString &dir) c
     return QString();
 }
 
+QVariantMap Aria2Manager::optionsForAdd(const QString &uri, const QVariantMap &options) const
+{
+    // Asking for something that was already downloaded once means "another copy":
+    // aria2 finds the finished file, and its control file, and reports the new
+    // task as complete without transferring a byte. A different output name is
+    // what makes it download again - and it has to happen on every path that adds
+    // a URL (list, dialog, browser bridge), not just one of them.
+    if (options.contains(QStringLiteral("out")))
+        return options;
+
+    const QString dir = options.value(QStringLiteral("dir"), m_settings->downloadDir()).toString();
+    const bool downloadedBefore = (m_history && m_history->hasCompletedUri(uri)) || targetLooksFinished(uri, dir);
+    if (!downloadedBefore)
+        return options;
+
+    QVariantMap adjusted = options;
+    const QString name = uniqueOutputName(uri, dir);
+    if (!name.isEmpty())
+        adjusted.insert(QStringLiteral("out"), name);
+    return adjusted;
+}
+
+bool Aria2Manager::targetLooksFinished(const QString &uri, const QString &dir) const
+{
+    // The file is a better witness than the history: the history only knows about
+    // a completion once a poll has seen it, and a user who clicks "download" again
+    // right after a download finishes would otherwise be told it is already done.
+    //
+    // A partial download always has an .aria2 control file next to it (the app
+    // keeps them, see removeControlFile), so "file exists, no control file" means
+    // the download it describes is finished.
+    const QString base = QUrl(uri).fileName();
+    if (base.isEmpty())
+        return false;
+    const QString folder = dir.isEmpty() ? m_settings->downloadDir() : dir;
+    const QString path = QDir(folder).filePath(base);
+    return QFileInfo::exists(path) && !QFileInfo::exists(path + QStringLiteral(".aria2"));
+}
+
 void Aria2Manager::restoreQueue()
 {
     const QList<QueuedTask> queue = m_pendingQueue;
@@ -1292,18 +1331,7 @@ void Aria2Manager::addUri(const QString &urls, const QVariantMap &options)
         return;
 
     for (const QString &u : httpUris) {
-        QVariantMap taskOptions = options;
-        // Asking for something that was already downloaded once means "another
-        // copy": aria2 finds the finished file, and its control file, and reports
-        // the new task as complete without transferring a byte. A different
-        // output name is what makes it download again.
-        if (!taskOptions.contains(QStringLiteral("out")) && m_history && m_history->hasCompletedUri(u)) {
-            const QString dir = taskOptions.value(QStringLiteral("dir"),
-                                                  m_settings->downloadDir()).toString();
-            const QString name = uniqueOutputName(u, dir);
-            if (!name.isEmpty())
-                taskOptions.insert(QStringLiteral("out"), name);
-        }
+        const QVariantMap taskOptions = optionsForAdd(u, options);
         m_client->addUri({u}, taskOptions, -1, [this, u](const QJsonValue &result, bool isError, const QString &err) {
             if (isError) {
                 emit toast(tr("无法添加 %1：%2").arg(u, err), true);
@@ -2075,7 +2103,7 @@ void Aria2Manager::onBridgeDownload(const QString &url, const QString &origin, c
         addMagnet(url, options);
         return;
     }
-    m_client->addUri({url}, options, -1, [this, url](const QJsonValue &, bool isError, const QString &err) {
+    m_client->addUri({url}, optionsForAdd(url, options), -1, [this, url](const QJsonValue &, bool isError, const QString &err) {
         if (isError) {
             emit toast(tr("浏览器请求失败：%1").arg(err), true);
             return;
@@ -2095,8 +2123,26 @@ void Aria2Manager::onBridgeBatch(const QStringList &urls, const QString &origin,
                                                        .toJson(QJsonDocument::Compact))),
                         false);
     }
-    m_client->addUri(urls, options, -1, [this, count = urls.size()](const QJsonValue &, bool isError,
-                                                                    const QString &err) {
+    // Each URL gets its own decision, so a batch that repeats an already
+    // downloaded link still produces a second copy.
+    QStringList adjusted;
+    adjusted.reserve(urls.size());
+    for (const QString &u : urls)
+        adjusted << u;
+    if (urls.size() == 1) {
+        m_client->addUri(adjusted, optionsForAdd(urls.first(), options), -1,
+                         [this, count = urls.size()](const QJsonValue &, bool isError, const QString &err) {
+                             if (isError) {
+                                 emit toast(tr("浏览器批量添加失败：%1").arg(err), true);
+                                 return;
+                             }
+                             emit toast(tr("已从浏览器添加 %1 个下载任务。").arg(count), false);
+                             refreshNow();
+                         });
+        return;
+    }
+    m_client->addUri(adjusted, options, -1, [this, count = urls.size()](const QJsonValue &, bool isError,
+                                                                        const QString &err) {
         if (isError) {
             emit toast(tr("浏览器批量添加失败：%1").arg(err), true);
             return;

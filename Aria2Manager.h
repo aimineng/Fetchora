@@ -240,6 +240,12 @@ private:
     /// because it otherwise finds the finished file and its control file and
     /// reports the new task as complete without transferring anything.
     QString uniqueOutputName(const QString &uri, const QString &dir) const;
+    /// `options` with a fresh output name when this URI was already downloaded
+    /// once. Every path that adds a URL has to go through this.
+    QVariantMap optionsForAdd(const QString &uri, const QVariantMap &options) const;
+    /// True when the URI's target file is already there and finished, judged by the
+    /// file itself (a partial download keeps its .aria2 control file).
+    bool targetLooksFinished(const QString &uri, const QString &dir) const;
 
 private:
     struct Task {

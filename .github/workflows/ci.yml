@@ -211,14 +211,19 @@ jobs:
         run: |
           $log = Join-Path $env:RUNNER_TEMP 'engine-supervision.log'
           # A slow 400 MiB file, so the download is still running when the check
-          # kills the engine: that is what makes the "the queue came back" half of
+          # kills the engine, plus a small one that can finish: that is what makes
+          # the "the queue came back" and "asking twice gives two copies" halves of
           # the test mean anything.
-          $server = Start-Process node -ArgumentList 'tools/testsrv.js', '8897', '400' -PassThru
+          $big = Start-Process node -ArgumentList 'tools/testsrv.js', '8897', '400' -PassThru
+          $small = Start-Process node -ArgumentList 'tools/testsrv.js', '8898', '12' -PassThru
           Start-Sleep -Seconds 3
           & .\tools\check-engine-supervision.ps1 -App build\Release\Fetchora.exe `
-              -DownloadUrl 'http://127.0.0.1:8897/supervision.bin' *> $log
+              -DownloadUrl 'http://127.0.0.1:8897/supervision.bin' `
+              -SmallDownloadUrl 'http://127.0.0.1:8898/supervision-small.bin' *> $log
           $status = $LASTEXITCODE
-          if ($server) { Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue }
+          foreach ($server in @($big, $small)) {
+            if ($server) { Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue }
+          }
           Get-Content $log | Write-Host
           if ($status -ne 0) {
             $tail = ((Get-Content $log -Tail 20) -join ' | ') -replace '%', '%25'

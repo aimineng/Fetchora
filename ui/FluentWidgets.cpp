@@ -351,13 +351,13 @@ StatCard::StatCard(QWidget *parent)
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
     auto *row = new QHBoxLayout(this);
-    row->setContentsMargins(FluentTheme::spacingL(), FluentTheme::spacingM(),
-                            FluentTheme::spacingL(), FluentTheme::spacingM());
-    row->setSpacing(14);
+    row->setContentsMargins(FluentTheme::spacingM(), FluentTheme::spacingM(),
+                            FluentTheme::spacingM(), FluentTheme::spacingM());
+    row->setSpacing(10);
 
     m_glyph = new FluentIcon(this);
     m_glyph->setIconSize(18);
-    m_glyph->setFixedSize(38, 38);
+    m_glyph->setFixedSize(32, 32);
     row->addWidget(m_glyph, 0, Qt::AlignVCenter);
 
     auto *col = new QVBoxLayout();
@@ -382,7 +382,38 @@ StatCard::StatCard(QWidget *parent)
 
 void StatCard::setGlyph(const QChar &glyph) { m_glyph->setGlyph(glyph); }
 void StatCard::setLabel(const QString &label) { m_label->setText(label); }
-void StatCard::setValue(const QString &value) { m_value->setText(value); }
+void StatCard::setValue(const QString &value)
+{
+    m_value->setText(value);
+    fitValueFont();
+}
+
+void StatCard::resizeEvent(QResizeEvent *event)
+{
+    QFrame::resizeEvent(event);
+    fitValueFont();
+}
+
+void StatCard::fitValueFont()
+{
+    // The role's rule sets the size from the style sheet, and a style sheet beats
+    // setFont(), so the size has to be handed back as a widget-level rule.
+    int size = 26;
+    const QString text = m_value->text();
+    const int available = qMax(24, m_value->width());
+    while (size > 13) {
+        QFont probe = FluentTheme::uiFont(size);
+        probe.setWeight(QFont::DemiBold);
+        if (QFontMetrics(probe).horizontalAdvance(text) <= available)
+            break;
+        --size;
+    }
+    if (size == m_valueFontSize)
+        return;
+    m_valueFontSize = size;
+    m_value->setStyleSheet(QStringLiteral("font-size: %1px; font-weight: 600; min-height: 34px;")
+                               .arg(size));
+}
 void StatCard::setSecondary(const QString &secondary)
 {
     m_secondary->setText(secondary);
