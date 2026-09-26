@@ -128,9 +128,15 @@ protected:
     void paintEvent(QPaintEvent *event) override;
     void enterEvent(QEnterEvent *event) override;
     void leaveEvent(QEvent *event) override;
+    void focusInEvent(QFocusEvent *event) override;
+    void focusOutEvent(QFocusEvent *event) override;
 
 private:
     qreal m_position = 0.0;
+    /// Keyboard focus only: clicking a switch should not paint an outline around it
+    /// (Windows draws a focus visual when the user *tabs* to a control, and a tinted
+    /// box that follows every click reads as a rendering artefact).
+    bool m_focusVisible = false;
 };
 
 /**
@@ -147,9 +153,12 @@ protected:
     void paintEvent(QPaintEvent *event) override;
     void enterEvent(QEnterEvent *event) override;
     void leaveEvent(QEvent *event) override;
+    void focusInEvent(QFocusEvent *event) override;
+    void focusOutEvent(QFocusEvent *event) override;
 
 private:
     bool m_hovered = false;
+    bool m_focusVisible = false;
 };
 
 /**
@@ -165,9 +174,12 @@ protected:
     void paintEvent(QPaintEvent *event) override;
     void enterEvent(QEnterEvent *event) override;
     void leaveEvent(QEvent *event) override;
+    void focusInEvent(QFocusEvent *event) override;
+    void focusOutEvent(QFocusEvent *event) override;
 
 private:
     bool m_hovered = false;
+    bool m_focusVisible = false;
 };
 
 /**

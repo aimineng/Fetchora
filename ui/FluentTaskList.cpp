@@ -113,7 +113,13 @@ void FluentTaskCard::buildActions()
     connect(m_copyButton, &QPushButton::clicked, this, [this]() { emit copyLinkRequested(m_gid); });
     connect(m_removeButton, &QPushButton::clicked, this, [this]() { emit removeRequested(m_gid); });
 
-    m_actionBar->hide();
+    // The bar stays visible. It used to appear on hover - and a click that lands
+    // before the hover has been processed (or after a fast move onto the row) hits
+    // the card instead of the button, which is exactly "I clicked delete and
+    // nothing happened". A row of small buttons that is always there cannot be
+    // missed, and needs no hover timing to work.
+    m_actionsVisible = true;
+    m_actionBar->show();
 }
 
 QChar FluentTaskCard::plateGlyph() const
@@ -300,26 +306,13 @@ void FluentTaskCard::enterEvent(QEnterEvent *event)
 {
     QFrame::enterEvent(event);
     m_hovered = true;
-    if (!m_actionsVisible) {
-        m_actionsVisible = true;
-        m_actionBar->show();
-        m_actionBar->raise();
-        relayout();
-    }
     update();
 }
 
 void FluentTaskCard::leaveEvent(QEvent *event)
 {
     QFrame::leaveEvent(event);
-    // Keep the actions visible while the pointer is over one of the buttons.
-    const QPoint local = mapFromGlobal(QCursor::pos());
-    m_hovered = rect().contains(local);
-    if (!m_hovered && !m_selected) {
-        m_actionsVisible = false;
-        m_actionBar->hide();
-        relayout();
-    }
+    m_hovered = false;
     update();
 }
 

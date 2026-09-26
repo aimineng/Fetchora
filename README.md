@@ -1,4 +1,4 @@
-<div align="center">
+﻿<div align="center">
 
 <img src="resources/app-256.png" width="112" alt="Fetchora icon">
 
@@ -42,7 +42,10 @@ creator, browser bridge, tray icon where the desktop provides one) is identical.
 ### Downloading
 - **HTTP / HTTPS / FTP / SFTP** with multi-connection segmented transfer.
 - **BitTorrent** — magnet links, `.torrent` files, DHT, DHT6, PEX, LPD, MSE encryption,
-  metadata exchange, seeding ratio/time limits, per-task trackers.
+  metadata exchange, seeding ratio/time limits, per-task trackers. Torrents are ordinary
+  rows in the download list (the `BT` chip filters for them); adding a `.torrent` or a
+  magnet link sits with the other ways of adding a download, and the **Tracker** page is
+  only about trackers.
 - **A tracker list that works out of the box.** A magnet link carries no trackers of its
   own, and DHT alone finds no peers on every network — a magnet that finds no peer never
   even gets its metadata. Fetchora hands every magnet a built-in list of public trackers
@@ -114,7 +117,7 @@ Captured from the real window with
 
 | BitTorrent | Settings |
 | --- | --- |
-| ![BitTorrent page](docs/screenshots/bittorrent.png) | ![Settings page](docs/screenshots/settings.png) |
+| ![Tracker page](docs/screenshots/bittorrent.png) | ![Settings page](docs/screenshots/settings.png) |
 
 | Create torrent | History |
 | --- | --- |
@@ -402,7 +405,7 @@ Fetchora [options] [urls...]      # Fetchora.exe on Windows
 
   -m, --minimized            Start hidden in the system tray
       --maximized            Start maximized
-      --page <key>           Open on a page: download, bittorrent, history,
+      --page <key>           Open on a page: download, tracker, history,
                              createtorrent, settings, about
       --detail <section>     Open the task inspector on a section: overview,
                              peers, servers, options

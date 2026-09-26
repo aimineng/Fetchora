@@ -1,4 +1,4 @@
-<div align="center">
+﻿<div align="center">
 
 <img src="resources/app-256.png" width="112" alt="Fetchora 图标">
 
@@ -41,7 +41,9 @@ Fluent 图标字体都是 Windows 独有的，因此窗口保留平台自己的�
 ### 下载能力
 - **HTTP / HTTPS / FTP / SFTP**，多连接分片下载。
 - **BitTorrent** —— 磁力链接、`.torrent` 文件、DHT、DHT6、PEX、LPD、MSE 加密、
-  元数据交换、做种比率/时间限制、逐任务 Tracker。
+  元数据交换、做种比率/时间限制、逐任务 Tracker。种子任务是下载列表里的普通一行
+  （用 `BT` 筛选条即可只看种子），添加种子/磁力链接与其它添加方式放在一起，
+  **Tracker** 页面则只负责 Tracker。
 - **开箱可用的 Tracker 列表。** 磁力链接本身不带 Tracker，而只靠 DHT 并非在所有网络
   都能找到 Peer —— 找不到 Peer 的磁力链接连元数据都拿不到。Fetchora 会给每个磁力链接
   附上内置的公共 Tracker 列表（可在「设置 → BitTorrent」里替换），并支持从**文件或网址**
@@ -92,7 +94,7 @@ Fluent 图标字体都是 Windows 独有的，因此窗口保留平台自己的�
 
 | BitTorrent | 设置 |
 | --- | --- |
-| ![BitTorrent 页](docs/screenshots/bittorrent.png) | ![设置页](docs/screenshots/settings.png) |
+| ![Tracker 页](docs/screenshots/bittorrent.png) | ![设置页](docs/screenshots/settings.png) |
 
 | 制作种子 | 下载历史 |
 | --- | --- |
@@ -361,7 +363,7 @@ Fetchora [选项] [链接...]      # Windows 下为 Fetchora.exe
 
   -m, --minimized            启动后隐藏到托盘
       --maximized            最大化启动
-      --page <key>           直接打开某页：download、bittorrent、history、
+      --page <key>           直接打开某页：download、tracker、history、
                              createtorrent、settings、about
       --detail <section>     任务详情面板打开到某个分页：overview、
                              peers、servers、options

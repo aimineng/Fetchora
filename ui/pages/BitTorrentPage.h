@@ -1,8 +1,6 @@
 #ifndef BITTORRENTPAGE_H
 #define BITTORRENTPAGE_H
 
-#include <QHash>
-#include <QList>
 #include <QString>
 #include <QStringList>
 #include <QVariantMap>
@@ -18,61 +16,46 @@ class BitTorrentPage;
 }
 
 /**
- * BitTorrentPage - the BitTorrent work surface.
+ * BitTorrentPage - the tracker editor.
  *
- * Sections, top to bottom: header + command bar, the BT statistics strip, the
- * list of BitTorrent tasks and the tracker editor.
- *
- * Structure and layout live in BitTorrentPage.ui; everything that depends on
- * the runtime theme (glyphs, roles, colours, stat cards, list rows) is built
- * here, exactly like DownloadsPage.
+ * This page used to be a second task list (torrents only) with its own
+ * statistics, its own add-torrent/add-magnet buttons and this editor. Lists were
+ * duplicated: the downloads page already shows every task, torrents included, and
+ * adding a .torrent or a magnet belongs next to the other ways of adding a
+ * download. What is left is the part with no other home - adding, importing and
+ * removing the trackers of a torrent task.
  */
 class BitTorrentPage : public QWidget
 {
     Q_OBJECT
+
 public:
     explicit BitTorrentPage(Aria2Manager *aria2, QWidget *parent = nullptr);
     ~BitTorrentPage() override;
 
+public slots:
+    /// Re-read the torrent tasks and the tracker list of the selected one.
+    void refresh();
+
 signals:
-    void torrentPickerRequested();
     void toast(const QString &message, bool isError);
 
 protected:
     void changeEvent(QEvent *event) override;
-    /// Enter in the magnet field submits instead of inserting a newline.
-    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
-    /// One BitTorrent row. Declared here so the page can own them; defined in
-    /// BitTorrentPage.cpp because it is pure presentation.
-    class BtRow;
-
-    void buildCommandBar();
-    void buildStatCards();
-    void buildTaskList();
     void buildTrackerEditor();
     void wireManager();
 
-    void refresh();
-    void refreshStats();
-    void refreshTaskList();
+    QVariantMap taskFor(const QString &gid) const;
+    /// Trackers of one task; Aria2Manager publishes them as "trackers".
+    static QStringList trackersOf(const QVariantMap &task);
+    /// The gid currently picked in the tracker combo ("" when there is none).
+    QString trackerGid() const;
+
     void refreshTrackers();
-
-    void restyle();
-    void retranslate();
-
-    void toggleMagnetPanel();
-    void submitMagnet();
-
-    void selectRow(const QString &gid);
-    void setSelectedRow(const QString &gid);
-    void toggleRowPause(const QString &gid);
-    void copyRowMagnet(const QString &gid);
-    void openRowFolder(const QString &gid);
-    void removeRow(const QString &gid);
-
-    void addTrackerFromInput();    void removeSelectedTracker();
+    void addTrackerFromInput();
+    void removeSelectedTracker();
     /// Pick a list from a file or a URL, parse it and hand the trackers over.
     void importTrackers();
     void importTrackersFromFile();
@@ -81,33 +64,17 @@ private:
     void applyImportedTrackers(const QStringList &trackers, int rejected, const QString &source,
                                bool truncated);
 
-    QVariantMap taskFor(const QString &gid) const;
-    /// Trackers of one task; Aria2Manager publishes them as "trackers".
-    static QStringList trackersOf(const QVariantMap &task);
-    /// The gid currently picked in the tracker combo ("" when there is none).
-    QString trackerGid() const;
+    void restyle();
+    void retranslate();
 
     Ui::BitTorrentPage *ui = nullptr;
     Aria2Manager *m_aria2 = nullptr;
 
-    FluentButton *m_addTorrentButton = nullptr;
-    FluentButton *m_magnetButton = nullptr;
-    FluentButton *m_magnetSubmitButton = nullptr;
-    FluentButton *m_pauseAllButton = nullptr;
-    FluentButton *m_resumeAllButton = nullptr;
-    FluentButton *m_refreshButton = nullptr;
     FluentButton *m_trackerAddButton = nullptr;
     FluentButton *m_trackerRemoveButton = nullptr;
     FluentButton *m_trackerImportButton = nullptr;
 
-    FluentIcon *m_tasksIcon = nullptr;
-    FluentIcon *m_emptyIcon = nullptr;
-
-    QList<StatCard *> m_cards;
-    QHash<QString, BtRow *> m_rows;
-    QStringList m_rowOrder;   ///< gid order of the rows currently laid out
-    QStringList m_comboGids;  ///< gids currently in the tracker combo
-    QString m_selectedGid;    ///< highlighted row ("" when nothing is picked)
+    QStringList m_comboGids;   ///< gids currently in the tracker combo
 };
 
 #endif // BITTORRENTPAGE_H

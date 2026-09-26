@@ -53,6 +53,8 @@ signals:
 
 protected:
     void changeEvent(QEvent *event) override;
+    /// Enter in the magnet field submits instead of inserting a newline.
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     /// The tasks this page shows: its own status filter + the global search text.
@@ -60,6 +62,10 @@ private:
     void buildCommandBar();
     void buildStatCards();
     void buildFilterChips();
+    /// The collapsible magnet field under the filter row.
+    void buildMagnetPanel();
+    void toggleMagnetPanel();
+    void submitMagnets();
     void wireManager();
     void refresh();
     void restyle();
@@ -69,11 +75,16 @@ private:
 
     FluentButton *m_newButton = nullptr;
     FluentButton *m_torrentButton = nullptr;
+    FluentButton *m_magnetButton = nullptr;
     FluentButton *m_pauseAllButton = nullptr;
     FluentButton *m_resumeAllButton = nullptr;
     FluentButton *m_refreshButton = nullptr;
     FluentButton *m_clearButton = nullptr;
     FluentButton *m_detailsButton = nullptr;
+
+    QWidget *m_magnetPanel = nullptr;
+    class QPlainTextEdit *m_magnetEdit = nullptr;
+    FluentButton *m_magnetSubmitButton = nullptr;
 
     QList<StatCard *> m_cards;
     QList<FluentButton *> m_chips;

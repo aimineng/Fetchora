@@ -9,7 +9,10 @@
 
 #include <QComboBox>
 #include <QHBoxLayout>
+#include <QKeyEvent>
 #include <QLabel>
+#include <QPlainTextEdit>
+#include <QRegularExpression>
 #include <QVBoxLayout>
 
 namespace {
@@ -66,6 +69,7 @@ DownloadsPage::DownloadsPage(Aria2Manager *aria2, QWidget *parent)
     qobject_cast<QVBoxLayout *>(layout())->insertWidget(1, m_banner);
 
     buildCommandBar();
+    buildMagnetPanel();
     buildFilterChips();
 
     m_list = new FluentTaskList(this);
@@ -169,6 +173,9 @@ void DownloadsPage::buildCommandBar()
 
     m_newButton = add(FluentTheme::Glyph::Add, tr("新建"), true);
     m_torrentButton = add(FluentTheme::Glyph::AddFile, tr("种子"), false);
+    // The magnet field moved here with the rest of "add a download": it used to sit
+    // on the BitTorrent page, which is now only the tracker editor.
+    m_magnetButton = add(FluentTheme::Glyph::Magnet, tr("磁力"), false);
     m_refreshButton = add(FluentTheme::Glyph::Refresh, QString(), false);
     m_refreshButton->setRole(FluentButton::Subtle);
     m_clearButton = add(FluentTheme::Glyph::Delete, QString(), false);
@@ -191,12 +198,14 @@ void DownloadsPage::buildCommandBar()
 
     m_newButton->setTooltipText(tr("新建下载 (Ctrl+N)"));
     m_torrentButton->setTooltipText(tr("打开 .torrent / .metalink 文件"));
+    m_magnetButton->setTooltipText(tr("粘贴 magnet:?xt=urn:btih:... 链接（可多条）"));
     m_refreshButton->setTooltipText(tr("刷新 (F5)"));
     m_clearButton->setTooltipText(tr("清除已完成记录"));
     m_detailsButton->setTooltipText(tr("显示/隐藏详情面板"));
 
     connect(m_newButton, &QPushButton::clicked, this, &DownloadsPage::newTaskRequested);
     connect(m_torrentButton, &QPushButton::clicked, this, &DownloadsPage::torrentPickerRequested);
+    connect(m_magnetButton, &QPushButton::clicked, this, &DownloadsPage::toggleMagnetPanel);
     connect(m_refreshButton, &QPushButton::clicked, this, [this]() {
         if (m_aria2)
             m_aria2->refreshNow();
@@ -214,6 +223,90 @@ void DownloadsPage::buildCommandBar()
         if (m_aria2)
             m_aria2->resumeAll();
     });
+}
+
+void DownloadsPage::buildMagnetPanel()
+{
+    // A multi-line field on purpose: a magnet link is longer than the window is
+    // wide, and several of them at once is the normal case.
+    m_magnetPanel = new QWidget(this);
+    auto *layout = new QHBoxLayout(m_magnetPanel);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(8);
+
+    m_magnetEdit = new QPlainTextEdit(m_magnetPanel);
+    m_magnetEdit->setProperty("fluentRole", "textArea");
+    m_magnetEdit->setPlaceholderText(tr("粘贴 magnet:?xt=urn:btih:... 链接（可多行）"));
+    m_magnetEdit->setFixedHeight(62);
+    m_magnetEdit->setTabChangesFocus(true);
+    m_magnetEdit->installEventFilter(this);
+    layout->addWidget(m_magnetEdit, 1);
+
+    m_magnetSubmitButton = new FluentButton(m_magnetPanel);
+    m_magnetSubmitButton->setGlyph(FluentTheme::Glyph::Check);
+    m_magnetSubmitButton->setText(tr("添加"));
+    m_magnetSubmitButton->setRole(FluentButton::Accent);
+    m_magnetSubmitButton->setEnabled(false);
+    layout->addWidget(m_magnetSubmitButton, 0, Qt::AlignTop);
+
+    connect(m_magnetSubmitButton, &QPushButton::clicked, this, &DownloadsPage::submitMagnets);
+    connect(m_magnetEdit, &QPlainTextEdit::textChanged, this, [this]() {
+        m_magnetSubmitButton->setEnabled(!m_magnetEdit->toPlainText().trimmed().isEmpty());
+    });
+
+    m_magnetPanel->setVisible(false);
+    // Under the filter row, above the list.
+    if (auto *root = qobject_cast<QVBoxLayout *>(this->layout()))
+        root->insertWidget(4, m_magnetPanel);
+}
+
+void DownloadsPage::toggleMagnetPanel()
+{
+    const bool show = !m_magnetPanel->isVisible();
+    m_magnetPanel->setVisible(show);
+    if (show)
+        m_magnetEdit->setFocus();
+}
+
+void DownloadsPage::submitMagnets()
+{
+    QStringList magnets;
+    const QStringList lines =
+        m_magnetEdit->toPlainText().split(QRegularExpression(QStringLiteral("[\\r\\n]+")),
+                                          Qt::SkipEmptyParts);
+    for (const QString &line : lines) {
+        const QString trimmed = line.trimmed();
+        if (trimmed.startsWith(QLatin1String("magnet:"), Qt::CaseInsensitive))
+            magnets << trimmed;
+    }
+    if (magnets.isEmpty()) {
+        // Saying nothing here would look like the button did nothing at all.
+        if (!lines.isEmpty())
+            emit toast(tr("没有找到 magnet: 开头的链接"), true);
+        return;
+    }
+    for (const QString &magnet : std::as_const(magnets)) {
+        if (m_aria2)
+            m_aria2->addMagnet(magnet);
+    }
+    m_magnetEdit->clear();
+    m_magnetPanel->hide();
+    emit toast(tr("已添加 %1 个磁力链接").arg(magnets.size()), false);
+}
+
+bool DownloadsPage::eventFilter(QObject *watched, QEvent *event)
+{
+    // Enter submits from the magnet field, Shift+Enter inserts a newline: a
+    // multi-line field otherwise swallows the key the user expects to confirm with.
+    if (watched == m_magnetEdit && event->type() == QEvent::KeyPress) {
+        auto *key = static_cast<QKeyEvent *>(event);
+        if ((key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter)
+            && !(key->modifiers() & Qt::ShiftModifier)) {
+            submitMagnets();
+            return true;
+        }
+    }
+    return QWidget::eventFilter(watched, event);
 }
 
 void DownloadsPage::buildFilterChips()

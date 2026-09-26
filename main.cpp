@@ -634,7 +634,7 @@ int main(int argc, char *argv[])
                                            QStringLiteral("Milliseconds between the frames (default 800)."),
                                            QStringLiteral("ms"));
     QCommandLineOption pageOption(QStringLiteral("page"),
-                                  QStringLiteral("Open on this page (download, bittorrent, ...)."),
+                                  QStringLiteral("Open on this page (download, tracker, ...)."),
                                   QStringLiteral("key"));
     QCommandLineOption detailSectionOption(QStringLiteral("detail"),
                                            QStringLiteral("Section of the task inspector to open "
@@ -844,7 +844,7 @@ int main(int argc, char *argv[])
     pageStack->addWidget(aboutPage);          // 5
 
     const QHash<QString, int> pageIndex = {
-        {QStringLiteral("download"), 0},     {QStringLiteral("bittorrent"), 1},
+        {QStringLiteral("download"), 0},     {QStringLiteral("tracker"), 1},
         {QStringLiteral("history"), 2},      {QStringLiteral("createtorrent"), 3},
         {QStringLiteral("settings"), 4},     {QStringLiteral("about"), 5},
     };
@@ -857,15 +857,18 @@ int main(int argc, char *argv[])
     // The navigation captions are re-applied on every language change.
     auto retranslateNav = [nav]() {
         nav->setItemTitle(QStringLiteral("download"), QObject::tr("下载任务"));
-        nav->setItemTitle(QStringLiteral("bittorrent"), QObject::tr("BitTorrent"));
+        nav->setItemTitle(QStringLiteral("tracker"), QObject::tr("Tracker"));
         nav->setItemTitle(QStringLiteral("history"), QObject::tr("下载历史"));
         nav->setItemTitle(QStringLiteral("createtorrent"), QObject::tr("制作种子"));
         nav->setItemTitle(QStringLiteral("settings"), QObject::tr("设置"));
         nav->setItemTitle(QStringLiteral("about"), QObject::tr("关于"));
         nav->retranslate();
     };
+    // "BitTorrent" as a page is gone: its task list was the download list (which
+    // shows torrents too) and its add buttons live next to the other ones, so what
+    // is left is the tracker editor - and that is what the rail calls it.
     nav->addItem(QStringLiteral("download"), FluentTheme::Glyph::Download, QObject::tr("下载任务"));
-    nav->addItem(QStringLiteral("bittorrent"), FluentTheme::Glyph::Torrent, QObject::tr("BitTorrent"));
+    nav->addItem(QStringLiteral("tracker"), FluentTheme::Glyph::Peer, QObject::tr("Tracker"));
     nav->addItem(QStringLiteral("history"), FluentTheme::Glyph::History, QObject::tr("下载历史"));
     nav->addItem(QStringLiteral("createtorrent"), FluentTheme::Glyph::Add, QObject::tr("制作种子"));
     nav->addSpacer(8);
@@ -914,7 +917,6 @@ int main(int argc, char *argv[])
                      [toasts](const QString &text, bool isError) {
                          toasts->push(text, isError ? ToastHost::Error : ToastHost::Success);
                      });
-    QObject::connect(btPage, &BitTorrentPage::torrentPickerRequested, &window, openTorrentPicker);
     QObject::connect(btPage, &BitTorrentPage::toast, &window,
                      [toasts](const QString &text, bool isError) {
                          toasts->push(text, isError ? ToastHost::Error : ToastHost::Success);

@@ -1487,8 +1487,17 @@ void Aria2Manager::resumeAll()
 void Aria2Manager::removeTask(const QString &gid, int mode)
 {
     Task *t = findTask(gid);
-    if (!t)
+    if (!t) {
+        // Worth a line in the log: with the task gone from the map, the click looks
+        // like it did nothing at all.
+        Logger::line(QStringLiteral("engine"),
+                     QStringLiteral("remove requested for unknown gid %1").arg(gid), true);
         return;
+    }
+    Logger::line(QStringLiteral("engine"),
+                 QStringLiteral("removing %1 (status %2, mode %3)")
+                     .arg(t->fileName.isEmpty() ? gid : t->fileName, t->status)
+                     .arg(mode));
 
     const QStringList paths = [&]() {
         QStringList p;

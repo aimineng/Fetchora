@@ -729,40 +729,16 @@
   <context>
     <name>BitTorrentPage</name>
     <message>
-      <source>BitTorrent</source>
-      <translation>BitTorrent</translation>
-    </message>
-    <message>
-      <source>0 个种子任务 · 0 个正在下载</source>
-      <translation>0 torrent tasks · 0 downloading</translation>
-    </message>
-    <message>
-      <source>粘贴 magnet:?xt=urn:btih:... 链接</source>
-      <translation>Paste a magnet:?xt=urn:btih:... link.</translation>
-    </message>
-    <message>
-      <source>粘贴 magnet:?xt=urn:btih:... 链接（可多行）</source>
-      <translation>Paste magnet:?xt=urn:btih:... links (several lines are fine)</translation>
-    </message>
-    <message>
-      <source>种子任务</source>
-      <translation>Torrent tasks</translation>
-    </message>
-    <message>
-      <source>0 个</source>
-      <translation>0</translation>
-    </message>
-    <message>
-      <source>暂无 BitTorrent 任务</source>
-      <translation>No BitTorrent downloads yet</translation>
-    </message>
-    <message>
-      <source>添加 .torrent 文件或磁力链接后，即可在这里查看节点、分片与 Tracker</source>
-      <translation>Add a .torrent file or magnet link to see peers, pieces and trackers here.</translation>
-    </message>
-    <message>
       <source>Tracker 编辑</source>
       <translation>Edit trackers</translation>
+    </message>
+    <message>
+      <source>为种子任务添加、导入与移除 Tracker；磁力链接的 Tracker 在添加时下发</source>
+      <translation>Add, import and remove the trackers of a torrent task; a magnet link gets its trackers when it is added</translation>
+    </message>
+    <message>
+      <source>Tracker 列表</source>
+      <translation>Tracker list</translation>
     </message>
     <message>
       <source>共 0 个 Tracker</source>
@@ -781,68 +757,8 @@
       <translation>Add tracker: udp:// or https:// .../announce</translation>
     </message>
     <message>
-      <source>暂停</source>
-      <translation>Pause</translation>
-    </message>
-    <message>
-      <source>复制磁力链接</source>
-      <translation>Copy magnet link</translation>
-    </message>
-    <message>
-      <source>打开文件夹</source>
-      <translation>Open folder</translation>
-    </message>
-    <message>
-      <source>移除任务</source>
-      <translation>Remove task</translation>
-    </message>
-    <message>
-      <source>获取元数据中…</source>
-      <translation>Fetching metadata…</translation>
-    </message>
-    <message>
-      <source>元数据获取中</source>
-      <translation>Fetching metadata</translation>
-    </message>
-    <message>
-      <source>未知错误</source>
-      <translation>Unknown error</translation>
-    </message>
-    <message>
-      <source>%1 个文件</source>
-      <translation>%1 files</translation>
-    </message>
-    <message>
-      <source>种子 %1 · 节点 %2</source>
-      <translation>%1 seeders · %2 peers</translation>
-    </message>
-    <message>
-      <source>继续</source>
-      <translation>Resume</translation>
-    </message>
-    <message>
-      <source>添加种子</source>
-      <translation>Add torrent</translation>
-    </message>
-    <message>
-      <source>添加磁力链接</source>
-      <translation>Add magnet link</translation>
-    </message>
-    <message>
-      <source>全部暂停</source>
-      <translation>Pause all</translation>
-    </message>
-    <message>
-      <source>全部开始</source>
-      <translation>Resume all</translation>
-    </message>
-    <message>
       <source>添加</source>
       <translation>Add</translation>
-    </message>
-    <message>
-      <source>刷新</source>
-      <translation>Refresh</translation>
     </message>
     <message>
       <source>移除选中</source>
@@ -857,36 +773,12 @@
       <translation>Import a tracker list from a file or a URL: one address per line; anything that is not a tracker is ignored</translation>
     </message>
     <message>
-      <source>没有找到 magnet: 开头的链接</source>
-      <translation>No link starting with magnet: was found</translation>
-    </message>
-    <message>
-      <source>已添加 %1 个磁力链接</source>
-      <translation>Added %1 magnet link(s)</translation>
-    </message>
-    <message>
-      <source>该任务还没有 Info Hash，请等待元数据</source>
-      <translation>This download has no Info Hash yet; wait for the metadata.</translation>
-    </message>
-    <message>
-      <source>已复制磁力链接</source>
-      <translation>Magnet link copied</translation>
-    </message>
-    <message>
-      <source>已移除任务</source>
-      <translation>Task removed</translation>
-    </message>
-    <message>
       <source>请先选择一个种子任务</source>
       <translation>Select a torrent download first</translation>
     </message>
     <message>
       <source>请输入 Tracker 地址</source>
       <translation>Enter a tracker address</translation>
-    </message>
-    <message>
-      <source>已添加 Tracker</source>
-      <translation>Tracker added</translation>
     </message>
     <message>
       <source>导入 Tracker 列表</source>
@@ -903,8 +795,8 @@ One address per line; anything that is not a tracker is ignored.</translation>
       <translation>Local file…</translation>
     </message>
     <message>
-      <source>网址…</source>
-      <translation>URL…</translation>
+      <source>网址或路径…</source>
+      <translation>URL or path…</translation>
     </message>
     <message>
       <source>取消</source>
@@ -931,16 +823,16 @@ One address per line; anything that is not a tracker is ignored.</translation>
       <translation>The file is too large; ignored</translation>
     </message>
     <message>
-      <source>从网址导入 Tracker</source>
-      <translation>Import trackers from a URL</translation>
+      <source>从网址或路径导入 Tracker</source>
+      <translation>Import trackers from a URL or a path</translation>
     </message>
     <message>
-      <source>列表地址（http 或 https）</source>
-      <translation>List address (http or https)</translation>
+      <source>列表地址（http/https）或本地文件路径</source>
+      <translation>List address (http/https) or a local file path</translation>
     </message>
     <message>
-      <source>只支持 http 或 https 地址</source>
-      <translation>Only http or https addresses are supported</translation>
+      <source>只支持 http、https 地址或本地文件路径</source>
+      <translation>Only http/https addresses or a local file path are supported</translation>
     </message>
     <message>
       <source>下载列表失败：%1</source>
@@ -971,34 +863,6 @@ One address per line; anything that is not a tracker is ignored.</translation>
       <translation>Select the tracker to remove in the list first</translation>
     </message>
     <message>
-      <source>已移除 Tracker</source>
-      <translation>Tracker removed</translation>
-    </message>
-    <message>
-      <source>%1 个种子任务 · %2 个正在下载</source>
-      <translation>%1 torrent tasks · %2 downloading</translation>
-    </message>
-    <message>
-      <source>%1 个</source>
-      <translation>%1</translation>
-    </message>
-    <message>
-      <source>共 %1 个</source>
-      <translation>%1 in total</translation>
-    </message>
-    <message>
-      <source>引擎全局速度</source>
-      <translation>Engine-wide speed</translation>
-    </message>
-    <message>
-      <source>种子合计 %1</source>
-      <translation>Torrents total %1</translation>
-    </message>
-    <message>
-      <source>种子 %1</source>
-      <translation>Seeders %1</translation>
-    </message>
-    <message>
       <source>未命名任务</source>
       <translation>Unnamed task</translation>
     </message>
@@ -1009,34 +873,6 @@ One address per line; anything that is not a tracker is ignored.</translation>
     <message>
       <source>共 %1 个 Tracker</source>
       <translation>%1 trackers</translation>
-    </message>
-    <message>
-      <source>打开 .torrent / .metalink 文件</source>
-      <translation>Open a .torrent / .metalink file.</translation>
-    </message>
-    <message>
-      <source>暂停全部 BitTorrent 任务</source>
-      <translation>Pause all BitTorrent downloads.</translation>
-    </message>
-    <message>
-      <source>继续全部 BitTorrent 任务</source>
-      <translation>Resume all BitTorrent downloads.</translation>
-    </message>
-    <message>
-      <source>活动种子数</source>
-      <translation>Active torrents</translation>
-    </message>
-    <message>
-      <source>总下载速度</source>
-      <translation>Download speed</translation>
-    </message>
-    <message>
-      <source>总上传速度</source>
-      <translation>Upload speed</translation>
-    </message>
-    <message>
-      <source>连接节点数</source>
-      <translation>Peer connections</translation>
     </message>
   </context>
   <context>
@@ -1451,6 +1287,10 @@ Info Hash %2 · Size %3</translation>
       <translation>Torrent</translation>
     </message>
     <message>
+      <source>磁力</source>
+      <translation>Magnet</translation>
+    </message>
+    <message>
       <source>全部暂停</source>
       <translation>Pause all</translation>
     </message>
@@ -1467,6 +1307,10 @@ Info Hash %2 · Size %3</translation>
       <translation>Open a .torrent / .metalink file.</translation>
     </message>
     <message>
+      <source>粘贴 magnet:?xt=urn:btih:... 链接（可多条）</source>
+      <translation>Paste magnet:?xt=urn:btih:... links (several are fine)</translation>
+    </message>
+    <message>
       <source>刷新 (F5)</source>
       <translation>Refresh (F5)</translation>
     </message>
@@ -1477,6 +1321,22 @@ Info Hash %2 · Size %3</translation>
     <message>
       <source>显示/隐藏详情面板</source>
       <translation>Show/hide the details pane</translation>
+    </message>
+    <message>
+      <source>粘贴 magnet:?xt=urn:btih:... 链接（可多行）</source>
+      <translation>Paste magnet:?xt=urn:btih:... links (several lines are fine)</translation>
+    </message>
+    <message>
+      <source>添加</source>
+      <translation>Add</translation>
+    </message>
+    <message>
+      <source>没有找到 magnet: 开头的链接</source>
+      <translation>No link starting with magnet: was found</translation>
+    </message>
+    <message>
+      <source>已添加 %1 个磁力链接</source>
+      <translation>Added %1 magnet link(s)</translation>
     </message>
     <message>
       <source>全部</source>
@@ -1948,8 +1808,8 @@ Info Hash %2 · Size %3</translation>
       <translation>Downloads</translation>
     </message>
     <message>
-      <source>BitTorrent</source>
-      <translation>BitTorrent</translation>
+      <source>Tracker</source>
+      <translation>Tracker</translation>
     </message>
     <message>
       <source>下载历史</source>

@@ -73,6 +73,17 @@ aria2 引擎连续 %1 次启动失败，已停止自动重启。请在「设置 
 没有可添加的 Tracker 地址。 => There is no tracker address to add.
 已添加 %1 个磁力链接 => Added %1 magnet link(s)
 每行一个或用逗号分隔；留空则使用内置的公共 Tracker 列表 => One per line or comma-separated; leave it empty to use the built-in public tracker list
+
+# ------------------------------------------------------- Tracker 页 / tracker page
+Tracker => Tracker
+Tracker 列表 => Tracker list
+为种子任务添加、导入与移除 Tracker；磁力链接的 Tracker 在添加时下发 => Add, import and remove the trackers of a torrent task; a magnet link gets its trackers when it is added
+网址或路径… => URL or path…
+从网址或路径导入 Tracker => Import trackers from a URL or a path
+列表地址（http/https）或本地文件路径 => List address (http/https) or a local file path
+只支持 http、https 地址或本地文件路径 => Only http/https addresses or a local file path are supported
+磁力 => Magnet
+粘贴 magnet:?xt=urn:btih:... 链接（可多条） => Paste magnet:?xt=urn:btih:... links (several are fine)
 以逗号分隔；留空则使用内置的公共 Tracker 列表，批量导入请用 BitTorrent 页的「导入列表」 => Comma-separated; leave it empty to use the built-in public tracker list. To import a list in bulk, use “Import list” on the BitTorrent page
 粘贴 magnet:?xt=urn:btih:... 链接（可多行） => Paste magnet:?xt=urn:btih:... links (several lines are fine)
 没有找到 magnet: 开头的链接 => No link starting with magnet: was found

@@ -518,13 +518,29 @@ void FluentSwitch::paintEvent(QPaintEvent *)
     p.setBrush(knobColor);
     p.drawEllipse(knobRect);
 
-    if (hasFocus() && isEnabled()) {
-        // A soft accent outline, not the white one this used to draw: white read
-        // as a rendering artefact around the control.
+    if (m_focusVisible && hasFocus() && isEnabled()) {
+        // Keyboard focus only (see m_focusVisible): a tinted outline that follows
+        // every click on the switch looks like a stray blue background.
         p.setPen(QPen(QColor(t->accent().red(), t->accent().green(), t->accent().blue(), 150), 2));
         p.setBrush(Qt::NoBrush);
         p.drawRoundedRect(track.adjusted(-3, -3, 3, 3), h / 2.0 + 3, h / 2.0 + 3);
     }
+}
+
+void FluentSwitch::focusInEvent(QFocusEvent *event)
+{
+    const Qt::FocusReason reason = event->reason();
+    m_focusVisible = reason == Qt::TabFocusReason || reason == Qt::BacktabFocusReason
+        || reason == Qt::ShortcutFocusReason;
+    QAbstractButton::focusInEvent(event);
+    update();
+}
+
+void FluentSwitch::focusOutEvent(QFocusEvent *event)
+{
+    m_focusVisible = false;
+    QAbstractButton::focusOutEvent(event);
+    update();
 }
 
 void FluentSwitch::enterEvent(QEnterEvent *event)
@@ -590,7 +606,7 @@ void FluentCheckBox::paintEvent(QPaintEvent *)
                    QString(partial ? FluentTheme::Glyph::Indeterminate : FluentTheme::Glyph::Check));
     }
 
-    if (hasFocus() && isEnabled()) {
+    if (m_focusVisible && hasFocus() && isEnabled()) {
         p.setPen(QPen(QColor(t->accent().red(), t->accent().green(), t->accent().blue(), 150), 2));
         p.setBrush(Qt::NoBrush);
         p.drawRoundedRect(ind.adjusted(-3, -3, 3, 3), FluentTheme::RadiusSmall + 3,
@@ -618,6 +634,22 @@ void FluentCheckBox::leaveEvent(QEvent *event)
 {
     QCheckBox::leaveEvent(event);
     m_hovered = false;
+    update();
+}
+
+void FluentCheckBox::focusInEvent(QFocusEvent *event)
+{
+    const Qt::FocusReason reason = event->reason();
+    m_focusVisible = reason == Qt::TabFocusReason || reason == Qt::BacktabFocusReason
+        || reason == Qt::ShortcutFocusReason;
+    QCheckBox::focusInEvent(event);
+    update();
+}
+
+void FluentCheckBox::focusOutEvent(QFocusEvent *event)
+{
+    m_focusVisible = false;
+    QCheckBox::focusOutEvent(event);
     update();
 }
 
@@ -670,7 +702,7 @@ void FluentRadioButton::paintEvent(QPaintEvent *)
         p.drawEllipse(ind.center(), inner / 2.0, inner / 2.0);
     }
 
-    if (hasFocus() && isEnabled()) {
+    if (m_focusVisible && hasFocus() && isEnabled()) {
         p.setPen(QPen(QColor(t->accent().red(), t->accent().green(), t->accent().blue(), 150), 2));
         p.setBrush(Qt::NoBrush);
         p.drawEllipse(ind.adjusted(-3, -3, 3, 3));
@@ -696,6 +728,22 @@ void FluentRadioButton::leaveEvent(QEvent *event)
 {
     QRadioButton::leaveEvent(event);
     m_hovered = false;
+    update();
+}
+
+void FluentRadioButton::focusInEvent(QFocusEvent *event)
+{
+    const Qt::FocusReason reason = event->reason();
+    m_focusVisible = reason == Qt::TabFocusReason || reason == Qt::BacktabFocusReason
+        || reason == Qt::ShortcutFocusReason;
+    QRadioButton::focusInEvent(event);
+    update();
+}
+
+void FluentRadioButton::focusOutEvent(QFocusEvent *event)
+{
+    m_focusVisible = false;
+    QRadioButton::focusOutEvent(event);
     update();
 }
 
