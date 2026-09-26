@@ -395,9 +395,15 @@ Fetchora [options] [urls...]      # Fetchora.exe on Windows
       --maximized            Start maximized
       --page <key>           Open on a page: download, bittorrent, history,
                              createtorrent, settings, about
+      --detail <section>     Open the task inspector on a section: overview, files,
+                             peers, servers, options
       --new-instance         Do not forward to a running instance
       --screenshot <file>    Render the window to a PNG and exit
       --screenshot-delay <ms>  Wait before --screenshot
+      --frames <count>       Take several screenshots from the same window
+                             (shot-1.png, shot-2.png, …): comparing two frames is
+                             how a flicker is measured instead of argued about
+      --frame-interval <ms>  Time between those frames (default 800)
       --self-test            Validate the update logic and the aria2c command line
       --check-updates        Ask GitHub for the newest release and exit
       --prerelease           Include pre-releases in --check-updates

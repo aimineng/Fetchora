@@ -13,6 +13,8 @@
 #include <QLayout>
 #include <QScrollArea>
 #include <QScrollBar>
+#include <QSet>
+#include <QSignalBlocker>
 #include <QStackedWidget>
 #include <QVBoxLayout>
 
@@ -205,6 +207,7 @@ void TaskDetailsPanel::buildSections()
         m_sectionScrolls << scroll;
         ui->sectionStack->addWidget(scroll);
     }
+    buildSkeleton();
     setSection(Overview);
 }
 
@@ -227,187 +230,229 @@ QVBoxLayout *TaskDetailsPanel::addCard(QVBoxLayout *into, const char *heading)
     return body;
 }
 
-QLabel *TaskDetailsPanel::addField(QGridLayout *grid, int row, const char *caption, bool mono)
+QLabel *TaskDetailsPanel::field(const QString &id, QGridLayout *grid, const char *caption, bool mono)
 {
-    auto *label = new QLabel(tr(caption), grid->parentWidget());
-    label->setProperty(kCaptionRole, kCaptionValue);
-    label->setMinimumWidth(84);
-    label->setAlignment(Qt::AlignLeft | Qt::AlignTop);
-    m_captionLabels << label;
+    auto it = m_fields.constFind(id);
+    if (it != m_fields.constEnd())
+        return it->value;
+
+    FieldRow row;
+    row.captionText = caption;
+    row.caption = new QLabel(tr(caption), grid->parentWidget());
+    row.caption->setProperty(kCaptionRole, kCaptionValue);
+    row.caption->setMinimumWidth(84);
+    row.caption->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+    m_captionLabels << row.caption;
     m_captions << caption;
 
-    auto *value = new QLabel(grid->parentWidget());
-    value->setWordWrap(true);
-    value->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    row.value = new QLabel(grid->parentWidget());
+    row.value->setWordWrap(true);
+    row.value->setTextInteractionFlags(Qt::TextSelectableByMouse);
     if (mono)
-        value->setFont(FluentTheme::monoFont());
+        row.value->setFont(FluentTheme::monoFont());
 
-    grid->addWidget(label, row, 0);
-    grid->addWidget(value, row, 1);
-    return value;
+    m_fields.insert(id, row);
+    return row.value;
 }
 
-void TaskDetailsPanel::buildOverview(QWidget *content)
+void TaskDetailsPanel::setField(const QString &id, const QString &text)
 {
-    auto *root = qobject_cast<QVBoxLayout *>(content->layout());
-    const QVariantMap detail = m_aria2 ? m_aria2->taskDetail() : QVariantMap();
-    const FluentTheme *t = FluentTheme::instance();
+    auto it = m_fields.find(id);
+    if (it == m_fields.end() || it->value->text() == text)
+        // Identical text: not touching the label means no repaint at all, which
+        // is the whole point - most values do not change between two polls.
+        return;
+    it->value->setText(text);
+}
 
-    // ---- identity --------------------------------------------------------
+QLabel *TaskDetailsPanel::fieldLabel(const QString &id) const
+{
+    const auto it = m_fields.constFind(id);
+    return it == m_fields.constEnd() ? nullptr : it->value;
+}
+
+void TaskDetailsPanel::setFieldVisible(const QString &id, bool visible)
+{
+    // Remembering what was asked for, rather than reading isVisible(): a row inside
+    // a hidden card is not "visible" either, and that made the comparison lie.
+    auto it = m_fields.find(id);
+    if (it == m_fields.end() || it->wanted == visible)
+        return;
+    it->wanted = visible;
+    it->caption->setVisible(visible);
+    it->value->setVisible(visible);
+}
+
+TaskDetailsPanel::Row *TaskDetailsPanel::rowFor(QList<Row> &rows, const QString &key,
+                                                QVBoxLayout *into, bool withCheckAndBar)
+{
+    for (Row &row : rows) {
+        if (row.key == key)
+            return &row;
+    }
+
+    Row row;
+    row.key = key;
+    row.widget = new QWidget(into->parentWidget());
+    auto *layout = new QHBoxLayout(row.widget);
+    layout->setContentsMargins(2, 4, 2, 4);
+    layout->setSpacing(10);
+
+    if (withCheckAndBar) {
+        auto *check = new FluentCheckBox(row.widget);
+        layout->addWidget(check);
+        row.check = check;
+    }
+
+    auto *text = new QWidget(row.widget);
+    auto *textLayout = new QVBoxLayout(text);
+    textLayout->setContentsMargins(0, 0, 0, 0);
+    textLayout->setSpacing(2);
+
+    row.primary = new QLabel(text);
+    row.primary->setWordWrap(true);
+    row.secondary = new QLabel(text);
+    row.secondary->setProperty(kCaptionRole, kCaptionValue);
+    textLayout->addWidget(row.primary);
+    textLayout->addWidget(row.secondary);
+
+    if (withCheckAndBar) {
+        row.bar = new FluentProgressBar(text);
+        row.bar->setBarHeight(3);
+        textLayout->addWidget(row.bar);
+    }
+
+    row.trailing = new QLabel(row.widget);
+
+    layout->addWidget(text, 1);
+    layout->addWidget(row.trailing, 0, Qt::AlignRight | Qt::AlignVCenter);
+
+    into->addWidget(row.widget);
+    rows.append(row);
+    return &rows.last();
+}
+
+void TaskDetailsPanel::fillRow(Row &row, const QString &primary, const QString &secondary,
+                               const QString &trailing, const QColor &tint)
+{
+    if (row.primary->text() != primary)
+        row.primary->setText(primary);
+    if (row.secondary->text() != secondary)
+        row.secondary->setText(secondary);
+    if (row.trailing->text() != trailing)
+        row.trailing->setText(trailing);
+    const QString colour = QStringLiteral("QLabel { color: %1; }").arg(tint.name());
+    if (row.trailing->styleSheet() != colour)
+        row.trailing->setStyleSheet(colour);
+}
+
+void TaskDetailsPanel::hideUnseen(QList<Row> &rows)
+{
+    for (Row &row : rows) {
+        if (!row.seen && row.widget->isVisible())
+            row.widget->hide();
+        row.seen = false;
+    }
+}
+
+// ============================================================================
+//  the section skeleton: built once, updated in place afterwards
+// ============================================================================
+void TaskDetailsPanel::buildSkeleton()
+{
+    // ---- 概要 -------------------------------------------------------------
+    QWidget *content = m_sectionContent.value(Overview);
+    auto *root = qobject_cast<QVBoxLayout *>(content->layout());
+
+    m_overviewEmpty = new QLabel(tr("未选择任务"), content);
+    m_overviewEmpty->setProperty(kCaptionRole, kCaptionValue);
+    m_captionLabels << m_overviewEmpty;
+    m_captions << QT_TR_NOOP("未选择任务");
+    root->insertWidget(root->count() - 1, m_overviewEmpty);
+
     QVBoxLayout *basic = addCard(root, QT_TR_NOOP("基本信息"));
-    auto *grid = new QGridLayout();
-    grid->setHorizontalSpacing(12);
-    grid->setVerticalSpacing(6);
-    grid->setColumnStretch(1, 1);
-    basic->addLayout(grid);
+    m_basicCard = basic->parentWidget();
+    m_basicGrid = new QGridLayout();
+    m_basicGrid->setHorizontalSpacing(12);
+    m_basicGrid->setVerticalSpacing(6);
+    m_basicGrid->setColumnStretch(1, 1);
+    basic->addLayout(m_basicGrid);
 
     int row = 0;
-    QLabel *name = addField(grid, row++, QT_TR_NOOP("名称"));
-    name->setText(elide(detail.value(QStringLiteral("fileName")).toString(), 200));
-    name->setProperty(kCaptionRole, "body");
+    field(QStringLiteral("name"), m_basicGrid, QT_TR_NOOP("名称"));
+    m_fieldRows.insert(QStringLiteral("name"), row++);
+    field(QStringLiteral("gid"), m_basicGrid, QT_TR_NOOP("GID"));
+    m_fieldRows.insert(QStringLiteral("gid"), row++);
+    field(QStringLiteral("status"), m_basicGrid, QT_TR_NOOP("状态"));
+    m_fieldRows.insert(QStringLiteral("status"), row++);
+    field(QStringLiteral("dir"), m_basicGrid, QT_TR_NOOP("保存到"));
+    m_fieldRows.insert(QStringLiteral("dir"), row++);
+    field(QStringLiteral("type"), m_basicGrid, QT_TR_NOOP("类型"));
+    m_fieldRows.insert(QStringLiteral("type"), row++);
+    field(QStringLiteral("infohash"), m_basicGrid, QT_TR_NOOP("信息哈希"), true);
+    m_fieldRows.insert(QStringLiteral("infohash"), row++);
+    field(QStringLiteral("pieces"), m_basicGrid, QT_TR_NOOP("分片"));
+    m_fieldRows.insert(QStringLiteral("pieces"), row++);
 
-    addField(grid, row++, QT_TR_NOOP("GID"))
-        ->setText(detail.value(QStringLiteral("gid")).toString());
-    addField(grid, row++, QT_TR_NOOP("状态"))
-        ->setText(FluentTheme::statusLabel(detail.value(QStringLiteral("status")).toString()));
-    addField(grid, row++, QT_TR_NOOP("保存到"))
-        ->setText(elide(detail.value(QStringLiteral("dir")).toString(), 200));
-    addField(grid, row++, QT_TR_NOOP("类型"))->setText(
-        detail.value(QStringLiteral("isTorrent")).toBool() ? tr("BitTorrent 任务")
-                                                           : tr("普通下载"));
-    if (!detail.value(QStringLiteral("infoHash")).toString().isEmpty()) {
-        addField(grid, row++, QT_TR_NOOP("信息哈希"), true)
-            ->setText(FluentTheme::prettyInfoHash(
-                detail.value(QStringLiteral("infoHash")).toString()));
-    }
-    const int pieceLength = detail.value(QStringLiteral("pieceLength")).toInt();
-    if (pieceLength > 0) {
-        addField(grid, row++, QT_TR_NOOP("分片"))
-            ->setText(tr("%1 片 × %2")
-                          .arg(detail.value(QStringLiteral("pieceCount")).toInt())
-                          .arg(FluentTheme::formatSize(pieceLength)));
+    for (auto it = m_fieldRows.constBegin(); it != m_fieldRows.constEnd(); ++it) {
+        FieldRow &fieldRow = m_fields[it.key()];
+        m_basicGrid->addWidget(fieldRow.caption, it.value(), 0);
+        m_basicGrid->addWidget(fieldRow.value, it.value(), 1);
+        fieldRow.caption->hide();
+        fieldRow.value->hide();
     }
 
-    // ---- transfer --------------------------------------------------------
     QVBoxLayout *transfer = addCard(root, QT_TR_NOOP("传输"));
-    auto *grid2 = new QGridLayout();
-    grid2->setHorizontalSpacing(12);
-    grid2->setVerticalSpacing(6);
-    grid2->setColumnStretch(1, 1);
-    transfer->addLayout(grid2);
+    m_transferCard = transfer->parentWidget();
+    m_transferGrid = new QGridLayout();
+    m_transferGrid->setHorizontalSpacing(12);
+    m_transferGrid->setVerticalSpacing(6);
+    m_transferGrid->setColumnStretch(1, 1);
+    transfer->addLayout(m_transferGrid);
 
+    struct TransferField { const char *id; const char *caption; };
+    static const TransferField transferFields[] = {
+        {"total", QT_TR_NOOP("总大小")},        {"done", QT_TR_NOOP("已下载")},
+        {"uploaded", QT_TR_NOOP("已上传")},     {"downspeed", QT_TR_NOOP("下载速度")},
+        {"upspeed", QT_TR_NOOP("上传速度")},    {"avgspeed", QT_TR_NOOP("平均速度")},
+        {"eta", QT_TR_NOOP("剩余时间")},        {"connections", QT_TR_NOOP("连接数")},
+        {"seeders", QT_TR_NOOP("种子 / 用户")},
+    };
     row = 0;
-    addField(grid2, row++, QT_TR_NOOP("总大小"))
-        ->setText(FluentTheme::formatSize(detail.value(QStringLiteral("totalLength")).toDouble()));
-    addField(grid2, row++, QT_TR_NOOP("已下载"))
-        ->setText(FluentTheme::formatSize(
-            detail.value(QStringLiteral("completedLength")).toDouble()));
-    addField(grid2, row++, QT_TR_NOOP("已上传"))
-        ->setText(FluentTheme::formatSize(detail.value(QStringLiteral("uploadLength")).toDouble()));
-    addField(grid2, row++, QT_TR_NOOP("下载速度"))
-        ->setText(FluentTheme::formatSpeed(
-            detail.value(QStringLiteral("downloadSpeed")).toDouble()));
-    addField(grid2, row++, QT_TR_NOOP("上传速度"))
-        ->setText(FluentTheme::formatSpeed(
-            detail.value(QStringLiteral("uploadSpeed")).toDouble()));
-    addField(grid2, row++, QT_TR_NOOP("平均速度"))
-        ->setText(FluentTheme::formatSpeed(detail.value(QStringLiteral("avgSpeed")).toDouble()));
-    addField(grid2, row++, QT_TR_NOOP("剩余时间"))
-        ->setText(FluentTheme::formatDuration(detail.value(QStringLiteral("eta")).toDouble()));
-    addField(grid2, row++, QT_TR_NOOP("连接数"))
-        ->setText(QString::number(detail.value(QStringLiteral("connections")).toInt()));
-    if (detail.value(QStringLiteral("isTorrent")).toBool()) {
-        addField(grid2, row++, QT_TR_NOOP("种子 / 用户"))
-            ->setText(tr("%1 个种子 · %2 个连接")
-                          .arg(detail.value(QStringLiteral("numSeeders")).toInt())
-                          .arg(detail.value(QStringLiteral("connections")).toInt()));
+    for (const TransferField &f : transferFields) {
+        const QString id = QString::fromLatin1(f.id);
+        field(id, m_transferGrid, f.caption);
+        FieldRow &fieldRow = m_fields[id];
+        m_transferGrid->addWidget(fieldRow.caption, row, 0);
+        m_transferGrid->addWidget(fieldRow.value, row, 1);
+        fieldRow.caption->hide();
+        fieldRow.value->hide();
+        ++row;
     }
 
-    const QString error = detail.value(QStringLiteral("errorMessage")).toString();
-    if (!error.isEmpty()) {
-        QVBoxLayout *errCard = addCard(root, QT_TR_NOOP("错误信息"));
-        auto *label = new QLabel(error, errCard->parentWidget());
-        label->setWordWrap(true);
-        label->setStyleSheet(QStringLiteral("QLabel { color: %1; }").arg(t->critical().name()));
-        errCard->addWidget(label);
-    }
+    QVBoxLayout *error = addCard(root, QT_TR_NOOP("错误信息"));
+    m_errorCard = error->parentWidget();
+    m_errorLabel = new QLabel(m_errorCard);
+    m_errorLabel->setWordWrap(true);
+    error->addWidget(m_errorLabel);
+    m_errorCard->hide();
 
-    root->addStretch(1);
-}
+    // ---- 文件 -------------------------------------------------------------
+    content = m_sectionContent.value(Files);
+    root = qobject_cast<QVBoxLayout *>(content->layout());
 
-void TaskDetailsPanel::buildFilesSection(QWidget *content)
-{
-    auto *root = qobject_cast<QVBoxLayout *>(content->layout());
-    const QVariantList files = m_aria2
-                                   ? m_aria2->taskDetail().value(QStringLiteral("files")).toList()
-                                   : QVariantList();
+    m_filesEmpty = new QLabel(tr("该任务还没有可显示的文件信息"), content);
+    m_filesEmpty->setProperty(kCaptionRole, kCaptionValue);
+    m_captionLabels << m_filesEmpty;
+    m_captions << QT_TR_NOOP("该任务还没有可显示的文件信息");
+    root->insertWidget(root->count() - 1, m_filesEmpty);
 
-    QVBoxLayout *card = addCard(root, QT_TR_NOOP("文件列表"));
-    Q_UNUSED(card)
-
-    if (files.isEmpty()) {
-        auto *empty = new QLabel(tr("该任务还没有可显示的文件信息"), content);
-        empty->setProperty(kCaptionRole, kCaptionValue);
-        root->insertWidget(root->count() - 1, empty);
-        root->addStretch(1);
-        return;
-    }
-
-    for (const QVariant &v : files) {
-        const QVariantMap f = v.toMap();
-        const qint64 length = f.value(QStringLiteral("length")).toLongLong();
-        const qint64 done = f.value(QStringLiteral("completedLength")).toLongLong();
-        const double pct = length > 0 ? double(done) * 100.0 / double(length) : 0.0;
-        const QString path = f.value(QStringLiteral("path")).toString();
-
-        auto *rowWidget = new QWidget(content);
-        auto *rowLayout = new QHBoxLayout(rowWidget);
-        rowLayout->setContentsMargins(0, 0, 0, 0);
-        rowLayout->setSpacing(10);
-
-        const int index = f.value(QStringLiteral("index")).toInt();
-        auto *check = new FluentCheckBox(rowWidget);
-        check->setChecked(m_filesLoaded
-                              ? m_selectedFiles.contains(QString::number(index))
-                              : f.value(QStringLiteral("selected")).toBool());
-        connect(check, &QCheckBox::toggled, this, [this, index](bool on) {
-            const QString key = QString::number(index);
-            if (on && !m_selectedFiles.contains(key))
-                m_selectedFiles << key;
-            else if (!on)
-                m_selectedFiles.removeAll(key);
-            m_filesLoaded = true;
-        });
-        rowLayout->addWidget(check);
-
-        auto *text = new QWidget(rowWidget);
-        auto *textLayout = new QVBoxLayout(text);
-        textLayout->setContentsMargins(0, 0, 0, 0);
-        textLayout->setSpacing(3);
-
-        auto *nameLabel = new QLabel(elide(f.value(QStringLiteral("name")).toString()), text);
-        nameLabel->setToolTip(path);
-        auto *metaLabel = new QLabel(
-            tr("%1 / %2 · %3%")
-                .arg(FluentTheme::formatSize(double(done)),
-                     FluentTheme::formatSize(double(length)))
-                .arg(int(pct)),
-            text);
-        metaLabel->setProperty(kCaptionRole, kCaptionValue);
-
-        auto *bar = new FluentProgressBar(text);
-        bar->setBarHeight(3);
-        bar->setValue(pct);
-
-        textLayout->addWidget(nameLabel);
-        textLayout->addWidget(metaLabel);
-        textLayout->addWidget(bar);
-        rowLayout->addWidget(text, 1);
-
-        root->insertWidget(root->count() - 1, rowWidget);
-    }
+    QVBoxLayout *filesCard = addCard(root, QT_TR_NOOP("文件列表"));
+    m_filesBody = filesCard;
+    m_filesCard = filesCard->parentWidget();
 
     auto *actions = new QWidget(content);
+    m_filesActions = actions;
     auto *actionLayout = new QHBoxLayout(actions);
     actionLayout->setContentsMargins(0, 0, 0, 0);
     actionLayout->setSpacing(8);
@@ -422,12 +467,10 @@ void TaskDetailsPanel::buildFilesSection(QWidget *content)
     apply->setRole(FluentButton::Accent);
     apply->setCompact(true);
 
-    QStringList everyIndex;
-    for (const QVariant &v : files)
-        everyIndex << QString::number(v.toMap().value(QStringLiteral("index")).toInt());
-
-    connect(all, &QPushButton::clicked, this, [this, everyIndex]() {
-        m_selectedFiles = everyIndex;
+    connect(all, &QPushButton::clicked, this, [this]() {
+        m_selectedFiles.clear();
+        for (const Row &row : std::as_const(m_fileRows))
+            m_selectedFiles << row.key;
         m_filesLoaded = true;
         refresh();
     });
@@ -448,168 +491,354 @@ void TaskDetailsPanel::buildFilesSection(QWidget *content)
     actionLayout->addStretch(1);
     actionLayout->addWidget(apply);
     root->insertWidget(root->count() - 1, actions);
-    root->addStretch(1);
+
+    // ---- 连接 -------------------------------------------------------------
+    content = m_sectionContent.value(Peers);
+    root = qobject_cast<QVBoxLayout *>(content->layout());
+
+    m_peersEmpty = new QLabel(tr("暂无连接的用户（仅 BitTorrent 任务有 Peer 信息）"), content);
+    m_peersEmpty->setProperty(kCaptionRole, kCaptionValue);
+    m_peersEmpty->setWordWrap(true);
+    m_captionLabels << m_peersEmpty;
+    m_captions << QT_TR_NOOP("暂无连接的用户（仅 BitTorrent 任务有 Peer 信息）");
+    root->insertWidget(root->count() - 1, m_peersEmpty);
+
+    QVBoxLayout *peersCard = addCard(root, QT_TR_NOOP("已连接的用户"));
+    m_peersCard = peersCard->parentWidget();
+    m_peersBody = peersCard;
+
+    // ---- 服务器 -----------------------------------------------------------
+    content = m_sectionContent.value(Servers);
+    root = qobject_cast<QVBoxLayout *>(content->layout());
+
+    m_serversEmpty = new QLabel(tr("暂无服务器信息"), content);
+    m_serversEmpty->setProperty(kCaptionRole, kCaptionValue);
+    m_captionLabels << m_serversEmpty;
+    m_captions << QT_TR_NOOP("暂无服务器信息");
+    root->insertWidget(root->count() - 1, m_serversEmpty);
+
+    QVBoxLayout *uriCard = addCard(root, QT_TR_NOOP("下载地址"));
+    m_uriCard = uriCard->parentWidget();
+    m_uriBody = uriCard;
+
+    QVBoxLayout *serverCard = addCard(root, QT_TR_NOOP("服务器 / 镜像"));
+    m_serverCard = serverCard->parentWidget();
+    m_serverBody = serverCard;
+
+    // ---- 选项 -------------------------------------------------------------
+    content = m_sectionContent.value(Options);
+    root = qobject_cast<QVBoxLayout *>(content->layout());
+
+    m_optionsEmpty = new QLabel(tr("正在读取任务选项…"), content);
+    m_optionsEmpty->setProperty(kCaptionRole, kCaptionValue);
+    m_captionLabels << m_optionsEmpty;
+    m_captions << QT_TR_NOOP("正在读取任务选项…");
+    root->insertWidget(root->count() - 1, m_optionsEmpty);
+
+    QVBoxLayout *optionsCard = addCard(root, QT_TR_NOOP("aria2 选项"));
+    m_optionsCard = optionsCard->parentWidget();
+    auto *refreshOptions = new FluentButton(tr("刷新选项"), m_optionsCard);
+    refreshOptions->setRole(FluentButton::Subtle);
+    refreshOptions->setCompact(true);
+    connect(refreshOptions, &QPushButton::clicked, this, [this]() {
+        if (m_aria2 && !m_gid.isEmpty())
+            m_aria2->fetchTaskOptions(m_gid);
+    });
+    optionsCard->addWidget(refreshOptions);
+
+    m_optionsGrid = new QGridLayout();
+    m_optionsGrid->setHorizontalSpacing(14);
+    m_optionsGrid->setVerticalSpacing(4);
+    m_optionsGrid->setColumnStretch(1, 1);
+    optionsCard->addLayout(m_optionsGrid);
 }
 
-void TaskDetailsPanel::buildPeersSection(QWidget *content)
+void TaskDetailsPanel::updateOverview()
 {
-    auto *root = qobject_cast<QVBoxLayout *>(content->layout());
+    const QVariantMap detail = m_aria2 ? m_aria2->taskDetail() : QVariantMap();
+    const FluentTheme *t = FluentTheme::instance();
+    const bool hasTask = !m_gid.isEmpty() && !detail.isEmpty();
+
+    m_overviewEmpty->setVisible(!hasTask);
+    m_basicCard->setVisible(hasTask);
+    m_transferCard->setVisible(hasTask);
+    if (!hasTask) {
+        m_errorCard->hide();
+        return;
+    }
+
+    const QString status = detail.value(QStringLiteral("status")).toString();
+    const bool isTorrent = detail.value(QStringLiteral("isTorrent")).toBool();
+
+    // The rows that always apply. They are created hidden (a field only appears
+    // once it has a value), so each update has to say which ones it wants; the
+    // three that depend on the task are handled below.
+    static const char *const alwaysVisible[] = {
+        "name", "gid", "status", "dir", "type",
+        "total", "done", "uploaded", "downspeed", "upspeed",
+        "avgspeed", "eta", "connections",
+    };
+    for (const char *id : alwaysVisible)
+        setFieldVisible(QString::fromLatin1(id), true);
+
+    setField(QStringLiteral("name"), elide(detail.value(QStringLiteral("fileName")).toString(), 200));
+    setField(QStringLiteral("gid"), detail.value(QStringLiteral("gid")).toString());
+    setField(QStringLiteral("status"), FluentTheme::statusLabel(status));
+    setField(QStringLiteral("dir"), elide(detail.value(QStringLiteral("dir")).toString(), 200));
+    setField(QStringLiteral("type"), isTorrent ? tr("BitTorrent 任务") : tr("普通下载"));
+
+    const QString infoHash = detail.value(QStringLiteral("infoHash")).toString();
+    setField(QStringLiteral("infohash"), FluentTheme::prettyInfoHash(infoHash));
+    setFieldVisible(QStringLiteral("infohash"), !infoHash.isEmpty());
+
+    const int pieceLength = detail.value(QStringLiteral("pieceLength")).toInt();
+    setField(QStringLiteral("pieces"),
+             tr("%1 片 × %2")
+                 .arg(detail.value(QStringLiteral("pieceCount")).toInt())
+                 .arg(FluentTheme::formatSize(pieceLength)));
+    setFieldVisible(QStringLiteral("pieces"), pieceLength > 0);
+
+    setField(QStringLiteral("total"),
+             FluentTheme::formatSize(detail.value(QStringLiteral("totalLength")).toDouble()));
+    setField(QStringLiteral("done"),
+             FluentTheme::formatSize(detail.value(QStringLiteral("completedLength")).toDouble()));
+    setField(QStringLiteral("uploaded"),
+             FluentTheme::formatSize(detail.value(QStringLiteral("uploadLength")).toDouble()));
+    setField(QStringLiteral("downspeed"),
+             FluentTheme::formatSpeed(detail.value(QStringLiteral("downloadSpeed")).toDouble()));
+    setField(QStringLiteral("upspeed"),
+             FluentTheme::formatSpeed(detail.value(QStringLiteral("uploadSpeed")).toDouble()));
+    setField(QStringLiteral("avgspeed"),
+             FluentTheme::formatSpeed(detail.value(QStringLiteral("avgSpeed")).toDouble()));
+    setField(QStringLiteral("eta"),
+             FluentTheme::formatDuration(detail.value(QStringLiteral("eta")).toDouble()));
+    setField(QStringLiteral("connections"),
+             QString::number(detail.value(QStringLiteral("connections")).toInt()));
+    setField(QStringLiteral("seeders"),
+             tr("%1 个种子 · %2 个连接")
+                 .arg(detail.value(QStringLiteral("numSeeders")).toInt())
+                 .arg(detail.value(QStringLiteral("connections")).toInt()));
+    setFieldVisible(QStringLiteral("seeders"), isTorrent);
+
+    const QString error = detail.value(QStringLiteral("errorMessage")).toString();
+    if (m_errorLabel->text() != error)
+        m_errorLabel->setText(error);
+    m_errorCard->setVisible(!error.isEmpty());
+    m_errorLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; }").arg(t->critical().name()));
+}
+
+void TaskDetailsPanel::updateFiles()
+{
+    const QVariantList files = m_aria2
+                                   ? m_aria2->taskDetail().value(QStringLiteral("files")).toList()
+                                   : QVariantList();
+    const bool hasTask = !m_gid.isEmpty() && m_aria2 && !m_aria2->taskDetail().isEmpty();
+
+    m_filesEmpty->setVisible(hasTask && files.isEmpty());
+    m_filesCard->setVisible(hasTask && !files.isEmpty());
+    m_filesActions->setVisible(hasTask && !files.isEmpty());
+    if (!hasTask) {
+        for (Row &row : m_fileRows)
+            row.widget->hide();
+        return;
+    }
+
+    for (const QVariant &v : files) {
+        const QVariantMap f = v.toMap();
+        const int index = f.value(QStringLiteral("index")).toInt();
+        const QString key = QString::number(index);
+        const qint64 length = f.value(QStringLiteral("length")).toLongLong();
+        const qint64 done = f.value(QStringLiteral("completedLength")).toLongLong();
+        const double pct = length > 0 ? double(done) * 100.0 / double(length) : 0.0;
+        const QString path = f.value(QStringLiteral("path")).toString();
+        const QString name = f.value(QStringLiteral("name")).toString();
+
+        Row *row = rowFor(m_fileRows, key, m_filesBody, true);
+        row->seen = true;
+        row->widget->show();
+
+        if (row->primary->text() != elide(name))
+            row->primary->setText(elide(name));
+        if (row->primary->toolTip() != path)
+            row->primary->setToolTip(path);
+        const QString meta = tr("%1 / %2 · %3%")
+                                 .arg(FluentTheme::formatSize(double(done)),
+                                      FluentTheme::formatSize(double(length)))
+                                 .arg(int(pct));
+        if (row->secondary->text() != meta)
+            row->secondary->setText(meta);
+
+        // The check box is the one widget whose state the user changes: while a
+        // selection is pending it is the source of truth, not the task data.
+        const bool checked = m_filesLoaded ? m_selectedFiles.contains(key)
+                                           : f.value(QStringLiteral("selected")).toBool();
+        if (row->check && row->check->isChecked() != checked) {
+            const QSignalBlocker blocker(row->check);
+            row->check->setChecked(checked);
+        }
+        if (row->check && !row->check->property("wired").toBool()) {
+            row->check->setProperty("wired", true);
+            const QString fileIndex = key;
+            connect(row->check, &QCheckBox::toggled, this, [this, fileIndex](bool on) {
+                if (on && !m_selectedFiles.contains(fileIndex))
+                    m_selectedFiles << fileIndex;
+                else if (!on)
+                    m_selectedFiles.removeAll(fileIndex);
+                m_filesLoaded = true;
+            });
+        }
+        if (row->bar)
+            row->bar->setValue(pct);
+    }
+
+    hideUnseen(m_fileRows);
+}
+
+void TaskDetailsPanel::updatePeers()
+{
     const QVariantList peers = m_aria2
                                    ? m_aria2->taskDetail().value(QStringLiteral("peers")).toList()
                                    : QVariantList();
     const FluentTheme *t = FluentTheme::instance();
 
-    if (peers.isEmpty()) {
-        auto *empty = new QLabel(tr("暂无连接的用户（仅 BitTorrent 任务有 Peer 信息）"), content);
-        empty->setProperty(kCaptionRole, kCaptionValue);
-        empty->setWordWrap(true);
-        root->insertWidget(root->count() - 1, empty);
-        root->addStretch(1);
-        return;
-    }
+    m_peersCard->setVisible(!peers.isEmpty());
+    m_peersEmpty->setVisible(peers.isEmpty());
 
-    addCard(root, QT_TR_NOOP("已连接的用户"));
     for (const QVariant &v : peers) {
         const QVariantMap p = v.toMap();
         const bool seeder = p.value(QStringLiteral("seeder")).toBool();
-        auto *row = addListRow(root,
-                               p.value(QStringLiteral("ip")).toString() + QLatin1Char(':')
-                                   + p.value(QStringLiteral("port")).toString(),
-                               tr("上传 %1 · 下载 %2")
-                                   .arg(FluentTheme::formatSpeed(
-                                            p.value(QStringLiteral("uploadSpeed")).toDouble()),
-                                        FluentTheme::formatSpeed(
-                                            p.value(QStringLiteral("speed")).toDouble())),
-                               seeder ? tr("做种") : tr("下载"),
-                               seeder ? t->success() : t->info());
-        Q_UNUSED(row)
+        const QString key = p.value(QStringLiteral("ip")).toString() + QLatin1Char(':')
+                            + p.value(QStringLiteral("port")).toString();
+        Row *row = rowFor(m_peerRows, key, m_peersBody);
+        row->seen = true;
+        row->widget->show();
+        fillRow(*row, key,
+                tr("上传 %1 · 下载 %2")
+                    .arg(FluentTheme::formatSpeed(p.value(QStringLiteral("uploadSpeed")).toDouble()),
+                         FluentTheme::formatSpeed(p.value(QStringLiteral("speed")).toDouble())),
+                seeder ? tr("做种") : tr("下载"), seeder ? t->success() : t->info());
     }
-    root->addStretch(1);
+
+    hideUnseen(m_peerRows);
 }
 
-void TaskDetailsPanel::buildServersSection(QWidget *content)
+void TaskDetailsPanel::updateServers()
 {
-    auto *root = qobject_cast<QVBoxLayout *>(content->layout());
     const QVariantMap detail = m_aria2 ? m_aria2->taskDetail() : QVariantMap();
     const QVariantList servers = detail.value(QStringLiteral("servers")).toList();
     const QVariantList uris = detail.value(QStringLiteral("uris")).toList();
     const FluentTheme *t = FluentTheme::instance();
 
-    if (!uris.isEmpty()) {
-        addCard(root, QT_TR_NOOP("下载地址"));
-        for (const QVariant &v : uris) {
-            const QVariantMap u = v.toMap();
-            const QString status = u.value(QStringLiteral("status")).toString();
-            addListRow(root, elide(u.value(QStringLiteral("uri")).toString(), 120), status,
-                       status, status == QLatin1String("used") ? t->success() : t->textTertiary());
-        }
-    }
+    m_uriCard->setVisible(!uris.isEmpty());
+    m_serverCard->setVisible(!servers.isEmpty());
+    m_serversEmpty->setVisible(uris.isEmpty() && servers.isEmpty());
 
-    if (!servers.isEmpty()) {
-        addCard(root, QT_TR_NOOP("服务器 / 镜像"));
-        for (const QVariant &v : servers) {
-            const QVariantMap s = v.toMap();
-            addListRow(root, elide(s.value(QStringLiteral("currentUri")).toString(), 120),
-                       tr("连接 %1").arg(s.value(QStringLiteral("index")).toString()),
-                       FluentTheme::formatSpeed(
-                           s.value(QStringLiteral("downloadSpeed")).toDouble()),
-                       t->accent());
-        }
+    for (const QVariant &v : uris) {
+        const QVariantMap u = v.toMap();
+        const QString uri = u.value(QStringLiteral("uri")).toString();
+        const QString status = u.value(QStringLiteral("status")).toString();
+        Row *row = rowFor(m_uriRows, uri, m_uriBody);
+        row->seen = true;
+        row->widget->show();
+        fillRow(*row, elide(uri, 120), status, status,
+                status == QLatin1String("used") ? t->success() : t->textTertiary());
     }
+    hideUnseen(m_uriRows);
 
-    if (uris.isEmpty() && servers.isEmpty()) {
-        auto *empty = new QLabel(tr("暂无服务器信息"), content);
-        empty->setProperty(kCaptionRole, kCaptionValue);
-        root->insertWidget(root->count() - 1, empty);
+    for (const QVariant &v : servers) {
+        const QVariantMap s = v.toMap();
+        const QString key = s.value(QStringLiteral("index")).toString();
+        Row *row = rowFor(m_serverRows, key, m_serverBody);
+        row->seen = true;
+        row->widget->show();
+        fillRow(*row, elide(s.value(QStringLiteral("currentUri")).toString(), 120),
+                tr("连接 %1").arg(key),
+                FluentTheme::formatSpeed(s.value(QStringLiteral("downloadSpeed")).toDouble()),
+                t->accent());
     }
-    root->addStretch(1);
+    hideUnseen(m_serverRows);
 }
 
-void TaskDetailsPanel::buildOptionsSection(QWidget *content)
+void TaskDetailsPanel::updateOptions()
 {
-    auto *root = qobject_cast<QVBoxLayout *>(content->layout());
     const QVariantMap options = m_aria2
                                     ? m_aria2->taskDetail().value(QStringLiteral("options")).toMap()
                                     : QVariantMap();
+    const bool hasTask = !m_gid.isEmpty() && m_aria2 && !m_aria2->taskDetail().isEmpty();
 
-    QVBoxLayout *card = addCard(root, QT_TR_NOOP("aria2 选项"));
-    if (options.isEmpty()) {
-        auto *empty = new QLabel(tr("正在读取任务选项…"), content);
-        empty->setProperty(kCaptionRole, kCaptionValue);
-        root->insertWidget(root->count() - 1, empty);
-        root->addStretch(1);
-        if (m_aria2 && !m_gid.isEmpty())
+    m_optionsEmpty->setVisible(hasTask && options.isEmpty());
+    m_optionsCard->setVisible(hasTask && !options.isEmpty());
+    if (!hasTask || options.isEmpty()) {
+        // Hide the label pairs, not their parent: parentWidget() is the card
+        // itself, and hiding that took the heading down with it.
+        for (FieldRow &row : m_optionFields) {
+            row.caption->hide();
+            row.value->hide();
+        }
+        if (hasTask && options.isEmpty() && m_aria2 && !m_gid.isEmpty())
             m_aria2->fetchTaskOptions(m_gid);
         return;
     }
 
-    auto *refresh = new FluentButton(tr("刷新选项"), card->parentWidget());
-    refresh->setRole(FluentButton::Subtle);
-    refresh->setCompact(true);
-    connect(refresh, &QPushButton::clicked, this, [this]() {
-        if (m_aria2 && !m_gid.isEmpty())
-            m_aria2->fetchTaskOptions(m_gid);
-    });
-    card->addWidget(refresh);
-
-    auto *grid = new QGridLayout();
-    grid->setHorizontalSpacing(14);
-    grid->setVerticalSpacing(4);
-    grid->setColumnStretch(1, 1);
-    card->addLayout(grid);
-
     QStringList keys = options.keys();
     keys.sort();
-    int row = 0;
-    for (const QString &key : std::as_const(keys)) {
-        auto *k = new QLabel(key, card->parentWidget());
-        k->setProperty(kCaptionRole, kCaptionValue);
-        k->setFont(FluentTheme::monoFont());
-        auto *val = new QLabel(elide(options.value(key).toString(), 160), card->parentWidget());
-        val->setFont(FluentTheme::monoFont());
-        val->setTextInteractionFlags(Qt::TextSelectableByMouse);
-        val->setWordWrap(true);
-        grid->addWidget(k, row, 0);
-        grid->addWidget(val, row, 1);
-        ++row;
+
+    // The layout is touched only when the *set* of options changes. Re-adding the
+    // pairs on every refresh (once a second) invalidated the grid, so the whole
+    // list was laid out again every second - which is what made this tab flicker
+    // even though the widgets were reused.
+    if (keys != m_optionOrder) {
+        m_optionOrder = keys;
+        int row = 0;
+        for (const QString &key : std::as_const(keys)) {
+            auto it = m_optionFields.find(key);
+            if (it == m_optionFields.end()) {
+                FieldRow created;
+                created.captionText = nullptr;
+                created.caption = new QLabel(key, m_optionsCard);
+                created.caption->setProperty(kCaptionRole, kCaptionValue);
+                created.caption->setFont(FluentTheme::monoFont());
+                created.value = new QLabel(m_optionsCard);
+                created.value->setFont(FluentTheme::monoFont());
+                created.value->setTextInteractionFlags(Qt::TextSelectableByMouse);
+                // Wrapping would let a long value change the row height, and with
+                // it the layout of everything below it.
+                created.value->setWordWrap(false);
+                it = m_optionFields.insert(key, created);
+            }
+            m_optionsGrid->addWidget(it->caption, row, 0);
+            m_optionsGrid->addWidget(it->value, row, 1);
+            it->caption->show();
+            it->value->show();
+            ++row;
+        }
+
+        // Options the engine no longer reports (the set changes with the task).
+        const QSet<QString> live(keys.constBegin(), keys.constEnd());
+        for (auto it = m_optionFields.begin(); it != m_optionFields.end(); ++it) {
+            if (live.contains(it.key()))
+                continue;
+            it->caption->hide();
+            it->value->hide();
+        }
     }
-    root->addStretch(1);
+
+    for (const QString &key : std::as_const(keys)) {
+        auto it = m_optionFields.find(key);
+        if (it == m_optionFields.end())
+            continue;
+        const QString raw = options.value(key).toString();
+        const QString text = elide(raw, 160);
+        if (it->text == text)
+            continue;
+        it->text = text;
+        it->value->setText(text);
+        // The whole value stays reachable: the row elides it to keep the list
+        // steady, so the tooltip is where the rest lives.
+        it->value->setToolTip(raw);
+    }
 }
 
-QWidget *TaskDetailsPanel::addListRow(QVBoxLayout *into, const QString &primary,
-                                      const QString &secondary, const QString &trailing,
-                                      const QColor &tint, QWidget *leading)
-{
-    Q_UNUSED(leading)
-    auto *row = new QWidget(into->parentWidget());
-    auto *layout = new QHBoxLayout(row);
-    layout->setContentsMargins(2, 4, 2, 4);
-    layout->setSpacing(10);
-
-    auto *text = new QWidget(row);
-    auto *textLayout = new QVBoxLayout(text);
-    textLayout->setContentsMargins(0, 0, 0, 0);
-    textLayout->setSpacing(2);
-
-    auto *primaryLabel = new QLabel(primary, text);
-    primaryLabel->setWordWrap(true);
-    auto *secondaryLabel = new QLabel(secondary, text);
-    secondaryLabel->setProperty(kCaptionRole, kCaptionValue);
-    textLayout->addWidget(primaryLabel);
-    textLayout->addWidget(secondaryLabel);
-
-    auto *trailingLabel = new QLabel(trailing, row);
-    trailingLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; }").arg(tint.name()));
-
-    layout->addWidget(text, 1);
-    layout->addWidget(trailingLabel, 0, Qt::AlignRight | Qt::AlignVCenter);
-
-    into->insertWidget(into->count() - 1, row);
-    return row;
-}
-
-// ============================================================================
-//  state
 // ============================================================================
 void TaskDetailsPanel::setGid(const QString &gid)
 {
@@ -630,24 +859,6 @@ void TaskDetailsPanel::setSection(int section)
     ui->sectionStack->setCurrentIndex(m_section);
     restyle();
     refresh();
-}
-
-void TaskDetailsPanel::clearLayout(QLayout *layout)
-{
-    if (!layout)
-        return;
-    while (QLayoutItem *item = layout->takeAt(0)) {
-        if (QWidget *w = item->widget()) {
-            // Hide before the deferred delete: a widget that was taken out of the
-            // layout is still a visible child until the event loop gets to it, so
-            // it kept being painted on top of the freshly built rows.
-            w->hide();
-            w->deleteLater();
-        } else if (QLayout *child = item->layout()) {
-            clearLayout(child);
-        }
-        delete item;
-    }
 }
 
 void TaskDetailsPanel::refresh()
@@ -702,55 +913,17 @@ void TaskDetailsPanel::refresh()
         button->setVisible(hasTask);
 
     // ---- section body ----------------------------------------------------
-    QWidget *content = m_sectionContent.value(m_section);
-    if (!content)
-        return;
-
-    // The body is rebuilt from scratch (the sections are short lists of labels,
-    // and this keeps one code path instead of five update-in-place ones). Two
-    // things make that invisible:
-    //
-    //   * repaints are off while the old rows are hidden and the new ones are
-    //     built, so the panel never shows a half-empty intermediate state, and
-    //   * the scroll position is restored afterwards, because a rebuild resets
-    //     the bar and the user could never scroll past the first screen.
-    QScrollArea *scroll = m_sectionScrolls.value(m_section);
-    const int scrollPos = scroll ? scroll->verticalScrollBar()->value() : 0;
-    const bool updates = content->updatesEnabled();
-    content->setUpdatesEnabled(false);
-
-    clearLayout(content->layout());
-    m_captionLabels.clear();
-    m_captions.clear();
-    qobject_cast<QVBoxLayout *>(content->layout())->addStretch(1);
-
-    if (!hasTask) {
-        auto *empty = new QLabel(tr("未选择任务"), content);
-        empty->setProperty(kCaptionRole, kCaptionValue);
-        auto *layout = qobject_cast<QVBoxLayout *>(content->layout());
-        layout->insertWidget(layout->count() - 1, empty);
-        layout->addStretch(1);
-        content->setUpdatesEnabled(updates);
-        return;
-    }
-
+    // Only the text inside the rows is touched. The widgets were built once (see
+    // buildSkeleton) and stay where they are, so a refresh costs a few setText()
+    // calls and repaints only the labels whose value actually changed - no
+    // flashing, and the scroll position is never disturbed.
     switch (m_section) {
-    case Overview: buildOverview(content); break;
-    case Files:    buildFilesSection(content); break;
-    case Peers:    buildPeersSection(content); break;
-    case Servers:  buildServersSection(content); break;
-    case Options:  buildOptionsSection(content); break;
+    case Overview: updateOverview(); break;
+    case Files:    updateFiles(); break;
+    case Peers:    updatePeers(); break;
+    case Servers:  updateServers(); break;
+    case Options:  updateOptions(); break;
     default: break;
-    }
-
-    content->setUpdatesEnabled(updates);
-    if (scroll) {
-        // Let the new rows decide the content size before restoring the position:
-        // the scroll bar's range follows the layout, and a value set against a
-        // stale range is simply clamped away.
-        if (auto *layout = qobject_cast<QVBoxLayout *>(content->layout()))
-            layout->activate();
-        scroll->verticalScrollBar()->setValue(scrollPos);
     }
 }
 
@@ -806,7 +979,15 @@ void TaskDetailsPanel::changeEvent(QEvent *event)
                                ? tr("暂停")
                                : tr("继续"));
 
-    // Captions recorded by addField()/addCard() were already translated once;
-    // refresh() rebuilds every section with the new catalogue.
+    // The rows are created once, so their captions have to be re-translated here
+    // rather than by a rebuild.
+    for (int i = 0; i < m_captionLabels.size() && i < m_captions.size(); ++i) {
+        if (m_captions.at(i))
+            m_captionLabels.at(i)->setText(tr(m_captions.at(i)));
+    }
+    for (const FieldRow &row : std::as_const(m_fields)) {
+        if (row.captionText && row.caption)
+            row.caption->setText(tr(row.captionText));
+    }
     refresh();
 }

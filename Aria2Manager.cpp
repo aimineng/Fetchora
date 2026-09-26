@@ -1818,6 +1818,13 @@ void Aria2Manager::fetchTaskDetail(const QString &gid)
         detail[QStringLiteral("servers")] = live.servers;
         detail[QStringLiteral("trackers")] = live.trackerUrls;
         detail[QStringLiteral("btMetaInfo")] = live.comment;
+        // The option map is fetched with a separate aria2.getOption call, and it
+        // belongs in the picture: this detail map is rebuilt on every poll, and
+        // leaving the options out made the inspector's Options tab empty out and
+        // refill once a second - which read as the panel "flashing" - while each
+        // of those passes asked the engine for the same options again.
+        if (!live.optionsMap.isEmpty())
+            detail[QStringLiteral("options")] = live.optionsMap.first().toMap();
 
         m_taskDetail = detail;
         emit taskDetailChanged();

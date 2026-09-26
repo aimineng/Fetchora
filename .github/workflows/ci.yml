@@ -271,6 +271,26 @@ jobs:
               Write-Host ("{0,-14} {1,10:N0} bytes" -f $page, (Get-Item $png).Length)
             }
           }
+
+          # The inspector's five sections, which are updated in place rather than
+          # rebuilt - a mistake there shows up as a missing row, and a row is not
+          # something a self-test can see.
+          foreach ($section in 'overview', 'files', 'peers', 'servers', 'options') {
+            $png = Join-Path $PWD "ui-shots\detail-$section.png"
+            $log = Join-Path $env:RUNNER_TEMP "shot-detail-$section.log"
+            Remove-Item $png -ErrorAction SilentlyContinue
+            $proc = Start-Process -FilePath $exe -PassThru -Wait -RedirectStandardOutput $log `
+                -RedirectStandardError "$log.err" `
+                -ArgumentList @('--new-instance', '--screenshot', $png, '--page', 'download',
+                                '--detail', $section, '--screenshot-delay', '1500')
+            if (-not (Test-Path $png)) {
+              $failed += "detail-$section (exit $($proc.ExitCode))"
+              $logs += @(Get-Content $log -ErrorAction SilentlyContinue) +
+                       @(Get-Content "$log.err" -ErrorAction SilentlyContinue) | Select-Object -Last 8
+            } else {
+              Write-Host ("detail/{0,-8} {1,10:N0} bytes" -f $section, (Get-Item $png).Length)
+            }
+          }
           Get-Process Fetchora, aria2c -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
           if ($failed.Count -gt 0) {
             # The job log needs a token; annotations do not, so the diagnosis goes

@@ -607,10 +607,22 @@ public:
         icon->setIconColor(tint);
         row->addWidget(icon, 0, Qt::AlignTop);
 
-        auto *label = new QLabel(text, this);
+        auto *label = new QLabel(this);
         label->setWordWrap(true);
-        label->setMaximumWidth(320);
         label->setProperty("fluentRole", "caption");
+        // A wrapping QLabel has a heightForWidth, and QLayout::sizeHint() does not
+        // use it: the card was sized for one line and everything that wrapped was
+        // cut off, so "已添加：http://…" arrived chopped mid-URL. Measuring the
+        // wrapped text and handing the label that height is what actually shows it.
+        const QString shown = text.size() > 320 ? text.left(319) + QChar(0x2026) : text;
+        label->setText(shown);
+        label->setToolTip(text);
+        const int maxLabelWidth = 320;
+        const QFontMetrics metrics(label->font());
+        const QRect bounds = metrics.boundingRect(QRect(0, 0, maxLabelWidth, 10000),
+                                                  Qt::TextWordWrap, shown);
+        label->setFixedWidth(qBound(120, bounds.width() + 4, maxLabelWidth));
+        label->setMinimumHeight(bounds.height());
         row->addWidget(label, 1);
 
         // The style sheet has to address this widget by object name: the class is

@@ -577,9 +577,21 @@ int main(int argc, char *argv[])
                                              QStringLiteral("Milliseconds to wait before --screenshot "
                                                             "(lets downloads populate the list)."),
                                              QStringLiteral("ms"));
+    QCommandLineOption framesOption(QStringLiteral("frames"),
+                                    QStringLiteral("How many screenshots to take (default 1). More than "
+                                                   "one turns --screenshot into a series: shot-1.png, "
+                                                   "shot-2.png, … from the same window."),
+                                    QStringLiteral("count"));
+    QCommandLineOption frameIntervalOption(QStringLiteral("frame-interval"),
+                                           QStringLiteral("Milliseconds between the frames (default 800)."),
+                                           QStringLiteral("ms"));
     QCommandLineOption pageOption(QStringLiteral("page"),
                                   QStringLiteral("Open on this page (download, bittorrent, ...)."),
                                   QStringLiteral("key"));
+    QCommandLineOption detailSectionOption(QStringLiteral("detail"),
+                                           QStringLiteral("Section of the task inspector to open "
+                                                          "(overview, files, peers, servers, options)."),
+                                           QStringLiteral("section"));
     QCommandLineOption newInstanceOption(QStringLiteral("new-instance"),
                                          QStringLiteral("Do not forward to a running instance."));
     QCommandLineOption selfTestOption(QStringLiteral("self-test"),
@@ -606,7 +618,10 @@ int main(int argc, char *argv[])
     parser.addOption(screenshotOption);
     parser.addOption(maximizedOption);
     parser.addOption(screenshotDelayOption);
+    parser.addOption(framesOption);
+    parser.addOption(frameIntervalOption);
     parser.addOption(pageOption);
+    parser.addOption(detailSectionOption);
     parser.addOption(selfTestOption);
     parser.addOption(makeTorrentOption);
     parser.addOption(outputOption);
@@ -1170,6 +1185,24 @@ int main(int argc, char *argv[])
     if (!startPage.isEmpty())
         showPage(startPage);
 
+    // The inspector's section, for screenshots and bug reports: the tabs are the
+    // only other way to choose one, and a script cannot click.
+    if (parser.isSet(detailSectionOption)) {
+        static const QHash<QString, int> detailSections = {
+            {QStringLiteral("overview"), 0}, {QStringLiteral("files"), 1},
+            {QStringLiteral("peers"), 2},    {QStringLiteral("servers"), 3},
+            {QStringLiteral("options"), 4},
+        };
+        const QString wanted = parser.value(detailSectionOption).trimmed().toLower();
+        const auto it = detailSections.constFind(wanted);
+        if (it != detailSections.constEnd()) {
+            detailsPanel->setVisible(true);
+            detailsPanel->setSection(it.value());
+        } else {
+            qWarning() << "--detail:" << wanted << "is not one of overview, files, peers, servers, options";
+        }
+    }
+
     if (parser.isSet(maximizedOption))
         window.showMaximized();
     else
@@ -1185,12 +1218,41 @@ int main(int argc, char *argv[])
     // ---------------------------------------------------------- ui screenshot
     // Renders the real window through the real widget tree into a PNG. Used to
     // verify the UI actually draws without needing to eyeball a live window.
+    //
+    // --frames > 1 grabs a *series* from the same running window (shot-1.png,
+    // shot-2.png, …). That is how a flicker is measured rather than argued about:
+    // comparing consecutive frames shows whether a region is stable between two
+    // polls or is being torn down and rebuilt.
     if (parser.isSet(screenshotOption)) {
         const QString path = parser.value(screenshotOption);
         const int delay = qMax(400, parser.value(screenshotDelayOption).toInt());
-        QTimer::singleShot(delay, &app, [&window, path]() {
-            const QPixmap shot = window.grab();
-            QCoreApplication::exit(shot.save(path) ? 0 : 1);
+        const int frames = qBound(1, parser.value(framesOption).toInt(), 240);
+        const int interval = qMax(60, parser.value(frameIntervalOption).toInt());
+        const QFileInfo info(path);
+        auto frameName = [info](int index) {
+            if (index <= 0)
+                return info.absoluteFilePath();
+            const QString suffix = info.suffix().isEmpty() ? QStringLiteral("png") : info.suffix();
+            return info.dir().filePath(QStringLiteral("%1-%2.%3")
+                                           .arg(info.completeBaseName())
+                                           .arg(index + 1)
+                                           .arg(suffix));
+        };
+
+        auto *timer = new QTimer(&app);
+        auto *index = new int(0);
+        QObject::connect(timer, &QTimer::timeout, &app,
+                         [&window, timer, index, frames, frameName]() {
+                             const bool saved = window.grab().save(frameName(*index));
+                             ++(*index);
+                             if (!saved || *index >= frames) {
+                                 timer->stop();
+                                 QCoreApplication::exit(saved ? 0 : 1);
+                             }
+                         });
+        QTimer::singleShot(delay, &app, [timer, interval]() {
+            timer->setInterval(interval);
+            timer->start();
         });
     }
 

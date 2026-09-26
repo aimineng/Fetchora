@@ -358,9 +358,14 @@ Fetchora [选项] [链接...]      # Windows 下为 Fetchora.exe
       --maximized            最大化启动
       --page <key>           直接打开某页：download、bittorrent、history、
                              createtorrent、settings、about
+      --detail <section>     任务详情面板打开到某个分页：overview、files、
+                             peers、servers、options
       --new-instance         不转发给已运行的实例
       --screenshot <file>    把窗口渲染成 PNG 后退出
       --screenshot-delay <ms>  截图前等待的毫秒数
+      --frames <count>       在同一个窗口里连拍若干张（shot-1.png、shot-2.png…）：
+                             比较相邻两帧是"量化闪烁"而不是靠嘴说的办法
+      --frame-interval <ms>  两帧之间的间隔（默认 800）
       --self-test            校验更新逻辑与生成的 aria2c 命令行
       --check-updates        查询 GitHub 上的最新版本后退出
       --prerelease           让 --check-updates 把预览版也算进来
