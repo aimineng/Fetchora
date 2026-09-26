@@ -1,4 +1,4 @@
-#ifndef TASKDETAILSPANEL_H
+﻿#ifndef TASKDETAILSPANEL_H
 #define TASKDETAILSPANEL_H
 
 #include <QHash>
@@ -104,9 +104,6 @@ private:
     void updateOptions();
     void addTrackerFromInput();
     void removeSelectedTracker();
-    void importTrackers();
-    /// Parses whatever was read from a file or a URL and adds what survived.
-    void applyImportedTrackers(const QByteArray &data, const QString &source);
     void restyle();
     void retranslate();
 
@@ -195,7 +192,6 @@ private:
     QLabel *m_trackerHint = nullptr;
     FluentButton *m_trackerAdd = nullptr;
     FluentButton *m_trackerRemove = nullptr;
-    FluentButton *m_trackerImport = nullptr;
     QString m_trackerText;      ///< what the list currently shows
 
     // Options

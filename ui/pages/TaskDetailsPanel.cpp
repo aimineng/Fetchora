@@ -522,20 +522,12 @@ void TaskDetailsPanel::buildSkeleton()
     m_trackerRemove->setRole(FluentButton::Subtle);
     trackerInputLayout->addWidget(m_trackerRemove);
 
-    m_trackerImport = new FluentButton(trackerInput);
-    m_trackerImport->setGlyph(FluentTheme::Glyph::OpenFile);
-    m_trackerImport->setText(tr("导入列表"));
-    m_trackerImport->setRole(FluentButton::Subtle);
-    m_trackerImport->setTooltipText(
-        tr("从一个文件或一个网址导入 Tracker 列表：每行一个地址，非 Tracker 的行会被忽略"));
-    trackerInputLayout->addWidget(m_trackerImport);
 
     trackerCard->addWidget(trackerInput);
 
     connect(m_trackerAdd, &QPushButton::clicked, this, &TaskDetailsPanel::addTrackerFromInput);
     connect(m_trackerEdit, &QLineEdit::returnPressed, this, &TaskDetailsPanel::addTrackerFromInput);
     connect(m_trackerRemove, &QPushButton::clicked, this, &TaskDetailsPanel::removeSelectedTracker);
-    connect(m_trackerImport, &QPushButton::clicked, this, &TaskDetailsPanel::importTrackers);
     connect(m_trackerEdit, &QLineEdit::textChanged, this, [this]() {
         m_trackerAdd->setEnabled(!m_gid.isEmpty() && !m_trackerEdit->text().trimmed().isEmpty());
     });
@@ -737,7 +729,6 @@ void TaskDetailsPanel::updateTracker()
     m_trackerEdit->setEnabled(true);
     m_trackerAdd->setEnabled(!m_trackerEdit->text().trimmed().isEmpty());
     m_trackerRemove->setEnabled(!trackers.isEmpty());
-    m_trackerImport->setEnabled(true);
 }
 
 void TaskDetailsPanel::addTrackerFromInput()
@@ -765,114 +756,6 @@ void TaskDetailsPanel::removeSelectedTracker()
         return;
     }
     m_aria2->removeTracker(m_gid, url);
-}
-
-void TaskDetailsPanel::importTrackers()
-{
-    if (m_gid.isEmpty() || !m_aria2)
-        return;
-
-    QMessageBox box(this);
-    box.setWindowTitle(tr("导入 Tracker 列表"));
-    box.setText(tr("从哪里读取 Tracker 列表？\n每行一个地址；不是 Tracker 的内容会被忽略。"));
-    QPushButton *fromFile = box.addButton(tr("本地文件…"), QMessageBox::AcceptRole);
-    QPushButton *fromUrl = box.addButton(tr("网址或路径…"), QMessageBox::ActionRole);
-    box.addButton(tr("取消"), QMessageBox::RejectRole);
-    box.exec();
-
-    QString source;
-    QByteArray data;
-    if (box.clickedButton() == fromFile) {
-        const QString path = QFileDialog::getOpenFileName(
-            this, tr("选择 Tracker 列表文件"), QString(),
-            tr("文本文件 (*.txt *.list *.md);;所有文件 (*)"));
-        if (path.isEmpty())
-            return;
-        QFile file(path);
-        if (!file.open(QIODevice::ReadOnly)) {
-            emit toast(tr("无法读取 %1").arg(path), true);
-            return;
-        }
-        data = file.read(TrackerList::kMaxBytes + 1);
-        source = QFileInfo(path).fileName();
-        applyImportedTrackers(data, source);
-        return;
-    }
-    if (box.clickedButton() != fromUrl)
-        return;
-
-    bool ok = false;
-    const QString input = QInputDialog::getText(this, tr("从网址或路径导入 Tracker"),
-                                                tr("列表地址（http/https）或本地文件路径"),
-                                                QLineEdit::Normal, QString(), &ok)
-                              .trimmed();
-    if (!ok || input.isEmpty())
-        return;
-
-    // A path typed here reads exactly like a URL does: both end up as bytes through
-    // TrackerList::parse, so a local list and a remote one cannot behave differently.
-    const bool local = input.startsWith(QLatin1String("file://"), Qt::CaseInsensitive)
-        || (!input.contains(QStringLiteral("://")) && input.size() > 1
-            && (input.at(1) == QLatin1Char(':') || input.startsWith(QLatin1String("\\\\"))));
-    if (local) {
-        QString path = input;
-        if (path.startsWith(QLatin1String("file://"), Qt::CaseInsensitive))
-            path = QUrl(path).toLocalFile();
-        QFile file(path);
-        if (!file.open(QIODevice::ReadOnly)) {
-            emit toast(tr("无法读取 %1").arg(path), true);
-            return;
-        }
-        data = file.read(TrackerList::kMaxBytes + 1);
-        applyImportedTrackers(data, QFileInfo(path).fileName());
-        return;
-    }
-    if (!input.startsWith(QLatin1String("http://"), Qt::CaseInsensitive)
-        && !input.startsWith(QLatin1String("https://"), Qt::CaseInsensitive)) {
-        emit toast(tr("只支持 http、https 地址或本地文件路径"), true);
-        return;
-    }
-
-    auto *nam = new QNetworkAccessManager(this);
-    QNetworkRequest request{QUrl(input)};
-    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-                         QNetworkRequest::NoLessSafeRedirectPolicy);
-    request.setTransferTimeout(15000);
-    QNetworkReply *reply = nam->get(request);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, input, nam]() {
-        reply->deleteLater();
-        nam->deleteLater();
-        if (reply->error() != QNetworkReply::NoError) {
-            emit toast(tr("下载列表失败：%1").arg(reply->errorString()), true);
-            return;
-        }
-        applyImportedTrackers(reply->readAll(), QUrl(input).host());
-    });
-}
-
-void TaskDetailsPanel::applyImportedTrackers(const QByteArray &data, const QString &source)
-{
-    const TrackerList::ParseResult parsed = TrackerList::parse(data);
-    if (parsed.binary) {
-        emit toast(tr("这个文件看起来不是文本（可能是种子、压缩包或程序），已忽略"), true);
-        return;
-    }
-    if (parsed.tooLarge) {
-        emit toast(tr("文件太大，已忽略"), true);
-        return;
-    }
-    if (parsed.trackers.isEmpty()) {
-        emit toast(tr("%1 里没有找到 Tracker 地址（已跳过 %2 行）").arg(source).arg(parsed.rejected),
-                   true);
-        return;
-    }
-    if (m_aria2 && !m_gid.isEmpty())
-        m_aria2->addTrackers(m_gid, parsed.trackers);
-    emit toast(tr("已从 %1 导入 %2 个 Tracker，跳过 %3 行")
-                   .arg(source)
-                   .arg(parsed.trackers.size())
-                   .arg(parsed.rejected),
-               false);
 }
 
 void TaskDetailsPanel::updateOptions()
