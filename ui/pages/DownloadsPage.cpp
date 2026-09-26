@@ -383,6 +383,10 @@ QVariantList DownloadsPage::visibleTasks() const
         const QVariantMap t = v.toMap();
         const QString status = t.value(QStringLiteral("status")).toString();
 
+        // Only tasks the manager still has: a removed task must never keep a row.
+        if (!m_aria2->isTaskKnown(t.value(QStringLiteral("gid")).toString()))
+            continue;
+
         bool show = true;
         if (m_filter == QLatin1String("active"))
             show = status == QLatin1String("active");

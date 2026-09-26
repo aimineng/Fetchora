@@ -63,6 +63,16 @@ public:
     ~Aria2Manager() override;
 
     QVariantList tasks() const { return m_taskList; }
+    /**
+     * True while this gid is a task the manager still has. The views filter on it:
+     * a row whose task was removed (and whose gid is dismissed) must not survive a
+     * rebuild, however stale a cached list happens to be - the header used to count
+     * "0 tasks" while such a row was still on screen.
+     */
+    Q_INVOKABLE bool isTaskKnown(const QString &gid) const
+    {
+        return m_taskMap.contains(gid) && !m_dismissed.contains(gid);
+    }
     QVariantList activeTasks() const { return m_activeList; }
     QVariantList waitingTasks() const { return m_waitingList; }
     QVariantList stoppedTasks() const { return m_stoppedList; }
@@ -165,8 +175,7 @@ public:
     Q_INVOKABLE void addTrackers(const QString &gid, const QStringList &trackers);
     Q_INVOKABLE void removeTracker(const QString &gid, const QString &tracker);
     /// The list every BitTorrent task is given (empty = the built-in one).
-    Q_INVOKABLE QStringList globalTrackers() const;
-    /// Replaces that list: stored in the settings and pushed to the running engine.
+    Q_INVOKABLE QStringList globalTrackers() const;    /// Replaces that list: stored in the settings and pushed to the running engine.
     Q_INVOKABLE void setGlobalTrackers(const QStringList &trackers);
 
     // ==================================================================== utils
