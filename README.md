@@ -45,6 +45,8 @@ creator, browser bridge, tray icon where the desktop provides one) is identical.
   metadata exchange, seeding ratio/time limits, per-task tracker editing.
 - **Metalink** (`.metalink` / `.meta4`) with automatic mirror selection.
 - **Resume** everything, including across restarts, with a persistent aria2 session.
+- **Download the same link twice** — a file that was already downloaded gets a second
+  copy (`report (2).pdf`) instead of being reported as finished on the spot.
 - **Per-task and global speed limits**, per-server connection caps, disk cache tuning.
 - **Queue management** — reorder waiting tasks (move up / down / to top), pause-all and
   resume-all.
@@ -334,7 +336,7 @@ Fetchora [options] [urls...]      # Fetchora.exe on Windows
 
   -m, --minimized            Start hidden in the system tray
       --maximized            Start maximized
-      --page <key>           Open on a page: download, queue, bittorrent, history,
+      --page <key>           Open on a page: download, bittorrent, history,
                              createtorrent, settings, about
       --new-instance         Do not forward to a running instance
       --screenshot <file>    Render the window to a PNG and exit
@@ -403,6 +405,14 @@ to the app over a local WebSocket bridge.
 3. Choose **Load unpacked** and select the `Plugin` folder.
 
 The bridge listens on `127.0.0.1:8899` by default; the port is configurable on both sides.
+It speaks plain HTTP (`POST /download`, `/torrent`, `/magnet`, `/pause`, `/unpause`,
+`/remove`, `GET /ping`, `GET /status`) as well as WebSocket, so a script can drive the app
+without the extension:
+
+```bash
+curl -X POST http://127.0.0.1:8899/download -H 'Content-Type: application/json' \
+     -d '{"url":"https://example.com/file.iso"}'
+```
 
 ## Logs and crash reports
 

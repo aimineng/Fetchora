@@ -203,6 +203,8 @@ function mapPathToCommand(path, body) {
       return { cmd: 'pause', gid: body ? body.gid : '' };
     case '/unpause':
       return { cmd: 'unpause', gid: body ? body.gid : '' };
+    case '/remove':
+      return { cmd: 'remove', gid: body ? body.gid : '' };
     case '/ping':
       return { cmd: 'ping' };
     default:

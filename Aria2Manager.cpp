@@ -194,6 +194,10 @@ void Aria2Manager::initBridge()
             else
                 resumeTask(gid);
         });
+        connect(m_bridge, &HttpServer::removeRequested, this, [this](const QString &gid) {
+            if (!gid.isEmpty())
+                removeTask(gid, 0);
+        });
         connect(m_bridge, &HttpServer::statusRequested, this, &Aria2Manager::onSocketStatus);
         connect(m_bridge, &HttpServer::clientCountChanged, this, &Aria2Manager::bridgeClientsChanged);
     }

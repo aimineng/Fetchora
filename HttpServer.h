@@ -59,6 +59,8 @@ signals:
     void magnetRequested(const QString &magnet, const QString &origin);
     void pauseRequested(const QString &gid);
     void unpauseRequested(const QString &gid);
+    /// Drop a task from the list (stopping it first if it is still running).
+    void removeRequested(const QString &gid);
     /// The extension asked for live statistics; answer with wsReply().
     void statusRequested(const QString &requestId);
     void clientCountChanged(int count);

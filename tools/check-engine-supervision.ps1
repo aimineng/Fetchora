@@ -182,6 +182,26 @@ if ($DownloadUrl) {
         Fail ("the restored download starts from {0:N0} bytes, but {1:N0} were already down" -f $bytes, $bytesBefore)
     }
     Write-Host ("ok: {0} task(s) restored, {1:N0} bytes already on disk" -f $tasks.Count, $bytes)
+
+    # --------------------------------------------- 2c. removing it really sticks
+    # aria2 answers with a stopped result until removeDownloadResult has been
+    # processed, so a delete used to be undone by the very next poll.
+    Write-Host "`n--- 2c. a removed task stays removed"
+    $gid = $tasks[0].gid
+    try {
+        Invoke-RestMethod -Uri 'http://127.0.0.1:8899/remove' -Method Post `
+            -Body (@{ gid = $gid } | ConvertTo-Json -Compress) `
+            -ContentType 'application/json' -TimeoutSec 8 | Out-Null
+    } catch {
+        Fail "the app's bridge did not accept the remove request: $($_.Exception.Message)"
+    }
+    # Two poll cycles: one to carry the removal out, one to prove it stayed gone.
+    Start-Sleep -Seconds 5
+    $still = @(Get-EngineTasks | Where-Object { $_.gid -eq $gid })
+    if ($still.Count -gt 0) {
+        Fail 'the task the app was told to remove is still there'
+    }
+    Write-Host 'ok: the removed task stayed removed'
 }
 
 # ------------------------------------------------------- 3. it dies with the app

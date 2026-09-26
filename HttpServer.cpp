@@ -330,12 +330,14 @@ void HttpServer::handleHttp(QTcpSocket *socket, const QByteArray &method, const 
         return;
     }
 
-    if (path == "/pause" || path == "/unpause") {
+    if (path == "/pause" || path == "/unpause" || path == "/remove") {
         const QString gid = obj.value(QStringLiteral("gid")).toString();
         if (path == "/pause")
             emit pauseRequested(gid);
-        else
+        else if (path == "/unpause")
             emit unpauseRequested(gid);
+        else
+            emit removeRequested(gid);
         respond(socket, 200, {{QStringLiteral("ok"), true}});
         return;
     }
@@ -630,12 +632,15 @@ void HttpServer::handleSocketCommand(QTcpSocket *socket, const QJsonObject &comm
         return;
     }
 
-    if (cmd == QLatin1String("pause") || cmd == QLatin1String("unpause")) {
+    if (cmd == QLatin1String("pause") || cmd == QLatin1String("unpause")
+        || cmd == QLatin1String("remove")) {
         const QString gid = command.value(QStringLiteral("gid")).toString();
         if (cmd == QLatin1String("pause"))
             emit pauseRequested(gid);
-        else
+        else if (cmd == QLatin1String("unpause"))
             emit unpauseRequested(gid);
+        else
+            emit removeRequested(gid);
         wsReply(id, QJsonObject{});
         return;
     }

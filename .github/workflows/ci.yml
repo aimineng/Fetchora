@@ -226,6 +226,43 @@ jobs:
             exit $status
           }
 
+      # Painting is where the app crashed last time (a stale QPainter in a spin
+      # box), and a paint-time crash is invisible to every other check here. So
+      # render every page for real and keep the images: the run fails if a page
+      # cannot be drawn, and the PNGs are there to look at when a layout is wrong.
+      - name: Render every page (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path ui-shots | Out-Null
+          $pages = 'download', 'bittorrent', 'history', 'createtorrent', 'settings', 'about'
+          $failed = @()
+          foreach ($page in $pages) {
+            $png = "ui-shots\$page.png"
+            Remove-Item $png -ErrorAction SilentlyContinue
+            & build\Release\Fetchora.exe --new-instance --screenshot $png --page $page `
+                --screenshot-delay 2500 *> (Join-Path $env:RUNNER_TEMP "shot-$page.log")
+            $code = $LASTEXITCODE
+            if (-not (Test-Path $png)) {
+              $failed += "$page (exit $code)"
+            } else {
+              Write-Host ("{0,-14} {1,10:N0} bytes" -f $page, (Get-Item $png).Length)
+            }
+          }
+          Get-Process Fetchora, aria2c -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          if ($failed.Count -gt 0) {
+            echo "::error title=UI rendering failed::$($failed -join ', ') did not render - see the uploaded ui-shots artifact"
+            exit 1
+          }
+
+      - name: Keep the rendered pages
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-shots
+          path: ui-shots/*.png
+          if-no-files-found: error
+
       # Single-config generator, so CMAKE_BUILD_TYPE applies as written.
       #
       # The binary is forced into dist/ so every platform has one stable

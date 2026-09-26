@@ -44,6 +44,7 @@ Fluent 图标字体都是 Windows 独有的，因此窗口保留平台自己的�
   元数据交换、做种比率/时间限制、逐任务编辑 Tracker。
 - **Metalink**（`.metalink` / `.meta4`），自动选择镜像。
 - **断点续传**，重启程序后依然继续，并保持 aria2 会话。
+- **同一个链接下载两次** —— 已经下载过的文件会另存一份（`报告 (2).pdf`），而不是被当场判定为"已完成"。
 - **单任务与全局限速**、每服务器连接数上限、磁盘缓存调优。
 - **队列管理** —— 上移 / 下移 / 置顶等待中的任务，全部暂停与全部开始。
 - 多文件种子支持**按文件选择**下载。
@@ -302,7 +303,7 @@ Fetchora [选项] [链接...]      # Windows 下为 Fetchora.exe
 
   -m, --minimized            启动后隐藏到托盘
       --maximized            最大化启动
-      --page <key>           直接打开某页：download、queue、bittorrent、history、
+      --page <key>           直接打开某页：download、bittorrent、history、
                              createtorrent、settings、about
       --new-instance         不转发给已运行的实例
       --screenshot <file>    把窗口渲染成 PNG 后退出
@@ -350,7 +351,14 @@ Vivaldi 等）。它会拦截浏览器下载、磁力链接与 `.torrent` 响应
 2. 访问 `edge://extensions`（或 `chrome://extensions`），打开 *开发者模式*。
 3. 点击 **加载解压缩的扩展**，选择 `Plugin` 目录。
 
-桥接默认监听 `127.0.0.1:8899`，两端都可以改端口。
+桥接默认监听 `127.0.0.1:8899`，两端都可以改端口。它同时支持普通 HTTP
+（`POST /download`、`/torrent`、`/magnet`、`/pause`、`/unpause`、`/remove`，
+`GET /ping`、`GET /status`）与 WebSocket，所以不装扩展也能用脚本驱动：
+
+```bash
+curl -X POST http://127.0.0.1:8899/download -H 'Content-Type: application/json' \
+     -d '{"url":"https://example.com/file.iso"}'
+```
 
 ## 日志与崩溃报告
 
