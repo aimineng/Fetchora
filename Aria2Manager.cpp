@@ -2017,6 +2017,25 @@ void Aria2Manager::selectTaskFiles(const QString &gid, const QStringList &fileIn
     applyTaskOptions(gid, options);
 }
 
+void Aria2Manager::setGlobalTrackers(const QStringList &trackers)
+{
+    // The global list is what every BitTorrent task is given (aria2's --bt-tracker),
+    // while a magnet carries its own list, which is why addMagnet() sends the same
+    // values per task. Storing the setting is what makes it survive a restart; the
+    // changeGlobalOption call is what makes the running engine use it now.
+    const QString joined = trackers.join(QLatin1Char(','));
+    m_settings->setBtTracker(joined);
+    applyGlobalOptions({{QStringLiteral("bt-tracker"), joined}});
+    emit toast(trackers.isEmpty() ? tr("已恢复内置 Tracker 列表。")
+                                  : tr("已更新全局 Tracker 列表（%1 个）。").arg(trackers.size()),
+               false);
+}
+
+QStringList Aria2Manager::globalTrackers() const
+{
+    return m_settings->effectiveTrackers();
+}
+
 void Aria2Manager::addTrackers(const QString &gid, const QStringList &trackers)
 {
     const Task *task = findTask(gid);

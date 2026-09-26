@@ -47,12 +47,6 @@ private:
     void buildTrackerEditor();
     void wireManager();
 
-    QVariantMap taskFor(const QString &gid) const;
-    /// Trackers of one task; Aria2Manager publishes them as "trackers".
-    static QStringList trackersOf(const QVariantMap &task);
-    /// The gid currently picked in the tracker combo ("" when there is none).
-    QString trackerGid() const;
-
     void refreshTrackers();
     void addTrackerFromInput();
     void removeSelectedTracker();
@@ -60,9 +54,8 @@ private:
     void importTrackers();
     void importTrackersFromFile();
     void importTrackersFromUrl();
-    /// Adds `trackers` to the selected task and reports what was used/ignored.
-    void applyImportedTrackers(const QStringList &trackers, int rejected, const QString &source,
-                               bool truncated);
+    /// Parses what was read and merges it into the global list.
+    void applyImportedTrackers(const QByteArray &data, const QString &source);
 
     void restyle();
     void retranslate();
@@ -73,8 +66,7 @@ private:
     FluentButton *m_trackerAddButton = nullptr;
     FluentButton *m_trackerRemoveButton = nullptr;
     FluentButton *m_trackerImportButton = nullptr;
-
-    QStringList m_comboGids;   ///< gids currently in the tracker combo
+    FluentButton *m_trackerResetButton = nullptr;
 };
 
 #endif // BITTORRENTPAGE_H

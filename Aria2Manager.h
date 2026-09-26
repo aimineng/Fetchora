@@ -164,6 +164,10 @@ public:
     Q_INVOKABLE void fetchBtMetaInfo(const QString &gid);
     Q_INVOKABLE void addTrackers(const QString &gid, const QStringList &trackers);
     Q_INVOKABLE void removeTracker(const QString &gid, const QString &tracker);
+    /// The list every BitTorrent task is given (empty = the built-in one).
+    Q_INVOKABLE QStringList globalTrackers() const;
+    /// Replaces that list: stored in the settings and pushed to the running engine.
+    Q_INVOKABLE void setGlobalTrackers(const QStringList &trackers);
 
     // ==================================================================== utils
     Q_INVOKABLE static QString formatSize(double bytes);

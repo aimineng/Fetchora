@@ -76,6 +76,16 @@ aria2 引擎连续 %1 次启动失败，已停止自动重启。请在「设置 
 
 # ------------------------------------------------------- Tracker 页 / tracker page
 Tracker => Tracker
+全局 Tracker 列表 => Global tracker list
+应用于所有 BitTorrent 任务 => Applies to every BitTorrent task
+这一份列表会下发给所有 BitTorrent 任务；单个任务的 Tracker 在任务详情里编辑 => This list is handed to every BitTorrent task; a single task's trackers are edited in the task details
+恢复内置 => Use the built-in list
+清空自定义列表，改用随程序内置的公共 Tracker => Clear the custom list and go back to the public trackers that ship with the app
+已恢复内置 Tracker 列表。 => Back to the built-in tracker list.
+已更新全局 Tracker 列表（%1 个）。 => Global tracker list updated (%1 entries).
+已从 %1 导入 %2 个 Tracker（新增 %3），跳过 %4 行 => Imported %2 tracker(s) from %1 (%3 new), skipped %4 line(s)
+只有种子任务有 Tracker => Only torrent tasks have trackers
+该任务还没有 Tracker；添加后更容易找到其它节点 => This task has no trackers yet; adding some makes peers easier to find
 Tracker 列表 => Tracker list
 为种子任务添加、导入与移除 Tracker；磁力链接的 Tracker 在添加时下发 => Add, import and remove the trackers of a torrent task; a magnet link gets its trackers when it is added
 网址或路径… => URL or path…

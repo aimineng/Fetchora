@@ -58,7 +58,10 @@ protected:
 private:
     // The "文件" tab was removed: for an ordinary download it listed a single row
     // (the file itself, already shown in the header) and it cost a whole tab.
-    enum Section { Overview = 0, Peers, Servers, Options, SectionCount };
+    // The Tracker tab only exists for torrent tasks - see refresh().
+    enum Section { Overview = 0, Peers, Servers, Tracker, Options, SectionCount };
+    /// Section index of the Tracker tab, for the handful of places that care.
+    static constexpr int kTrackerSection = Tracker;
 
     /// One "caption  value" pair in one of the overview grids. Created on first
     /// use and then only ever given new text.
@@ -96,7 +99,14 @@ private:
     void updateOverview();
     void updatePeers();
     void updateServers();
+    /// The per-task tracker list (only meaningful for torrent tasks).
+    void updateTracker();
     void updateOptions();
+    void addTrackerFromInput();
+    void removeSelectedTracker();
+    void importTrackers();
+    /// Parses whatever was read from a file or a URL and adds what survived.
+    void applyImportedTrackers(const QByteArray &data, const QString &source);
     void restyle();
     void retranslate();
 
@@ -176,6 +186,17 @@ private:
     QList<Row> m_serverRows;
     QWidget *m_serverCard = nullptr;
     QLabel *m_serversEmpty = nullptr;
+
+    // Tracker (torrent tasks only)
+    QWidget *m_trackerCard = nullptr;
+    class QPlainTextEdit *m_trackerList = nullptr;
+    class FluentLineEdit *m_trackerEdit = nullptr;
+    QLabel *m_trackerEmpty = nullptr;
+    QLabel *m_trackerHint = nullptr;
+    FluentButton *m_trackerAdd = nullptr;
+    FluentButton *m_trackerRemove = nullptr;
+    FluentButton *m_trackerImport = nullptr;
+    QString m_trackerText;      ///< what the list currently shows
 
     // Options
     QGridLayout *m_optionsGrid = nullptr;

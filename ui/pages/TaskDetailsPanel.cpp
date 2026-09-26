@@ -1,21 +1,33 @@
-#include "ui/pages/TaskDetailsPanel.h"
+﻿#include "ui/pages/TaskDetailsPanel.h"
 
 #include "Aria2Manager.h"
+#include "TorrentUtils.h"
 #include "ui/FluentButton.h"
 #include "ui/FluentInputs.h"
 #include "ui/FluentTheme.h"
 #include "ui/FluentWidgets.h"
 #include "ui/pages/ui_TaskDetailsPanel.h"
 
+#include <QFile>
+#include <QFileDialog>
 #include <QGridLayout>
 #include <QHBoxLayout>
+#include <QInputDialog>
 #include <QLabel>
 #include <QLayout>
+#include <QMessageBox>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QPlainTextEdit>
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QSet>
 #include <QSignalBlocker>
 #include <QStackedWidget>
+#include <QTextBlock>
+#include <QTextCursor>
+#include <QUrl>
 #include <QVBoxLayout>
 
 namespace {
@@ -103,7 +115,7 @@ void TaskDetailsPanel::buildTabs()
     struct Spec { const char *caption; };
     const QList<Spec> specs = {
         {QT_TR_NOOP("概要")}, {QT_TR_NOOP("连接")},
-        {QT_TR_NOOP("服务器")}, {QT_TR_NOOP("选项")},
+        {QT_TR_NOOP("服务器")}, {QT_TR_NOOP("Tracker")}, {QT_TR_NOOP("选项")},
     };
     for (int i = 0; i < specs.size(); ++i) {
         auto *tab = new FluentButton(tr(specs.at(i).caption), this);
@@ -461,6 +473,73 @@ void TaskDetailsPanel::buildSkeleton()
     m_serverCard = serverCard->parentWidget();
     m_serverBody = serverCard;
 
+    // ---- Tracker (shown only for torrent tasks) ---------------------------
+    content = m_sectionContent.value(Tracker);
+    root = qobject_cast<QVBoxLayout *>(content->layout());
+
+    m_trackerEmpty = new QLabel(tr("只有种子任务有 Tracker"), content);
+    m_trackerEmpty->setProperty(kCaptionRole, kCaptionValue);
+    m_captionLabels << m_trackerEmpty;
+    m_captions << QT_TR_NOOP("只有种子任务有 Tracker");
+    root->insertWidget(root->count() - 1, m_trackerEmpty);
+
+    QVBoxLayout *trackerCard = addCard(root, QT_TR_NOOP("Tracker 列表"));
+    m_trackerCard = trackerCard->parentWidget();
+
+    m_trackerList = new QPlainTextEdit(m_trackerCard);
+    m_trackerList->setReadOnly(true);
+    m_trackerList->setProperty(kCaptionRole, "textArea");
+    m_trackerList->setProperty("fluentMono", true);
+    m_trackerList->setMinimumHeight(180);
+    m_trackerList->setLineWrapMode(QPlainTextEdit::NoWrap);
+    trackerCard->addWidget(m_trackerList);
+
+    m_trackerHint = new QLabel(tr("该任务还没有 Tracker；添加后更容易找到其它节点"), m_trackerCard);
+    m_trackerHint->setProperty(kCaptionRole, kCaptionValue);
+    m_trackerHint->setWordWrap(true);
+    m_captionLabels << m_trackerHint;
+    m_captions << QT_TR_NOOP("该任务还没有 Tracker；添加后更容易找到其它节点");
+    trackerCard->addWidget(m_trackerHint);
+
+    auto *trackerInput = new QWidget(m_trackerCard);
+    auto *trackerInputLayout = new QHBoxLayout(trackerInput);
+    trackerInputLayout->setContentsMargins(0, 0, 0, 0);
+    trackerInputLayout->setSpacing(8);
+
+    m_trackerEdit = new FluentLineEdit(trackerInput);
+    m_trackerEdit->setPlaceholderText(tr("添加 Tracker：udp:// 或 https:// .../announce"));
+    trackerInputLayout->addWidget(m_trackerEdit, 1);
+
+    m_trackerAdd = new FluentButton(trackerInput);
+    m_trackerAdd->setGlyph(FluentTheme::Glyph::Add);
+    m_trackerAdd->setText(tr("添加"));
+    m_trackerAdd->setRole(FluentButton::Standard);
+    trackerInputLayout->addWidget(m_trackerAdd);
+
+    m_trackerRemove = new FluentButton(trackerInput);
+    m_trackerRemove->setGlyph(FluentTheme::Glyph::Close);
+    m_trackerRemove->setText(tr("移除选中"));
+    m_trackerRemove->setRole(FluentButton::Subtle);
+    trackerInputLayout->addWidget(m_trackerRemove);
+
+    m_trackerImport = new FluentButton(trackerInput);
+    m_trackerImport->setGlyph(FluentTheme::Glyph::OpenFile);
+    m_trackerImport->setText(tr("导入列表"));
+    m_trackerImport->setRole(FluentButton::Subtle);
+    m_trackerImport->setTooltipText(
+        tr("从一个文件或一个网址导入 Tracker 列表：每行一个地址，非 Tracker 的行会被忽略"));
+    trackerInputLayout->addWidget(m_trackerImport);
+
+    trackerCard->addWidget(trackerInput);
+
+    connect(m_trackerAdd, &QPushButton::clicked, this, &TaskDetailsPanel::addTrackerFromInput);
+    connect(m_trackerEdit, &QLineEdit::returnPressed, this, &TaskDetailsPanel::addTrackerFromInput);
+    connect(m_trackerRemove, &QPushButton::clicked, this, &TaskDetailsPanel::removeSelectedTracker);
+    connect(m_trackerImport, &QPushButton::clicked, this, &TaskDetailsPanel::importTrackers);
+    connect(m_trackerEdit, &QLineEdit::textChanged, this, [this]() {
+        m_trackerAdd->setEnabled(!m_gid.isEmpty() && !m_trackerEdit->text().trimmed().isEmpty());
+    });
+
     // ---- 选项 -------------------------------------------------------------
     content = m_sectionContent.value(Options);
     root = qobject_cast<QVBoxLayout *>(content->layout());
@@ -628,6 +707,174 @@ void TaskDetailsPanel::updateServers()
     hideUnseen(m_serverRows);
 }
 
+void TaskDetailsPanel::updateTracker()
+{
+    const QVariantMap detail = m_aria2 ? m_aria2->taskDetail() : QVariantMap();
+    const bool hasTask = !m_gid.isEmpty() && !detail.isEmpty();
+    const bool isTorrent = detail.value(QStringLiteral("isTorrent")).toBool();
+    const bool shows = hasTask && isTorrent;
+
+    m_trackerEmpty->setVisible(!shows);
+    m_trackerCard->setVisible(shows);
+    if (!shows)
+        return;
+
+    QStringList trackers;
+    for (const QVariant &v : detail.value(QStringLiteral("trackers")).toList()) {
+        const QString tracker = v.toString();
+        if (!tracker.isEmpty() && !trackers.contains(tracker))
+            trackers << tracker;
+    }
+
+    const QString text = trackers.join(QLatin1Char('\n'));
+    // Only touch the view when the list really changed: re-setting the text on every
+    // poll would drop the user's line selection.
+    if (text != m_trackerText) {
+        m_trackerText = text;
+        m_trackerList->setPlainText(text);
+    }
+    m_trackerHint->setVisible(trackers.isEmpty());
+    m_trackerEdit->setEnabled(true);
+    m_trackerAdd->setEnabled(!m_trackerEdit->text().trimmed().isEmpty());
+    m_trackerRemove->setEnabled(!trackers.isEmpty());
+    m_trackerImport->setEnabled(true);
+}
+
+void TaskDetailsPanel::addTrackerFromInput()
+{
+    const QString url = m_trackerEdit->text().trimmed();
+    if (m_gid.isEmpty() || url.isEmpty() || !m_aria2)
+        return;
+    m_aria2->addTrackers(m_gid, QStringList{url});
+    m_trackerEdit->clear();
+}
+
+void TaskDetailsPanel::removeSelectedTracker()
+{
+    if (m_gid.isEmpty() || !m_aria2)
+        return;
+    // The list is read-only, so the "selection" is the highlighted line (or the
+    // first line of a dragged selection).
+    QString url = m_trackerList->textCursor().selectedText();
+    url.replace(QChar(0x2029), QLatin1Char('\n'));
+    url = url.section(QLatin1Char('\n'), 0, 0).trimmed();
+    if (url.isEmpty())
+        url = m_trackerList->textCursor().block().text().trimmed();
+    if (url.isEmpty()) {
+        emit toast(tr("请先在列表中选择要移除的 Tracker"), true);
+        return;
+    }
+    m_aria2->removeTracker(m_gid, url);
+}
+
+void TaskDetailsPanel::importTrackers()
+{
+    if (m_gid.isEmpty() || !m_aria2)
+        return;
+
+    QMessageBox box(this);
+    box.setWindowTitle(tr("导入 Tracker 列表"));
+    box.setText(tr("从哪里读取 Tracker 列表？\n每行一个地址；不是 Tracker 的内容会被忽略。"));
+    QPushButton *fromFile = box.addButton(tr("本地文件…"), QMessageBox::AcceptRole);
+    QPushButton *fromUrl = box.addButton(tr("网址或路径…"), QMessageBox::ActionRole);
+    box.addButton(tr("取消"), QMessageBox::RejectRole);
+    box.exec();
+
+    QString source;
+    QByteArray data;
+    if (box.clickedButton() == fromFile) {
+        const QString path = QFileDialog::getOpenFileName(
+            this, tr("选择 Tracker 列表文件"), QString(),
+            tr("文本文件 (*.txt *.list *.md);;所有文件 (*)"));
+        if (path.isEmpty())
+            return;
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly)) {
+            emit toast(tr("无法读取 %1").arg(path), true);
+            return;
+        }
+        data = file.read(TrackerList::kMaxBytes + 1);
+        source = QFileInfo(path).fileName();
+        applyImportedTrackers(data, source);
+        return;
+    }
+    if (box.clickedButton() != fromUrl)
+        return;
+
+    bool ok = false;
+    const QString input = QInputDialog::getText(this, tr("从网址或路径导入 Tracker"),
+                                                tr("列表地址（http/https）或本地文件路径"),
+                                                QLineEdit::Normal, QString(), &ok)
+                              .trimmed();
+    if (!ok || input.isEmpty())
+        return;
+
+    // A path typed here reads exactly like a URL does: both end up as bytes through
+    // TrackerList::parse, so a local list and a remote one cannot behave differently.
+    const bool local = input.startsWith(QLatin1String("file://"), Qt::CaseInsensitive)
+        || (!input.contains(QStringLiteral("://")) && input.size() > 1
+            && (input.at(1) == QLatin1Char(':') || input.startsWith(QLatin1String("\\\\"))));
+    if (local) {
+        QString path = input;
+        if (path.startsWith(QLatin1String("file://"), Qt::CaseInsensitive))
+            path = QUrl(path).toLocalFile();
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly)) {
+            emit toast(tr("无法读取 %1").arg(path), true);
+            return;
+        }
+        data = file.read(TrackerList::kMaxBytes + 1);
+        applyImportedTrackers(data, QFileInfo(path).fileName());
+        return;
+    }
+    if (!input.startsWith(QLatin1String("http://"), Qt::CaseInsensitive)
+        && !input.startsWith(QLatin1String("https://"), Qt::CaseInsensitive)) {
+        emit toast(tr("只支持 http、https 地址或本地文件路径"), true);
+        return;
+    }
+
+    auto *nam = new QNetworkAccessManager(this);
+    QNetworkRequest request{QUrl(input)};
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                         QNetworkRequest::NoLessSafeRedirectPolicy);
+    request.setTransferTimeout(15000);
+    QNetworkReply *reply = nam->get(request);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, input, nam]() {
+        reply->deleteLater();
+        nam->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) {
+            emit toast(tr("下载列表失败：%1").arg(reply->errorString()), true);
+            return;
+        }
+        applyImportedTrackers(reply->readAll(), QUrl(input).host());
+    });
+}
+
+void TaskDetailsPanel::applyImportedTrackers(const QByteArray &data, const QString &source)
+{
+    const TrackerList::ParseResult parsed = TrackerList::parse(data);
+    if (parsed.binary) {
+        emit toast(tr("这个文件看起来不是文本（可能是种子、压缩包或程序），已忽略"), true);
+        return;
+    }
+    if (parsed.tooLarge) {
+        emit toast(tr("文件太大，已忽略"), true);
+        return;
+    }
+    if (parsed.trackers.isEmpty()) {
+        emit toast(tr("%1 里没有找到 Tracker 地址（已跳过 %2 行）").arg(source).arg(parsed.rejected),
+                   true);
+        return;
+    }
+    if (m_aria2 && !m_gid.isEmpty())
+        m_aria2->addTrackers(m_gid, parsed.trackers);
+    emit toast(tr("已从 %1 导入 %2 个 Tracker，跳过 %3 行")
+                   .arg(source)
+                   .arg(parsed.trackers.size())
+                   .arg(parsed.rejected),
+               false);
+}
+
 void TaskDetailsPanel::updateOptions()
 {
     const QVariantMap options = m_aria2
@@ -772,6 +1019,16 @@ void TaskDetailsPanel::refresh()
     for (FluentButton *button : std::as_const(m_tabs))
         button->setVisible(hasTask);
 
+    // The Tracker tab means nothing for an HTTP download: it exists only while a
+    // torrent task is selected, and the pane falls back to the overview if it was
+    // the one on screen.
+    const bool torrent = hasTask
+        && detail.value(QStringLiteral("isTorrent")).toBool();
+    if (FluentButton *trackerTab = m_tabs.value(kTrackerSection))
+        trackerTab->setVisible(torrent);
+    if (!torrent && m_section == kTrackerSection)
+        setSection(Overview);
+
     // ---- section body ----------------------------------------------------
     // Only the text inside the rows is touched. The widgets were built once (see
     // buildSkeleton) and stay where they are, so a refresh costs a few setText()
@@ -781,6 +1038,7 @@ void TaskDetailsPanel::refresh()
     case Overview: updateOverview(); break;
     case Peers:    updatePeers(); break;
     case Servers:  updateServers(); break;
+    case Tracker:  updateTracker(); break;
     case Options:  updateOptions(); break;
     default: break;
     }
@@ -822,7 +1080,7 @@ void TaskDetailsPanel::changeEvent(QEvent *event)
 
     ui->retranslateUi(this);
     // Tabs, buttons and cards are built in C++: rebuild their captions.
-    static const char *tabCaptions[SectionCount] = {"概要", "连接", "服务器", "选项"};
+    static const char *tabCaptions[SectionCount] = {"概要", "连接", "服务器", "Tracker", "选项"};
     for (int i = 0; i < m_tabs.size(); ++i)
         m_tabs.at(i)->setText(tr(tabCaptions[i]));
 

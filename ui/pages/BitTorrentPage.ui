@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
  <!--
    TrackerPage - everything about a torrent's trackers, and nothing else.
@@ -55,7 +55,7 @@
        <item>
         <widget class="QLabel" name="pageSubtitle">
          <property name="text">
-          <string>为种子任务添加、导入与移除 Tracker；磁力链接的 Tracker 在添加时下发</string>
+          <string>这一份列表会下发给所有 BitTorrent 任务；单个任务的 Tracker 在任务详情里编辑</string>
          </property>
         </widget>
        </item>
@@ -92,7 +92,7 @@
          <item>
           <widget class="QLabel" name="trackerTitle">
            <property name="text">
-            <string>Tracker 列表</string>
+            <string>全局 Tracker 列表</string>
            </property>
           </widget>
          </item>
@@ -117,19 +117,9 @@
           </spacer>
          </item>
          <item>
-          <widget class="QLabel" name="trackerTaskLabel">
+          <widget class="QLabel" name="trackerScopeLabel">
            <property name="text">
-            <string>任务</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="FluentComboBox" name="trackerCombo">
-           <property name="minimumSize">
-            <size>
-             <width>320</width>
-             <height>0</height>
-            </size>
+            <string>应用于所有 BitTorrent 任务</string>
            </property>
           </widget>
          </item>
@@ -191,11 +181,6 @@
   <customwidget>
    <class>FluentLineEdit</class>
    <extends>QLineEdit</extends>
-   <header>ui/FluentInputs.h</header>
-  </customwidget>
-  <customwidget>
-   <class>FluentComboBox</class>
-   <extends>QComboBox</extends>
    <header>ui/FluentInputs.h</header>
   </customwidget>
  </customwidgets>
