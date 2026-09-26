@@ -1529,8 +1529,12 @@ Info Hash %2 · Size %3</translation>
   <context>
     <name>FluentTitleBar</name>
     <message>
-      <source>搜索下载</source>
+      <source>搜索下载任务</source>
       <translation>Search downloads</translation>
+    </message>
+    <message>
+      <source>在下载任务里按文件名或链接搜索；历史与设置页各有自己的搜索框</source>
+      <translation>Search the download list by file name or link. The history and settings pages have their own search boxes.</translation>
     </message>
   </context>
   <context>
@@ -1838,12 +1842,8 @@ Info Hash %2 · Size %3</translation>
   <context>
     <name>QObject</name>
     <message>
-      <source>正在下载</source>
+      <source>下载任务</source>
       <translation>Downloads</translation>
-    </message>
-    <message>
-      <source>队列与完成</source>
-      <translation>Queue</translation>
     </message>
     <message>
       <source>BitTorrent</source>
@@ -2255,6 +2255,14 @@ Info Hash %2 · Size %3</translation>
     <message>
       <source>文件预分配</source>
       <translation>File preallocation</translation>
+    </message>
+    <message>
+      <source>下载前删除续传文件</source>
+      <translation>Delete the resume data before downloading</translation>
+    </message>
+    <message>
+      <source>每次开始下载都丢掉 .aria2 续传记录：暂停、继续与断点续传都会失效</source>
+      <translation>Throw away the .aria2 resume record at the start of every download: pausing, resuming and continuing an interrupted transfer all stop working</translation>
     </message>
     <message>
       <source>速度与缓存</source>

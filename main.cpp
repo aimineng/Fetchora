@@ -745,9 +745,6 @@ int main(int argc, char *argv[])
     pageLayout->addWidget(pageStack, 1);
 
     auto *downloadsPage = new DownloadsPage(&aria2, pageStack);
-    auto *queuePage = new DownloadsPage(&aria2, pageStack);
-    queuePage->setStatusFilter(QStringLiteral("waiting"));
-    queuePage->setShowFilterBar(false);
     auto *detailsPanel = new TaskDetailsPanel(&aria2, pageStack);
     auto *btPage = new BitTorrentPage(&aria2, pageStack);
     auto *historyPage = new HistoryPage(&aria2, pageStack);
@@ -765,19 +762,20 @@ int main(int argc, char *argv[])
     downloadsHost->setStretchFactor(1, 4);
     detailsPanel->setVisible(settings.showDetailsPanel());
 
+    // One page for every task, with the status chips and the search above it. A
+    // separate "queue" page used to show the same rows filtered to waiting ones,
+    // which is what the 等待中 chip already does.
     pageStack->addWidget(downloadsHost);      // 0
-    pageStack->addWidget(queuePage);          // 1
-    pageStack->addWidget(btPage);             // 2
-    pageStack->addWidget(historyPage);        // 3
-    pageStack->addWidget(createTorrentPage);  // 4
-    pageStack->addWidget(settingsPage);       // 5
-    pageStack->addWidget(aboutPage);          // 6
+    pageStack->addWidget(btPage);             // 1
+    pageStack->addWidget(historyPage);        // 2
+    pageStack->addWidget(createTorrentPage);  // 3
+    pageStack->addWidget(settingsPage);       // 4
+    pageStack->addWidget(aboutPage);          // 5
 
     const QHash<QString, int> pageIndex = {
-        {QStringLiteral("download"), 0},     {QStringLiteral("queue"), 1},
-        {QStringLiteral("bittorrent"), 2},   {QStringLiteral("history"), 3},
-        {QStringLiteral("createtorrent"), 4}, {QStringLiteral("settings"), 5},
-        {QStringLiteral("about"), 6},
+        {QStringLiteral("download"), 0},     {QStringLiteral("bittorrent"), 1},
+        {QStringLiteral("history"), 2},      {QStringLiteral("createtorrent"), 3},
+        {QStringLiteral("settings"), 4},     {QStringLiteral("about"), 5},
     };
 
     auto showPage = [nav, pageStack, pageIndex](const QString &key) {
@@ -787,8 +785,7 @@ int main(int argc, char *argv[])
 
     // The navigation captions are re-applied on every language change.
     auto retranslateNav = [nav]() {
-        nav->setItemTitle(QStringLiteral("download"), QObject::tr("正在下载"));
-        nav->setItemTitle(QStringLiteral("queue"), QObject::tr("队列与完成"));
+        nav->setItemTitle(QStringLiteral("download"), QObject::tr("下载任务"));
         nav->setItemTitle(QStringLiteral("bittorrent"), QObject::tr("BitTorrent"));
         nav->setItemTitle(QStringLiteral("history"), QObject::tr("下载历史"));
         nav->setItemTitle(QStringLiteral("createtorrent"), QObject::tr("制作种子"));
@@ -796,8 +793,7 @@ int main(int argc, char *argv[])
         nav->setItemTitle(QStringLiteral("about"), QObject::tr("关于"));
         nav->retranslate();
     };
-    nav->addItem(QStringLiteral("download"), FluentTheme::Glyph::Download, QObject::tr("正在下载"));
-    nav->addItem(QStringLiteral("queue"), FluentTheme::Glyph::Clock, QObject::tr("队列与完成"));
+    nav->addItem(QStringLiteral("download"), FluentTheme::Glyph::Download, QObject::tr("下载任务"));
     nav->addItem(QStringLiteral("bittorrent"), FluentTheme::Glyph::Torrent, QObject::tr("BitTorrent"));
     nav->addItem(QStringLiteral("history"), FluentTheme::Glyph::History, QObject::tr("下载历史"));
     nav->addItem(QStringLiteral("createtorrent"), FluentTheme::Glyph::Add, QObject::tr("制作种子"));
@@ -831,14 +827,12 @@ int main(int argc, char *argv[])
         dialog.exec();
     };
 
-    for (DownloadsPage *page : {downloadsPage, queuePage}) {
-        QObject::connect(page, &DownloadsPage::newTaskRequested, &window, openNewTaskDialog);
-        QObject::connect(page, &DownloadsPage::torrentPickerRequested, &window, openTorrentPicker);
-        QObject::connect(page, &DownloadsPage::toast, &window,
-                         [toasts](const QString &text, bool isError) {
-                             toasts->push(text, isError ? ToastHost::Error : ToastHost::Success);
-                         });
-    }
+    QObject::connect(downloadsPage, &DownloadsPage::newTaskRequested, &window, openNewTaskDialog);
+    QObject::connect(downloadsPage, &DownloadsPage::torrentPickerRequested, &window, openTorrentPicker);
+    QObject::connect(downloadsPage, &DownloadsPage::toast, &window,
+                     [toasts](const QString &text, bool isError) {
+                         toasts->push(text, isError ? ToastHost::Error : ToastHost::Success);
+                     });
     QObject::connect(downloadsPage, &DownloadsPage::detailsToggleRequested, &window,
                      [detailsPanel]() {
                          detailsPanel->setVisible(!detailsPanel->isVisible());
@@ -872,12 +866,6 @@ int main(int argc, char *argv[])
                          if (!gid.isEmpty())
                              detailsPanel->setVisible(true);
                      });
-    QObject::connect(queuePage, &DownloadsPage::selectionChanged, &window,
-                     [&aria2, detailsPanel](const QString &gid) {
-                         aria2.setDetailGid(gid);
-                         if (!gid.isEmpty())
-                             detailsPanel->setVisible(true);
-                     });
     QObject::connect(&aria2, &Aria2Manager::toast, &window,
                      [toasts](const QString &message, bool isError) {
                          toasts->push(message, isError ? ToastHost::Error : ToastHost::Success);
@@ -898,7 +886,15 @@ int main(int argc, char *argv[])
                          pageStack->setCurrentIndex(pageIndex.value(key, 0));
                      });
     QObject::connect(titleBar, &FluentTitleBar::searchEdited, &window,
-                     [&aria2](const QString &text) { aria2.setSearchText(text); });
+                     [&aria2, showPage](const QString &text) {
+                         aria2.setSearchText(text);
+                         // Typing in the title bar filters the download list, so
+                         // that is where the results are: showing them means going
+                         // there instead of leaving the user on another page
+                         // wondering what the box did.
+                         if (!text.isEmpty())
+                             showPage(QStringLiteral("download"));
+                     });
 
     // The inspector is visible by default and starts out empty, which reads as a
     // broken pane. Select the first task once, as soon as the list has content;
@@ -933,9 +929,11 @@ int main(int argc, char *argv[])
             QStringLiteral("↓ ") + FluentTheme::formatSpeed(stats.value(QStringLiteral("downloadSpeed")).toDouble()));
         const int active = stats.value(QStringLiteral("activeCount")).toInt();
         titleBar->setSecondaryBadge(active > 0 ? QObject::tr("%1 个活动").arg(active) : QString());
-        nav->setItemBadge(QStringLiteral("download"), active > 0 ? QString::number(active) : QString());
+        // One badge for the whole list: active plus queued, since the page shows
+        // both (the chips filter, the badge counts).
         const int queued = stats.value(QStringLiteral("waitingCount")).toInt();
-        nav->setItemBadge(QStringLiteral("queue"), queued > 0 ? QString::number(queued) : QString());
+        const int total = active + queued;
+        nav->setItemBadge(QStringLiteral("download"), total > 0 ? QString::number(total) : QString());
     };
     QObject::connect(&aria2, &Aria2Manager::statisticsChanged, &window, updateChrome);
     QObject::connect(&aria2, &Aria2Manager::engineReadyChanged, &window, updateChrome);

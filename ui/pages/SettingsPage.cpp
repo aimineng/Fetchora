@@ -370,6 +370,8 @@ void SettingsPage::buildSections()
     addCombo(body, QStringLiteral("fileAllocation"), QT_TR_NOOP("文件预分配"),
              kFileAllocationLabels,
              {QStringLiteral("none"), QStringLiteral("prealloc"), QStringLiteral("falloc")});
+    addSwitch(body, QStringLiteral("removeControlFile"), QT_TR_NOOP("下载前删除续传文件"),
+              QT_TR_NOOP("每次开始下载都丢掉 .aria2 续传记录：暂停、继续与断点续传都会失效"));
 
     body = addGroupCard(page, QT_TR_NOOP("速度与缓存"));
     addLineEdit(body, QStringLiteral("maxDownloadLimit"), QT_TR_NOOP("下载限速"),
@@ -794,6 +796,12 @@ void SettingsPage::buildSections()
                "caption", QString(), true);
     page->addStretch(1);
 
+    // Rows keep their own height and stop at the last one; the stretch absorbs the
+    // rest, so filtering the rail cannot stretch the survivors over the column.
+    auto *rail = qobject_cast<QVBoxLayout *>(ui->railNavLayout);
+    if (rail && rail->count() > 0 && !rail->itemAt(rail->count() - 1)->spacerItem())
+        rail->addStretch(1);
+
     Q_ASSERT(m_sections.size() == SectionCount);
 }
 
@@ -814,6 +822,10 @@ QVBoxLayout *SettingsPage::addSectionPage(const char *title, const char *subtitl
     auto *row = new QWidget(ui->railNavHost);
     row->setObjectName(section.rowName);
     row->setAttribute(Qt::WA_StyledBackground, true);
+    // A fixed height, and a stretch after the last row (added in buildSections):
+    // without both, filtering the rail left the remaining rows stretched over the
+    // whole column instead of staying the height of a navigation item.
+    row->setFixedHeight(FluentTheme::controlHeight() + 8);
     auto *rowLayout = new QHBoxLayout(row);
     rowLayout->setContentsMargins(2, 2, 2, 2);
     rowLayout->setSpacing(0);

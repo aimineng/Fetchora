@@ -582,8 +582,15 @@ public:
         label->setProperty("fluentRole", "caption");
         row->addWidget(label, 1);
 
+        // The style sheet has to address this widget by object name: the class is
+        // a QFrame subclass in an anonymous namespace without Q_OBJECT, so Qt's
+        // selector engine only knows it as "QFrame" and a "Toast { ... }" rule
+        // matches nothing at all - which is why the card had no background and
+        // the text underneath showed through it.
+        setObjectName(QStringLiteral("toastCard"));
+        setAttribute(Qt::WA_StyledBackground, true);
         setStyleSheet(QStringLiteral(
-                          "Toast { background: %1; border: 1px solid %2; border-radius: %3px; }")
+                          "#toastCard { background: %1; border: 1px solid %2; border-radius: %3px; }")
                           .arg(t->isDark() ? t->cardTertiary().name() : t->card().name(),
                                QColor(tint.red(), tint.green(), tint.blue(), 130).name(QColor::HexArgb))
                           .arg(FluentTheme::RadiusLarge));

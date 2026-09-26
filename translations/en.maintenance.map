@@ -21,6 +21,15 @@ aria2 引擎连续 %1 次启动失败，已停止自动重启。请在「设置 
 无法打开日志目录 %1 => Could not open the log folder %1
 天 => days
 
+# ------------------------------------------------------- 导航与搜索 / navigation + search
+下载任务 => Downloads
+搜索下载任务 => Search downloads
+在下载任务里按文件名或链接搜索；历史与设置页各有自己的搜索框 => Search the download list by file name or link. The history and settings pages have their own search boxes.
+
+# --------------------------------------------------- 断点续传 / resume behaviour
+下载前删除续传文件 => Delete the resume data before downloading
+每次开始下载都丢掉 .aria2 续传记录：暂停、继续与断点续传都会失效 => Throw away the .aria2 resume record at the start of every download: pausing, resuming and continuing an interrupted transfer all stop working
+
 # --------------------------------------------------------- 批量选择 / batch selection
 批量选择 => Select
 退出批量选择 => Done selecting

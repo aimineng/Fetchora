@@ -52,7 +52,10 @@ FluentTitleBar::FluentTitleBar(QWidget *parent)
     m_secondaryBadge->hide();
 
     m_search = new QLineEdit(this);
-    m_search->setPlaceholderText(tr("搜索下载"));
+    // Names the scope: this box filters the download list, while the history and
+    // settings pages each have their own search for their own page.
+    m_search->setPlaceholderText(tr("搜索下载任务"));
+    m_search->setToolTip(tr("在下载任务里按文件名或链接搜索；历史与设置页各有自己的搜索框"));
     m_search->setFont(FluentTheme::uiFont(12));
     m_search->setFixedHeight(30);
     m_search->setTextMargins(30, 0, 10, 0);
@@ -83,8 +86,10 @@ FluentTitleBar::FluentTitleBar(QWidget *parent)
 void FluentTitleBar::changeEvent(QEvent *event)
 {
     QWidget::changeEvent(event);
-    if (event->type() == QEvent::LanguageChange)
-        m_search->setPlaceholderText(tr("搜索下载"));
+    if (event->type() == QEvent::LanguageChange) {
+        m_search->setPlaceholderText(tr("搜索下载任务"));
+        m_search->setToolTip(tr("在下载任务里按文件名或链接搜索；历史与设置页各有自己的搜索框"));
+    }
 }
 
 void FluentTitleBar::setTitle(const QString &title)

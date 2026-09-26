@@ -203,7 +203,11 @@ void SettingsManager::loadSettings()
     m_checkIntegrity = get("checkIntegrity", false).toBool();
     m_realtimeChunkChecksum = get("realtimeChunkChecksum", true).toBool();
     m_hashCheckOnly = get("hashCheckOnly", false).toBool();
-    m_removeControlFile = get("removeControlFile", true).toBool();
+    // Off by default: with this on, aria2 deletes the .aria2 control file
+    // *before* every download, so nothing can be resumed - and because
+    // --file-allocation=prealloc already made the file its full size, a resumed
+    // download was then declared complete on the spot.
+    m_removeControlFile = get("removeControlFile", false).toBool();
     m_autoSaveSession = get("autoSaveSession", true).toBool();
     m_saveSessionInterval = boundedInt(get("saveSessionInterval", 60).toInt(), 0, 86400);
     m_sessionFile = get("sessionFile", appData + "/aria2.session").toString();

@@ -12,6 +12,7 @@
 #include <QLabel>
 #include <QLayout>
 #include <QScrollArea>
+#include <QScrollBar>
 #include <QStackedWidget>
 #include <QVBoxLayout>
 
@@ -201,6 +202,7 @@ void TaskDetailsPanel::buildSections()
         scroll->setWidget(content);
 
         m_sectionContent << content;
+        m_sectionScrolls << scroll;
         ui->sectionStack->addWidget(scroll);
     }
     setSection(Overview);
@@ -635,10 +637,15 @@ void TaskDetailsPanel::clearLayout(QLayout *layout)
     if (!layout)
         return;
     while (QLayoutItem *item = layout->takeAt(0)) {
-        if (QWidget *w = item->widget())
+        if (QWidget *w = item->widget()) {
+            // Hide before the deferred delete: a widget that was taken out of the
+            // layout is still a visible child until the event loop gets to it, so
+            // it kept being painted on top of the freshly built rows.
+            w->hide();
             w->deleteLater();
-        else if (QLayout *child = item->layout())
+        } else if (QLayout *child = item->layout()) {
             clearLayout(child);
+        }
         delete item;
     }
 }
@@ -698,6 +705,20 @@ void TaskDetailsPanel::refresh()
     QWidget *content = m_sectionContent.value(m_section);
     if (!content)
         return;
+
+    // The body is rebuilt from scratch (the sections are short lists of labels,
+    // and this keeps one code path instead of five update-in-place ones). Two
+    // things make that invisible:
+    //
+    //   * repaints are off while the old rows are hidden and the new ones are
+    //     built, so the panel never shows a half-empty intermediate state, and
+    //   * the scroll position is restored afterwards, because a rebuild resets
+    //     the bar and the user could never scroll past the first screen.
+    QScrollArea *scroll = m_sectionScrolls.value(m_section);
+    const int scrollPos = scroll ? scroll->verticalScrollBar()->value() : 0;
+    const bool updates = content->updatesEnabled();
+    content->setUpdatesEnabled(false);
+
     clearLayout(content->layout());
     m_captionLabels.clear();
     m_captions.clear();
@@ -709,6 +730,7 @@ void TaskDetailsPanel::refresh()
         auto *layout = qobject_cast<QVBoxLayout *>(content->layout());
         layout->insertWidget(layout->count() - 1, empty);
         layout->addStretch(1);
+        content->setUpdatesEnabled(updates);
         return;
     }
 
@@ -720,6 +742,10 @@ void TaskDetailsPanel::refresh()
     case Options:  buildOptionsSection(content); break;
     default: break;
     }
+
+    content->setUpdatesEnabled(updates);
+    if (scroll)
+        scroll->verticalScrollBar()->setValue(scrollPos);
 }
 
 // ============================================================================

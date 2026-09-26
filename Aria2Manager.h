@@ -234,6 +234,13 @@ private:
     /// Hand m_pendingQueue to a freshly started engine and say so.
     void restoreQueue();
 
+    /// A file name in `dir` that nothing is using yet ("report (2).pdf"), derived
+    /// from the URI; empty when the URI has no usable name. Used when a URI is
+    /// asked for a second time: aria2 needs a different target to download at all,
+    /// because it otherwise finds the finished file and its control file and
+    /// reports the new task as complete without transferring anything.
+    QString uniqueOutputName(const QString &uri, const QString &dir) const;
+
 private:
     struct Task {
         QString gid;
@@ -394,6 +401,10 @@ private:
     /// starting up, or in the middle of a restart. They are added as soon as it
     /// is back instead of failing with a toast nobody can act on.
     QList<QPair<QString, QVariantMap>> m_pendingAdds;
+    /// Gids the user removed. A poll that still sees them (aria2 answers with a
+    /// stopped result until removeDownloadResult is processed) must not resurrect
+    /// the row.
+    QSet<QString> m_dismissed;
 
     QSet<QString> m_historyRecorded;
 };

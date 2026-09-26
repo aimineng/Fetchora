@@ -102,6 +102,9 @@ private:
 
     // section bodies (rebuilt on every refresh)
     QList<QWidget *> m_sectionContent;
+    /// The scroll area each section body lives in, so a rebuild can put the
+    /// scroll position back where the user left it.
+    QList<QScrollArea *> m_sectionScrolls;
     QList<QLabel *> m_captionLabels;
     QList<const char *> m_captions;
 

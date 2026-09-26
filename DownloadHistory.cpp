@@ -397,6 +397,28 @@ int DownloadHistory::prune(int keepEntries)
     return removed;
 }
 
+bool DownloadHistory::hasCompletedUri(const QString &uri) const
+{
+    if (uri.isEmpty())
+        return false;
+    if (!m_ready) {
+        for (const QVariant &v : m_memoryFallback) {
+            const QVariantMap row = v.toMap();
+            if (row.value(QStringLiteral("uri")).toString() == uri
+                && row.value(QStringLiteral("status")).toString() == QLatin1String("complete"))
+                return true;
+        }
+        return false;
+    }
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral(
+        "SELECT 1 FROM downloads WHERE uri = :uri AND status = 'complete' LIMIT 1"));
+    q.bindValue(QStringLiteral(":uri"), uri);
+    if (!q.exec())
+        return false;
+    return q.next();
+}
+
 QVariantMap DownloadHistory::statistics() const
 {
     QVariantMap stats;

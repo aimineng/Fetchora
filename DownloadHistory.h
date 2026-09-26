@@ -49,6 +49,11 @@ public:
     Q_INVOKABLE void clear();
     Q_INVOKABLE int prune(int keepEntries);
     Q_INVOKABLE QVariantMap statistics() const;
+    /// True when this exact URI was downloaded successfully before. The download
+    /// manager uses it to tell "resume what I started" from "give me another
+    /// copy": aria2 reports the second one as complete without touching the disk
+    /// unless it is given a different output name.
+    bool hasCompletedUri(const QString &uri) const;
     /// Force pending writes out to the database file.
     void flush();
 

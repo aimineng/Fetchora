@@ -458,6 +458,31 @@ QList<Aria2Manager::QueuedTask> Aria2Manager::captureQueue() const
     return queue;
 }
 
+QString Aria2Manager::uniqueOutputName(const QString &uri, const QString &dir) const
+{
+    // QUrl::fileName() percent-decodes, which is what the file on disk will be
+    // called. A URI that ends in a slash (or has no path) has no name to build on.
+    const QString base = QUrl(uri).fileName();
+    if (base.isEmpty())
+        return QString();
+
+    const QFileInfo info(base);
+    const QString stem = info.completeBaseName();
+    const QString suffix = info.suffix();
+    if (stem.isEmpty())
+        return QString();
+
+    const QString folder = dir.isEmpty() ? m_settings->downloadDir() : dir;
+    for (int n = 2; n < 1000; ++n) {
+        const QString candidate = suffix.isEmpty()
+            ? QStringLiteral("%1 (%2)").arg(stem).arg(n)
+            : QStringLiteral("%1 (%2).%3").arg(stem).arg(n).arg(suffix);
+        if (!QFileInfo::exists(QDir(folder).filePath(candidate)))
+            return candidate;
+    }
+    return QString();
+}
+
 void Aria2Manager::restoreQueue()
 {
     const QList<QueuedTask> queue = m_pendingQueue;
@@ -752,6 +777,9 @@ void Aria2Manager::applyTask(const QJsonObject &obj, const QString &bucket)
     Q_UNUSED(bucket)
     const QString gid = obj.value(QStringLiteral("gid")).toString();
     if (gid.isEmpty())
+        return;
+    // Removed tasks stay removed even if a poll still sees them (see removeTask).
+    if (m_dismissed.contains(gid))
         return;
 
     Task previous;
@@ -1260,7 +1288,19 @@ void Aria2Manager::addUri(const QString &urls, const QVariantMap &options)
         return;
 
     for (const QString &u : httpUris) {
-        m_client->addUri({u}, options, -1, [this, u](const QJsonValue &result, bool isError, const QString &err) {
+        QVariantMap taskOptions = options;
+        // Asking for something that was already downloaded once means "another
+        // copy": aria2 finds the finished file, and its control file, and reports
+        // the new task as complete without transferring a byte. A different
+        // output name is what makes it download again.
+        if (!taskOptions.contains(QStringLiteral("out")) && m_history && m_history->hasCompletedUri(u)) {
+            const QString dir = taskOptions.value(QStringLiteral("dir"),
+                                                  m_settings->downloadDir()).toString();
+            const QString name = uniqueOutputName(u, dir);
+            if (!name.isEmpty())
+                taskOptions.insert(QStringLiteral("out"), name);
+        }
+        m_client->addUri({u}, taskOptions, -1, [this, u](const QJsonValue &result, bool isError, const QString &err) {
             if (isError) {
                 emit toast(tr("无法添加 %1：%2").arg(u, err), true);
                 return;
@@ -1423,6 +1463,11 @@ void Aria2Manager::removeTask(const QString &gid, int mode)
     // For a live task aria2 must forget it first; force-remove so that a paused
     // or in-flight download is dropped immediately.
     auto afterRemove = [this, gid, mode, paths, snapshot]() {
+        // Remember that this gid is gone for good: aria2 keeps answering with a
+        // stopped result until removeDownloadResult has been processed, and the
+        // next poll would otherwise put the row the user just deleted straight
+        // back into the list.
+        m_dismissed.insert(gid);
         m_client->removeDownloadResult(gid, [](const QJsonValue &, bool, const QString &) {});
         if (mode == 1) {
             for (const QString &path : paths) {
