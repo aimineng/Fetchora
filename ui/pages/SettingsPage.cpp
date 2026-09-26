@@ -539,7 +539,8 @@ void SettingsPage::buildSections()
 
     body = addGroupCard(page, QT_TR_NOOP("Tracker 与 DHT"));
     addLineEdit(body, QStringLiteral("btTracker"), QT_TR_NOOP("附加 Tracker"),
-                QT_TR_NOOP("每行一个或用逗号分隔；留空则使用内置的公共 Tracker 列表"));
+                QT_TR_NOOP("以逗号分隔；留空则使用内置的公共 Tracker 列表，"
+                           "批量导入请用 BitTorrent 页的「导入列表」"));
     addLineEdit(body, QStringLiteral("dhtEntryPoint"), QT_TR_NOOP("DHT 入口"),
                 QT_TR_NOOP("加入 DHT 网络使用的入口节点 host:port"));
     addLineEdit(body, QStringLiteral("dhtEntryPoint6"), QT_TR_NOOP("DHT 入口 6"),

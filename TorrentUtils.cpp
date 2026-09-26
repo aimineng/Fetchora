@@ -13,22 +13,37 @@
 // ============================================================================
 //  Tracker lists
 // ============================================================================
+namespace {
+
+/**
+ * Drop the punctuation a pasted list wraps an address in ("quoted", [bracketed],
+ * <angled>, trailing comma). Brackets are *not* split on: an IPv6 tracker URL
+ * contains them (udp://[2001:db8::1]:6969/announce) and splitting there shredded
+ * exactly those URLs.
+ */
+QString stripWrappers(const QString &value)
+{
+    static const QString leading = QStringLiteral("\"'`<([{|");
+    static const QString trailing = QStringLiteral("\"'`>)]}|,;.");
+    QString out = value.trimmed();
+    while (!out.isEmpty() && leading.contains(out.front()))
+        out.remove(0, 1);
+    while (!out.isEmpty() && trailing.contains(out.back()))
+        out.chop(1);
+    return out.trimmed();
+}
+
+} // namespace
+
 namespace TrackerList {
 
 bool looksLikeTracker(const QString &line)
 {
-    const QString trimmed = line.trimmed();
-    if (trimmed.size() < 12 || trimmed.size() > 2048)
+    const QString value = stripWrappers(line);
+    if (value.size() < 12 || value.size() > 2048)
         return false;
-    if (trimmed.contains(QLatin1Char(' ')) || trimmed.contains(QLatin1Char('\t')))
+    if (value.contains(QLatin1Char(' ')) || value.contains(QLatin1Char('\t')))
         return false;
-    // Quoted entries turn up in copied JSON/YAML lists.
-    QString value = trimmed;
-    if (value.startsWith(QLatin1Char('"')) || value.startsWith(QLatin1Char('\'')))
-        value = value.mid(1);
-    if (value.endsWith(QLatin1Char('"')) || value.endsWith(QLatin1Char('\'')))
-        value.chop(1);
-    value = value.trimmed();
 
     static const QStringList schemes = {
         QStringLiteral("udp"), QStringLiteral("http"), QStringLiteral("https"),
@@ -62,7 +77,7 @@ ParseResult parse(const QByteArray &data, int limit)
 
     if (data.size() > kMaxBytes) {
         // Refused, not truncated mid-way: a 200 MB "tracker list" is not one.
-        result.truncated = true;
+        result.tooLarge = true;
         return result;
     }
 
@@ -91,8 +106,9 @@ ParseResult parse(const QByteArray &data, int limit)
     }
 
     const QString text = QString::fromUtf8(data);
-    // Split on every separator tracker lists are published with, then filter.
-    static const QRegularExpression separators(QStringLiteral("[\\s,;\\[\\]{}()]+"));
+    // Split on separators only - never on brackets, which an IPv6 tracker URL
+    // needs (see stripWrappers).
+    static const QRegularExpression separators(QStringLiteral("[\\s,;]+"));
     const QStringList candidates = text.split(separators, Qt::SkipEmptyParts);
     for (const QString &candidate : candidates) {
         ++result.lines;
@@ -100,11 +116,7 @@ ParseResult parse(const QByteArray &data, int limit)
             ++result.rejected;
             continue;
         }
-        QString value = candidate.trimmed();
-        if (value.startsWith(QLatin1Char('"')) || value.startsWith(QLatin1Char('\'')))
-            value = value.mid(1);
-        if (value.endsWith(QLatin1Char('"')) || value.endsWith(QLatin1Char('\'')))
-            value.chop(1);
+        const QString value = stripWrappers(candidate);
         if (result.trackers.contains(value))
             continue;
         if (result.trackers.size() >= qMax(1, limit)) {

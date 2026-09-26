@@ -271,7 +271,10 @@ void HistoryPage::HistoryRow::setRecord(const QVariantMap &record)
     m_name->setFullText(name);
 
     m_detail->setFullText(detailLine());
-    m_meta->setText(metaLine());
+    // setFullText: an ElidedLabel paints the text it was handed, it does not hold
+    // it in the base class - so setText() here would draw nothing (which is what
+    // the row's meta line had been doing).
+    m_meta->setFullText(metaLine());
     m_pill->setText(statusText());
     m_plate->setGlyph(plateGlyph());
     updateActions();

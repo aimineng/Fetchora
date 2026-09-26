@@ -37,8 +37,13 @@ struct ParseResult {
     QStringList trackers;   ///< deduplicated, in the order they were found
     int lines = 0;          ///< candidate lines seen
     int rejected = 0;       ///< lines that were not tracker URLs
-    bool truncated = false; ///< the input was larger than kMaxBytes
-    bool binary = false;    ///< the input is not text at all and was ignored
+    /// The input was larger than kMaxBytes and was refused without being parsed.
+    bool tooLarge = false;
+    /// The entry cap was reached: what is in `trackers` is still usable, there is
+    /// just more in the file than the app will hand to aria2.
+    bool truncated = false;
+    /// The input is not text at all (or is a .torrent) and was ignored.
+    bool binary = false;
 };
 
 /// True when `line` is a tracker announce URL this app will hand to aria2.

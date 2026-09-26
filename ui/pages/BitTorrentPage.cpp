@@ -678,13 +678,16 @@ void BitTorrentPage::submitMagnet()
         if (trimmed.startsWith(QLatin1String("magnet:"), Qt::CaseInsensitive))
             magnets << trimmed;
     }
-    if (magnets.isEmpty() || !m_aria2) {
-        if (!magnets.isEmpty() == false && !lines.isEmpty())
+    if (magnets.isEmpty()) {
+        // Saying nothing here would look like the button did nothing at all.
+        if (!lines.isEmpty())
             emit toast(tr("没有找到 magnet: 开头的链接"), true);
         return;
     }
-    for (const QString &magnet : std::as_const(magnets))
-        m_aria2->addMagnet(magnet);
+    for (const QString &magnet : std::as_const(magnets)) {
+        if (m_aria2)
+            m_aria2->addMagnet(magnet);
+    }
     ui->magnetEdit->clear();
     ui->magnetPanel->hide();
     emit toast(tr("已添加 %1 个磁力链接").arg(magnets.size()), false);
@@ -851,11 +854,12 @@ void BitTorrentPage::importTrackersFromFile()
         emit toast(tr("这个文件看起来不是文本（可能是种子、压缩包或程序），已忽略"), true);
         return;
     }
-    if (parsed.truncated) {
+    if (parsed.tooLarge) {
         emit toast(tr("文件太大，已忽略"), true);
         return;
     }
-    applyImportedTrackers(parsed.trackers, parsed.rejected, QFileInfo(path).fileName());
+    applyImportedTrackers(parsed.trackers, parsed.rejected, QFileInfo(path).fileName(),
+                          parsed.truncated);
 }
 
 void BitTorrentPage::importTrackersFromUrl()
@@ -892,16 +896,17 @@ void BitTorrentPage::importTrackersFromUrl()
             emit toast(tr("这个地址返回的不是文本列表，已忽略"), true);
             return;
         }
-        if (parsed.truncated) {
-            emit toast(tr("列表太大或条目过多，已忽略"), true);
+        if (parsed.tooLarge) {
+            emit toast(tr("列表太大，已忽略"), true);
             return;
         }
-        applyImportedTrackers(parsed.trackers, parsed.rejected, QUrl(url).host());
+        applyImportedTrackers(parsed.trackers, parsed.rejected, QUrl(url).host(),
+                              parsed.truncated);
     });
 }
 
 void BitTorrentPage::applyImportedTrackers(const QStringList &trackers, int rejected,
-                                           const QString &source)
+                                           const QString &source, bool truncated)
 {
     const QString gid = trackerGid();
     if (gid.isEmpty()) {
@@ -915,10 +920,16 @@ void BitTorrentPage::applyImportedTrackers(const QStringList &trackers, int reje
     }
     if (m_aria2)
         m_aria2->addTrackers(gid, trackers);
-    emit toast(tr("已从 %1 导入 %2 个 Tracker，跳过 %3 行")
-                   .arg(source)
-                   .arg(trackers.size())
-                   .arg(rejected),
+    // A long list is capped rather than refused, and the cap is reported: silently
+    // dropping two thirds of a list would look like it worked.
+    emit toast(truncated ? tr("已从 %1 导入 %2 个 Tracker（超出上限，只取了前 %2 个），跳过 %3 行")
+                               .arg(source)
+                               .arg(trackers.size())
+                               .arg(rejected)
+                         : tr("已从 %1 导入 %2 个 Tracker，跳过 %3 行")
+                               .arg(source)
+                               .arg(trackers.size())
+                               .arg(rejected),
                false);
 }
 

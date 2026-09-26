@@ -694,14 +694,13 @@ void TaskDetailsPanel::updateOptions()
         if (it == m_optionFields.end())
             continue;
         const QString raw = options.value(key).toString();
-        const QString text = elide(raw, 160);
-        if (it->text == text)
+        if (it->text == raw)
             continue;
-        it->text = text;
-        it->value->setText(text);
-        // The whole value stays reachable: the row elides it to keep the list
-        // steady, so the tooltip is where the rest lives.
-        it->value->setToolTip(raw);
+        it->text = raw;
+        // setFullText, not setText: an ElidedLabel paints what it was given here and
+        // ignores the base class's text, so setText() drew nothing at all (which is
+        // how the option values disappeared from this list).
+        it->value->setFullText(raw);
     }
 }
 

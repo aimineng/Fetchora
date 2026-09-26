@@ -268,7 +268,7 @@
           <item>
            <widget class="QLabel" name="tasksEmptyHint">
             <property name="text">
-             <string>添加 .torrent 文件或磁力链接后，即可在这里查看节点、分片与文件选择</string>
+             <string>添加 .torrent 文件或磁力链接后，即可在这里查看节点、分片与 Tracker</string>
             </property>
             <property name="alignment">
              <set>Qt::AlignCenter</set>

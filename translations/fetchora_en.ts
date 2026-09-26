@@ -757,8 +757,8 @@
       <translation>No BitTorrent downloads yet</translation>
     </message>
     <message>
-      <source>添加 .torrent 文件或磁力链接后，即可在这里查看节点、分片与文件选择</source>
-      <translation>Add a .torrent file or magnet link to see peers, pieces and file selection here.</translation>
+      <source>添加 .torrent 文件或磁力链接后，即可在这里查看节点、分片与 Tracker</source>
+      <translation>Add a .torrent file or magnet link to see peers, pieces and trackers here.</translation>
     </message>
     <message>
       <source>Tracker 编辑</source>
@@ -951,12 +951,16 @@ One address per line; anything that is not a tracker is ignored.</translation>
       <translation>That address did not return a text list; ignored</translation>
     </message>
     <message>
-      <source>列表太大或条目过多，已忽略</source>
-      <translation>The list is too large or has too many entries; ignored</translation>
+      <source>列表太大，已忽略</source>
+      <translation>The list is too large; ignored</translation>
     </message>
     <message>
       <source>%1 里没有找到 Tracker 地址（已跳过 %2 行）</source>
       <translation>No tracker addresses found in %1 (%2 line(s) skipped)</translation>
+    </message>
+    <message>
+      <source>已从 %1 导入 %2 个 Tracker（超出上限，只取了前 %2 个），跳过 %3 行</source>
+      <translation>Imported the first %2 tracker(s) from %1 (the list is longer than the cap), skipped %3 line(s)</translation>
     </message>
     <message>
       <source>已从 %1 导入 %2 个 Tracker，跳过 %3 行</source>
@@ -2895,8 +2899,8 @@ Info Hash %2 · Size %3</translation>
       <translation>Extra Trackers</translation>
     </message>
     <message>
-      <source>每行一个或用逗号分隔；留空则使用内置的公共 Tracker 列表</source>
-      <translation>One per line or comma-separated; leave it empty to use the built-in public tracker list</translation>
+      <source>以逗号分隔；留空则使用内置的公共 Tracker 列表，批量导入请用 BitTorrent 页的「导入列表」</source>
+      <translation>Comma-separated; leave it empty to use the built-in public tracker list. To import a list in bulk, use “Import list” on the BitTorrent page</translation>
     </message>
     <message>
       <source>DHT 入口</source>

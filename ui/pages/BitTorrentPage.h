@@ -78,7 +78,8 @@ private:
     void importTrackersFromFile();
     void importTrackersFromUrl();
     /// Adds `trackers` to the selected task and reports what was used/ignored.
-    void applyImportedTrackers(const QStringList &trackers, int rejected, const QString &source);
+    void applyImportedTrackers(const QStringList &trackers, int rejected, const QString &source,
+                               bool truncated);
 
     QVariantMap taskFor(const QString &gid) const;
     /// Trackers of one task; Aria2Manager publishes them as "trackers".

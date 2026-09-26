@@ -64,13 +64,16 @@ aria2 引擎连续 %1 次启动失败，已停止自动重启。请在「设置 
 这个文件看起来不是文本（可能是种子、压缩包或程序），已忽略 => That file does not look like text (it may be a torrent, an archive or a program); ignored
 这个地址返回的不是文本列表，已忽略 => That address did not return a text list; ignored
 文件太大，已忽略 => The file is too large; ignored
+列表太大，已忽略 => The list is too large; ignored
 列表太大或条目过多，已忽略 => The list is too large or has too many entries; ignored
+已从 %1 导入 %2 个 Tracker（超出上限，只取了前 %2 个），跳过 %3 行 => Imported the first %2 tracker(s) from %1 (the list is longer than the cap), skipped %3 line(s)
 %1 里没有找到 Tracker 地址（已跳过 %2 行） => No tracker addresses found in %1 (%2 line(s) skipped)
 已从 %1 导入 %2 个 Tracker，跳过 %3 行 => Imported %2 tracker(s) from %1, skipped %3 line(s)
 已添加 %1 个 Tracker。 => Added %1 tracker(s).
 没有可添加的 Tracker 地址。 => There is no tracker address to add.
 已添加 %1 个磁力链接 => Added %1 magnet link(s)
 每行一个或用逗号分隔；留空则使用内置的公共 Tracker 列表 => One per line or comma-separated; leave it empty to use the built-in public tracker list
+以逗号分隔；留空则使用内置的公共 Tracker 列表，批量导入请用 BitTorrent 页的「导入列表」 => Comma-separated; leave it empty to use the built-in public tracker list. To import a list in bulk, use “Import list” on the BitTorrent page
 粘贴 magnet:?xt=urn:btih:... 链接（可多行） => Paste magnet:?xt=urn:btih:... links (several lines are fine)
 没有找到 magnet: 开头的链接 => No link starting with magnet: was found
 

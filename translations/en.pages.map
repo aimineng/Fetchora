@@ -87,6 +87,7 @@ BitTorrent => BitTorrent
 粘贴 magnet:?xt=urn:btih:... 链接 => Paste a magnet:?xt=urn:btih:... link.
 添加 => Add
 添加 .torrent 文件或磁力链接后，即可在这里查看节点、分片与文件选择 => Add a .torrent file or magnet link to see peers, pieces and file selection here.
+添加 .torrent 文件或磁力链接后，即可在这里查看节点、分片与 Tracker => Add a .torrent file or magnet link to see peers, pieces and trackers here.
 暂无 BitTorrent 任务 => No BitTorrent downloads yet
 暂无种子任务 => No torrent tasks yet
 未命名任务 => Unnamed task

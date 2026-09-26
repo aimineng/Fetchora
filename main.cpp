@@ -404,7 +404,7 @@ int runTorrentSelfTest()
     const TrackerList::ParseResult huge =
         TrackerList::parse(QByteArray(TrackerList::kMaxBytes + 1, 'u'));
     check(QStringLiteral("an oversized file is refused before parsing"),
-          huge.truncated && huge.trackers.isEmpty(), QStringLiteral("size cap"));
+          huge.tooLarge && huge.trackers.isEmpty(), QStringLiteral("size cap"));
 
     QByteArray many;
     for (int i = 0; i < 2000; ++i)
