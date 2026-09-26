@@ -737,134 +737,140 @@
   <context>
     <name>BitTorrentPage</name>
     <message>
-      <source>Tracker 编辑</source>
-      <translation>Edit trackers</translation>
+      <source>生效</source>
+      <translation>Active</translation>
     </message>
     <message>
-      <source>共 0 个 Tracker</source>
-      <translation>0 trackers</translation>
-    </message>
-    <message>
-      <source>这一份列表会下发给所有 BitTorrent 任务；单个任务的 Tracker 在任务详情里编辑</source>
-      <translation>This list is handed to every BitTorrent task; a single task's trackers are edited in the task details</translation>
-    </message>
-    <message>
-      <source>全局 Tracker 列表</source>
-      <translation>Global tracker list</translation>
-    </message>
-    <message>
-      <source>应用于所有 BitTorrent 任务</source>
-      <translation>Applies to every BitTorrent task</translation>
-    </message>
-    <message>
-      <source>该任务还没有 Tracker，添加后可以更快找到其他节点</source>
-      <translation>This download has no trackers yet; adding some helps find peers faster.</translation>
-    </message>
-    <message>
-      <source>添加 Tracker：udp:// 或 https:// .../announce</source>
-      <translation>Add tracker: udp:// or https:// .../announce</translation>
-    </message>
-    <message>
-      <source>添加</source>
-      <translation>Add</translation>
+      <source>黑名单</source>
+      <translation>Blacklist</translation>
     </message>
     <message>
       <source>移除选中</source>
       <translation>Remove selected</translation>
     </message>
     <message>
-      <source>导入列表</source>
-      <translation>Import list</translation>
+      <source>立即同步</source>
+      <translation>Sync now</translation>
     </message>
     <message>
-      <source>从一个文件或一个网址导入 Tracker 列表：每行一个地址，非 Tracker 的行会被忽略</source>
-      <translation>Import a tracker list from a file or a URL: one address per line; anything that is not a tracker is ignored</translation>
+      <source>订阅源：选择内置列表，或填入网址 / 本地文件</source>
+      <translation>Source: pick a built-in list, or type a URL / local file</translation>
     </message>
     <message>
-      <source>请输入 Tracker 地址</source>
-      <translation>Enter a tracker address</translation>
+      <source>添加订阅源</source>
+      <translation>Add source</translation>
     </message>
     <message>
-      <source>导入 Tracker 列表</source>
-      <translation>Import tracker list</translation>
+      <source>点击从订阅源中移除：%1</source>
+      <translation>Click to remove this source: %1</translation>
     </message>
     <message>
-      <source>从哪里读取 Tracker 列表？
-每行一个地址；不是 Tracker 的内容会被忽略。</source>
-      <translation>Where should the tracker list come from?
-One address per line; anything that is not a tracker is ignored.</translation>
+      <source>黑名单条目  ×</source>
+      <translation>Blacklist entries  ×</translation>
     </message>
     <message>
-      <source>本地文件…</source>
-      <translation>Local file…</translation>
+      <source>清空黑名单（当前 %1 条）</source>
+      <translation>Clear the blacklist (%1 entries)</translation>
     </message>
     <message>
-      <source>网址或路径…</source>
-      <translation>URL or path…</translation>
+      <source>无法读取</source>
+      <translation>could not be read</translation>
     </message>
     <message>
-      <source>取消</source>
-      <translation>Cancel</translation>
+      <source>不是文本文件</source>
+      <translation>not a text file</translation>
     </message>
     <message>
-      <source>选择 Tracker 列表文件</source>
-      <translation>Choose a tracker list file</translation>
+      <source>返回的不是文本列表</source>
+      <translation>did not return a text list</translation>
     </message>
     <message>
-      <source>文本文件 (*.txt *.list *.md);;所有文件 (*)</source>
-      <translation>Text files (*.txt *.list *.md);;All files (*)</translation>
+      <source>已同步 %1 个订阅源，共 %2 个 Tracker（生效 %3 个）</source>
+      <translation>Synced %1 source(s), %2 trackers (%3 in use)</translation>
     </message>
     <message>
-      <source>无法读取 %1</source>
-      <translation>Could not read %1</translation>
+      <source>已同步 %1 个订阅源（%2 个失败），共 %3 个 Tracker</source>
+      <translation>Synced %1 source(s), %2 failed, %3 trackers</translation>
     </message>
     <message>
-      <source>这个文件看起来不是文本（可能是种子、压缩包或程序），已忽略</source>
-      <translation>That file does not look like text (it may be a torrent, an archive or a program); ignored</translation>
+      <source>手动</source>
+      <translation>Manual</translation>
     </message>
     <message>
-      <source>文件太大，已忽略</source>
-      <translation>The file is too large; ignored</translation>
+      <source>内置</source>
+      <translation>Built-in</translation>
     </message>
     <message>
-      <source>已从 %1 导入 %2 个 Tracker（新增 %3），跳过 %4 行</source>
-      <translation>Imported %2 tracker(s) from %1 (%3 new), skipped %4 line(s)</translation>
+      <source>订阅源获取失败：%1</source>
+      <translation>Source failed: %1</translation>
     </message>
     <message>
-      <source>从网址或路径导入 Tracker</source>
-      <translation>Import trackers from a URL or a path</translation>
+      <source>URL</source>
+      <translation>URL</translation>
     </message>
     <message>
-      <source>恢复内置</source>
-      <translation>Use the built-in list</translation>
+      <source>健康度</source>
+      <translation>Health</translation>
     </message>
     <message>
-      <source>清空自定义列表，改用随程序内置的公共 Tracker</source>
-      <translation>Clear the custom list and go back to the public trackers that ship with the app</translation>
+      <source>最后探测</source>
+      <translation>Last announce</translation>
     </message>
     <message>
-      <source>列表地址（http/https）或本地文件路径</source>
-      <translation>List address (http/https) or a local file path</translation>
+      <source>来源</source>
+      <translation>Source</translation>
     </message>
     <message>
-      <source>只支持 http、https 地址或本地文件路径</source>
-      <translation>Only http/https addresses or a local file path are supported</translation>
+      <source>● 可用</source>
+      <translation>● reachable</translation>
     </message>
     <message>
-      <source>下载列表失败：%1</source>
-      <translation>Could not download the list: %1</translation>
+      <source>● 失败</source>
+      <translation>● failed</translation>
     </message>
     <message>
-      <source>%1 里没有找到 Tracker 地址（已跳过 %2 行）</source>
-      <translation>No tracker addresses found in %1 (%2 line(s) skipped)</translation>
+      <source>— 未知</source>
+      <translation>— unknown</translation>
     </message>
     <message>
-      <source>请先在列表中选择要移除的 Tracker</source>
-      <translation>Select the tracker to remove in the list first</translation>
+      <source>%1 / %2 个 Tracker（生效 %3 个）</source>
+      <translation>%1 / %2 trackers (%3 in use)</translation>
     </message>
     <message>
-      <source>共 %1 个 Tracker</source>
-      <translation>%1 trackers</translation>
+      <source>%1 / %2 条黑名单</source>
+      <translation>%1 / %2 blacklist entries</translation>
+    </message>
+    <message>
+      <source>已加入黑名单：%1 条</source>
+      <translation>Added %1 entry/entries to the blacklist</translation>
+    </message>
+    <message>
+      <source>把上面的订阅源加入列表并立即同步</source>
+      <translation>Add the source above to the list and sync it now</translation>
+    </message>
+    <message>
+      <source>Tracker</source>
+      <translation>Tracker</translation>
+    </message>
+    <message>
+      <source>订阅源合并后下发给所有 BitTorrent 任务；单个任务的 Tracker 在任务详情里编辑</source>
+      <translation>The merged sources are handed to every BitTorrent task; a single task's trackers are edited in the task details</translation>
+    </message>
+    <message>
+      <source>按 URL 过滤…</source>
+      <translation>Filter by URL…</translation>
+    </message>
+    <message>
+      <source>注入精选 Tracker</source>
+      <translation>Inject curated trackers</translation>
+    </message>
+    <message>
+      <source>将选中的订阅源合并后追加到所有 BT 任务</source>
+      <translation>Append the selected sources, merged, to every BT task</translation>
+    </message>
+    <message>
+      <source>尚未同步</source>
+      <translation>Not synced yet</translation>
     </message>
   </context>
   <context>
@@ -3446,14 +3452,6 @@ Info Hash %2 · Size %3</translation>
       <translation>Remove selected</translation>
     </message>
     <message>
-      <source>导入列表</source>
-      <translation>Import list</translation>
-    </message>
-    <message>
-      <source>从一个文件或一个网址导入 Tracker 列表：每行一个地址，非 Tracker 的行会被忽略</source>
-      <translation>Import a tracker list from a file or a URL: one address per line; anything that is not a tracker is ignored</translation>
-    </message>
-    <message>
       <source>BitTorrent 任务</source>
       <translation>BitTorrent downloads</translation>
     </message>
@@ -3584,72 +3582,6 @@ Info Hash %2 · Size %3</translation>
     <message>
       <source>请先在列表中选择要移除的 Tracker</source>
       <translation>Select the tracker to remove in the list first</translation>
-    </message>
-    <message>
-      <source>导入 Tracker 列表</source>
-      <translation>Import tracker list</translation>
-    </message>
-    <message>
-      <source>从哪里读取 Tracker 列表？
-每行一个地址；不是 Tracker 的内容会被忽略。</source>
-      <translation>Where should the tracker list come from?
-One address per line; anything that is not a tracker is ignored.</translation>
-    </message>
-    <message>
-      <source>本地文件…</source>
-      <translation>Local file…</translation>
-    </message>
-    <message>
-      <source>网址或路径…</source>
-      <translation>URL or path…</translation>
-    </message>
-    <message>
-      <source>取消</source>
-      <translation>Cancel</translation>
-    </message>
-    <message>
-      <source>选择 Tracker 列表文件</source>
-      <translation>Choose a tracker list file</translation>
-    </message>
-    <message>
-      <source>文本文件 (*.txt *.list *.md);;所有文件 (*)</source>
-      <translation>Text files (*.txt *.list *.md);;All files (*)</translation>
-    </message>
-    <message>
-      <source>无法读取 %1</source>
-      <translation>Could not read %1</translation>
-    </message>
-    <message>
-      <source>从网址或路径导入 Tracker</source>
-      <translation>Import trackers from a URL or a path</translation>
-    </message>
-    <message>
-      <source>列表地址（http/https）或本地文件路径</source>
-      <translation>List address (http/https) or a local file path</translation>
-    </message>
-    <message>
-      <source>只支持 http、https 地址或本地文件路径</source>
-      <translation>Only http/https addresses or a local file path are supported</translation>
-    </message>
-    <message>
-      <source>下载列表失败：%1</source>
-      <translation>Could not download the list: %1</translation>
-    </message>
-    <message>
-      <source>这个文件看起来不是文本（可能是种子、压缩包或程序），已忽略</source>
-      <translation>That file does not look like text (it may be a torrent, an archive or a program); ignored</translation>
-    </message>
-    <message>
-      <source>文件太大，已忽略</source>
-      <translation>The file is too large; ignored</translation>
-    </message>
-    <message>
-      <source>%1 里没有找到 Tracker 地址（已跳过 %2 行）</source>
-      <translation>No tracker addresses found in %1 (%2 line(s) skipped)</translation>
-    </message>
-    <message>
-      <source>已从 %1 导入 %2 个 Tracker，跳过 %3 行</source>
-      <translation>Imported %2 tracker(s) from %1, skipped %3 line(s)</translation>
     </message>
     <message>
       <source>%1 · %2 / %3</source>

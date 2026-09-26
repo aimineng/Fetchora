@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.21)
+﻿cmake_minimum_required(VERSION 3.21)
 
 project(Fetchora VERSION 0.1.4 LANGUAGES CXX)
 
@@ -49,6 +49,7 @@ set(APP_BACKEND_SOURCES
     SettingsManager.cpp   SettingsManager.h
     DownloadHistory.cpp   DownloadHistory.h
     TorrentUtils.cpp      TorrentUtils.h
+    TrackerSources.cpp    TrackerSources.h
     HttpServer.cpp        HttpServer.h
     ClipboardHelper.cpp   ClipboardHelper.h
     UpdateChecker.cpp     UpdateChecker.h

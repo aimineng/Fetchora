@@ -1,4 +1,4 @@
-# English strings for the housekeeping half of the app: the engine supervisor
+﻿# English strings for the housekeeping half of the app: the engine supervisor
 # (Aria2Manager), the log file settings and the history page's batch selection.
 #
 # Format is "中文 => English"; a [Context] prefix restricts an entry to one Qt
@@ -103,3 +103,38 @@ Tracker 列表 => Tracker list
 已复制「%1」的链接：%2 => Copied the link of “%1”: %2
 这个任务没有可复制的链接 => This task has no link to copy
 这个任务已经不在了，无法复制链接 => That task is gone, so there is no link to copy
+# --------------------------------------------------- Tracker 管理器 / tracker manager
+生效 => Active
+黑名单 => Blacklist
+移除选中 => Remove selected
+立即同步 => Sync now
+添加订阅源 => Add source
+把上面的订阅源加入列表并立即同步 => Add the source above to the list and sync it now
+订阅源：选择内置列表，或填入网址 / 本地文件 => Source: pick a built-in list, or type a URL / local file
+按 URL 过滤… => Filter by URL…
+URL => URL
+健康度 => Health
+最后探测 => Last announce
+来源 => Source
+内置 => Built-in
+手动 => Manual
+尚未同步 => Not synced yet
+● 可用 => ● reachable
+● 失败 => ● failed
+— 未知 => — unknown
+%1 / %2 个 Tracker（生效 %3 个） => %1 / %2 trackers (%3 in use)
+%1 / %2 条黑名单 => %1 / %2 blacklist entries
+已同步 %1 个订阅源，共 %2 个 Tracker（生效 %3 个） => Synced %1 source(s), %2 trackers (%3 in use)
+已同步 %1 个订阅源（%2 个失败），共 %3 个 Tracker => Synced %1 source(s), %2 failed, %3 trackers
+订阅源获取失败：%1 => Source failed: %1
+点击从订阅源中移除：%1 => Click to remove this source: %1
+黑名单条目  × => Blacklist entries  ×
+清空黑名单（当前 %1 条） => Clear the blacklist (%1 entries)
+不是文本文件 => not a text file
+返回的不是文本列表 => did not return a text list
+已加入黑名单：%1 条 => Added %1 entry/entries to the blacklist
+订阅源合并后下发给所有 BitTorrent 任务；单个任务的 Tracker 在任务详情里编辑 => The merged sources are handed to every BitTorrent task; a single task's trackers are edited in the task details
+将选中的订阅源合并后追加到所有 BT 任务 => Append the selected sources, merged, to every BT task
+无法读取 => could not be read
+注入精选 Tracker => Inject curated trackers
+

@@ -1,13 +1,12 @@
-﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
  <!--
-   TrackerPage - everything about a torrent's trackers, and nothing else.
+   TrackerPage - the tracker manager.
 
-   It used to be the "BitTorrent" page: a second task list (torrents only), BT
-   statistics, its own add-torrent/add-magnet buttons and this editor. The list
-   duplicated the downloads page, which shows every task anyway - including
-   torrents - so what is left here is the part that has no other home. Adding a
-   .torrent or a magnet link lives next to the other ways of adding a download.
+   Two lists live here: the trackers handed to every BitTorrent task (fed from the
+   subscription sources below) and the blacklist that is filtered out of them.
+   Health is not probed from this machine: aria2 announces by itself and logs the
+   outcome, and that log is what the 健康度 / 最后探测 columns show.
  -->
  <class>BitTorrentPage</class>
  <widget class="QWidget" name="BitTorrentPage">
@@ -16,7 +15,7 @@
     <x>0</x>
     <y>0</y>
     <width>980</width>
-    <height>640</height>
+    <height>660</height>
    </rect>
   </property>
   <layout class="QVBoxLayout" name="rootLayout">
@@ -33,7 +32,7 @@
     <number>20</number>
    </property>
    <property name="spacing">
-    <number>16</number>
+    <number>14</number>
    </property>
    <item>
     <layout class="QHBoxLayout" name="headerLayout">
@@ -48,27 +47,61 @@
        <item>
         <widget class="QLabel" name="pageTitle">
          <property name="text">
-          <string>Tracker 编辑</string>
+          <string>Tracker</string>
          </property>
         </widget>
        </item>
        <item>
         <widget class="QLabel" name="pageSubtitle">
          <property name="text">
-          <string>这一份列表会下发给所有 BitTorrent 任务；单个任务的 Tracker 在任务详情里编辑</string>
+          <string>订阅源合并后下发给所有 BitTorrent 任务；单个任务的 Tracker 在任务详情里编辑</string>
          </property>
         </widget>
        </item>
       </layout>
      </item>
+     <item>
+      <spacer name="headerSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="FluentLineEdit" name="filterEdit">
+       <property name="minimumSize">
+        <size>
+         <width>240</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="placeholderText">
+        <string>按 URL 过滤…</string>
+       </property>
+      </widget>
+     </item>
     </layout>
    </item>
 
-   <!-- ======================== tracker editor ======================== -->
    <item>
-    <widget class="FluentCard" name="trackerCard">
-     <widget class="QWidget" name="trackerBody" native="true">
-      <layout class="QVBoxLayout" name="trackerBodyLayout">
+    <layout class="QHBoxLayout" name="tabLayout">
+     <property name="spacing">
+      <number>6</number>
+     </property>
+    </layout>
+   </item>
+
+   <!-- "Inject the selected trackers into every BT task" -->
+   <item>
+    <widget class="FluentCard" name="injectCard">
+     <widget class="QWidget" name="injectBody" native="true">
+      <layout class="QHBoxLayout" name="injectLayout">
        <property name="leftMargin">
         <number>0</number>
        </property>
@@ -82,92 +115,131 @@
         <number>0</number>
        </property>
        <property name="spacing">
-        <number>10</number>
+        <number>12</number>
        </property>
        <item>
-        <layout class="QHBoxLayout" name="trackerHeaderLayout">
+        <layout class="QVBoxLayout" name="injectTextLayout">
          <property name="spacing">
-          <number>8</number>
+          <number>2</number>
          </property>
          <item>
-          <widget class="QLabel" name="trackerTitle">
+          <widget class="QLabel" name="injectTitle">
            <property name="text">
-            <string>全局 Tracker 列表</string>
+            <string>注入精选 Tracker</string>
            </property>
           </widget>
          </item>
          <item>
-          <widget class="QLabel" name="trackerCountLabel">
+          <widget class="QLabel" name="injectHint">
            <property name="text">
-            <string>共 0 个 Tracker</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <spacer name="trackerHeaderSpacer">
-           <property name="orientation">
-            <enum>Qt::Horizontal</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>40</width>
-             <height>20</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-         <item>
-          <widget class="QLabel" name="trackerScopeLabel">
-           <property name="text">
-            <string>应用于所有 BitTorrent 任务</string>
+            <string>将选中的订阅源合并后追加到所有 BT 任务</string>
            </property>
           </widget>
          </item>
         </layout>
        </item>
        <item>
-        <widget class="QPlainTextEdit" name="trackerList">
-         <property name="minimumSize">
+        <spacer name="injectSpacer">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
           <size>
-           <width>0</width>
-           <height>240</height>
+           <width>40</width>
+           <height>20</height>
           </size>
          </property>
-         <property name="readOnly">
-          <bool>true</bool>
-         </property>
-         <property name="lineWrapMode">
-          <enum>QPlainTextEdit::NoWrap</enum>
-         </property>
-        </widget>
+        </spacer>
        </item>
        <item>
-        <widget class="QLabel" name="trackerHint">
-         <property name="text">
-          <string>该任务还没有 Tracker，添加后可以更快找到其他节点</string>
-         </property>
-         <property name="wordWrap">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <layout class="QHBoxLayout" name="trackerInputLayout">
-         <property name="spacing">
-          <number>8</number>
-         </property>
-         <item>
-          <widget class="FluentLineEdit" name="trackerEdit">
-           <property name="placeholderText">
-            <string>添加 Tracker：udp:// 或 https:// .../announce</string>
-           </property>
-          </widget>
-         </item>
-        </layout>
+        <widget class="FluentSwitch" name="injectSwitch"/>
        </item>
       </layout>
      </widget>
     </widget>
+   </item>
+
+   <!-- Source chips + the field that adds one -->
+   <item>
+    <widget class="QWidget" name="sourcesHost" native="true">
+     <layout class="QHBoxLayout" name="sourcesLayout">
+      <property name="leftMargin">
+       <number>0</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <property name="spacing">
+       <number>6</number>
+      </property>
+     </layout>
+    </widget>
+   </item>
+
+   <item>
+    <widget class="QTableWidget" name="trackerTable">
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>260</height>
+      </size>
+     </property>
+     <property name="editTriggers">
+      <set>QAbstractItemView::NoEditTriggers</set>
+     </property>
+     <property name="selectionBehavior">
+      <enum>QAbstractItemView::SelectRows</enum>
+     </property>
+     <property name="selectionMode">
+      <enum>QAbstractItemView::ExtendedSelection</enum>
+     </property>
+     <property name="showGrid">
+      <bool>false</bool>
+     </property>
+     <property name="wordWrap">
+      <bool>false</bool>
+     </property>
+     <attribute name="horizontalHeaderHighlightSections">
+      <bool>false</bool>
+     </attribute>
+     <attribute name="verticalHeaderVisible">
+      <bool>false</bool>
+     </attribute>
+    </widget>
+   </item>
+
+   <item>
+    <layout class="QHBoxLayout" name="bottomLayout">
+     <property name="spacing">
+      <number>8</number>
+     </property>
+     <item>
+      <widget class="QLabel" name="statusLabel">
+       <property name="text">
+        <string>尚未同步</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="bottomSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+    </layout>
    </item>
   </layout>
  </widget>
@@ -181,6 +253,11 @@
   <customwidget>
    <class>FluentLineEdit</class>
    <extends>QLineEdit</extends>
+   <header>ui/FluentInputs.h</header>
+  </customwidget>
+  <customwidget>
+   <class>FluentSwitch</class>
+   <extends>QAbstractButton</extends>
    <header>ui/FluentInputs.h</header>
   </customwidget>
  </customwidgets>

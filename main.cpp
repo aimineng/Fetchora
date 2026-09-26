@@ -1,8 +1,9 @@
-#include "Aria2Manager.h"
+﻿#include "Aria2Manager.h"
 #include "ClipboardHelper.h"
 #include "Logger.h"
 #include "NotificationManager.h"
 #include "SettingsManager.h"
+#include "TrackerSources.h"
 #include "TorrentUtils.h"
 #include "UpdateChecker.h"
 
@@ -417,6 +418,32 @@ int runTorrentSelfTest()
           !SettingsManager::builtInTrackers().isEmpty()
               && SettingsManager::builtInTrackers().first().startsWith(QLatin1String("udp://")),
           QStringLiteral("%1 trackers").arg(SettingsManager::builtInTrackers().size()));
+
+    // The tracker page subscribes to published lists; a duplicate id there would make
+    // two different chips write the same setting, and a missing URL would fetch nothing.
+    const QList<TrackerSource> catalogue = builtInTrackerSources();
+    QSet<QString> ids;
+    bool catalogueOk = !catalogue.isEmpty();
+    bool hasBlacklist = false;
+    for (const TrackerSource &source : catalogue) {
+        if (source.id.isEmpty() || source.name.isEmpty()
+            || !source.url.startsWith(QLatin1String("https://")) || ids.contains(source.id))
+            catalogueOk = false;
+        ids.insert(source.id);
+        if (source.blacklist)
+            hasBlacklist = true;
+    }
+    check(QStringLiteral("the subscription catalogue is complete"), catalogueOk,
+          QStringLiteral("%1 sources").arg(catalogue.size()));
+    // A custom entry is just a URL the user typed: it has to come back usable.
+    const TrackerSource custom = trackerSourceForId(QStringLiteral("https://example.com/list.txt"));
+    check(QStringLiteral("an unknown source id is accepted as a URL"),
+          custom.url == QStringLiteral("https://example.com/list.txt") && !custom.blacklist,
+          trackerSourceLabel(QStringLiteral("https://example.com/list.txt")));
+    check(QStringLiteral("the catalogue ships a blacklist source"), hasBlacklist,
+          QStringLiteral("blacklist sources: %1")
+              .arg(std::count_if(catalogue.begin(), catalogue.end(),
+                                 [](const TrackerSource &s) { return s.blacklist; })));
 
     if (failures > 0) {
         out() << "RESULT: " << failures << " torrent check(s) failed\n";
