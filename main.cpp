@@ -847,6 +847,9 @@ int main(int argc, char *argv[])
         {QStringLiteral("download"), 0},     {QStringLiteral("tracker"), 1},
         {QStringLiteral("history"), 2},      {QStringLiteral("createtorrent"), 3},
         {QStringLiteral("settings"), 4},     {QStringLiteral("about"), 5},
+        // The page used to be called "bittorrent"; a command line, a script or a
+        // shortcut written against that name should still land on it.
+        {QStringLiteral("bittorrent"), 1},
     };
 
     auto showPage = [nav, pageStack, pageIndex](const QString &key) {
