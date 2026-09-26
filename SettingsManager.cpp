@@ -1,4 +1,4 @@
-#include "SettingsManager.h"
+﻿#include "SettingsManager.h"
 
 #include <QCoreApplication>
 #include <QDebug>
@@ -559,6 +559,18 @@ QStringList SettingsManager::builtInTrackers()
     return list;
 }
 
+QStringList SettingsManager::blacklistTrackers() const
+{
+    QStringList out;
+    for (const QString &part : m_btTrackerBlacklist.split(QRegularExpression(QStringLiteral("[\\s,]+")),
+                                                          Qt::SkipEmptyParts)) {
+        const QString trimmed = part.trimmed();
+        if (!trimmed.isEmpty() && !out.contains(trimmed))
+            out << trimmed;
+    }
+    return out;
+}
+
 QStringList SettingsManager::effectiveTrackers() const
 {
     // The field accepts one tracker per line or a comma-separated list, because
@@ -576,6 +588,9 @@ IMPL_SETTING(QSTRING_PARAM, DhtEntryPoint, m_dhtEntryPoint, "dhtEntryPoint", dht
 IMPL_SETTING(QSTRING_PARAM, DhtEntryPoint6, m_dhtEntryPoint6, "dhtEntryPoint6", dhtEntryPoint6Changed)
 IMPL_SETTING(QSTRING_PARAM, DhtFilePath, m_dhtFilePath, "dhtFilePath", dhtFilePathChanged)
 IMPL_SETTING(QSTRING_PARAM, BtSaveMetadataFile, m_btSaveMetadataFile, "btSaveMetadataFile", btSaveMetadataFileChanged)
+IMPL_SETTING(QSTRING_PARAM, BtTrackerSources, m_btTrackerSources, "btTrackerSources", btTrackerSourcesChanged)
+IMPL_SETTING(QSTRING_PARAM, BtTrackerBlacklist, m_btTrackerBlacklist, "btTrackerBlacklist", btTrackerBlacklistChanged)
+IMPL_SETTING(BOOL_PARAM, BtTrackerInject, m_btTrackerInject, "btTrackerInject", btTrackerInjectChanged)
 
 // ---- seeding --------------------------------------------------------------
 IMPL_SETTING_RUNTIME(DOUBLE_PARAM, SeedRatio, m_seedRatio, "seedRatio", seedRatioChanged)

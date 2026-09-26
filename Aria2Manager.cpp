@@ -1,4 +1,4 @@
-#include "Aria2Manager.h"
+﻿#include "Aria2Manager.h"
 
 #include "Logger.h"
 
@@ -1412,7 +1412,7 @@ void Aria2Manager::addMagnet(const QString &magnet, const QVariantMap &options)
     // at add time. Without it the task relies on DHT alone, and a magnet that
     // finds no peer never even gets its metadata.
     if (!taskOptions.contains(QStringLiteral("bt-tracker"))) {
-        const QStringList trackers = m_settings->effectiveTrackers();
+        const QStringList trackers = effectiveTrackers();
         if (!trackers.isEmpty())
             taskOptions.insert(QStringLiteral("bt-tracker"), trackers.join(QLatin1Char(',')));
     }
@@ -2034,6 +2034,74 @@ void Aria2Manager::setGlobalTrackers(const QStringList &trackers)
 QStringList Aria2Manager::globalTrackers() const
 {
     return m_settings->effectiveTrackers();
+}
+
+QStringList Aria2Manager::effectiveTrackers() const
+{
+    // What actually goes to the engine: the configured list, plus whatever the
+    // subscriptions fetched, minus the blacklist. Everything downstream (addMagnet,
+    // new torrents, the global option) asks for this, so a blacklisted tracker
+    // cannot slip in through one path while being filtered on another.
+    QStringList out = m_settings->effectiveTrackers();
+    for (const QString &tracker : m_subscriptionTrackers) {
+        if (!out.contains(tracker))
+            out << tracker;
+    }
+    const QStringList blocked = m_settings->blacklistTrackers();
+    for (const QString &tracker : blocked)
+        out.removeAll(tracker);
+    return m_settings->btTrackerInject() ? out : m_settings->effectiveTrackers();
+}
+
+bool Aria2Manager::isTrackerBlacklisted(const QString &tracker) const
+{
+    return m_settings->blacklistTrackers().contains(tracker);
+}
+
+// The fetched subscription lists live for the session: they are refetched on sync.
+static QStringList s_unused;
+
+void Aria2Manager::setSubscriptionTrackers(const QStringList &trackers)
+{
+    if (m_subscriptionTrackers == trackers)
+        return;
+    m_subscriptionTrackers = trackers;
+    applyGlobalOptions({{QStringLiteral("bt-tracker"), effectiveTrackers().join(QLatin1Char(','))}});
+    emit trackerSubscriptionsChanged();
+}
+
+QVariantMap Aria2Manager::trackerHealth() const
+{
+    // aria2 announces by itself and logs the outcome, so the health of a tracker is
+    // read from those lines rather than by probing third-party servers from here.
+    // Keys are tracker URLs, values carry {"ok": bool, "lastSeen": epoch seconds}.
+    QVariantMap health;
+    const QRegularExpression line(
+        QStringLiteral("(Announce(?:d)?[^\\s]*\\s+(?:to|successfully to)?\\s*|Failed to announce to\\s+"
+                       "|announce error[^\\s]*\\s+)((?:udp|https?|wss?)://\\S+)"));
+    const QRegularExpression failed(QStringLiteral("Failed|error|timeout|unreachable"),
+                                    QRegularExpression::CaseInsensitiveOption);
+    const QStringList lines = engineLog().split(QLatin1Char('\n'), Qt::SkipEmptyParts);
+    for (const QString &text : lines) {
+        if (text.isEmpty())
+            continue;
+        auto match = line.match(text);
+        while (match.hasMatch()) {
+            QString url = match.captured(2);
+            while (url.endsWith(QLatin1Char('.')) || url.endsWith(QLatin1Char(','))
+                   || url.endsWith(QLatin1Char(')')))
+                url.chop(1);
+            QVariantMap entry = health.value(url).toMap();
+            const bool bad = failed.match(text).hasMatch();
+            // A failure only overwrites a success when it is newer, and the log is
+            // read oldest-first, so the last line about a tracker wins.
+            entry[QStringLiteral("ok")] = !bad;
+            entry[QStringLiteral("lastSeen")] = QDateTime::currentSecsSinceEpoch();
+            health[url] = entry;
+            match = line.match(text, match.capturedEnd());
+        }
+    }
+    return health;
 }
 
 void Aria2Manager::addTrackers(const QString &gid, const QStringList &trackers)

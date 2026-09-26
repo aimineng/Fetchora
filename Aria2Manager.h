@@ -1,4 +1,4 @@
-#ifndef ARIA2MANAGER_H
+﻿#ifndef ARIA2MANAGER_H
 #define ARIA2MANAGER_H
 
 #include <QObject>
@@ -177,6 +177,13 @@ public:
     /// The list every BitTorrent task is given (empty = the built-in one).
     Q_INVOKABLE QStringList globalTrackers() const;    /// Replaces that list: stored in the settings and pushed to the running engine.
     Q_INVOKABLE void setGlobalTrackers(const QStringList &trackers);
+    /// Trackers fetched from the subscription sources (not stored, refetched on sync).
+    Q_INVOKABLE void setSubscriptionTrackers(const QStringList &trackers);
+    /// Configured + fetched, minus the blacklist: what the engine is actually given.
+    Q_INVOKABLE QStringList effectiveTrackers() const;
+    Q_INVOKABLE bool isTrackerBlacklisted(const QString &tracker) const;
+    /// Per-tracker announce outcome read from the engine log: url -> {ok, lastSeen}.
+    Q_INVOKABLE QVariantMap trackerHealth() const;
 
     // ==================================================================== utils
     Q_INVOKABLE static QString formatSize(double bytes);
@@ -189,6 +196,8 @@ public:
 signals:
     void tasksChanged();
     void viewChanged();
+    void trackerSubscriptionsChanged();
+
     void statisticsChanged();
     void sessionInfoChanged();
     void globalOptionsChanged();
@@ -379,6 +388,8 @@ private:
     QString m_detailGid;
     QString m_engineError;
     QString m_engineLog;
+    /// Trackers fetched from the subscription sources; refetched on every sync.
+    QStringList m_subscriptionTrackers;
     QString m_rpcLog;
     QString m_lastClipboardUri;
 

@@ -1,4 +1,4 @@
-#ifndef SETTINGSMANAGER_H
+﻿#ifndef SETTINGSMANAGER_H
 #define SETTINGSMANAGER_H
 
 #include <QObject>
@@ -343,6 +343,9 @@ public:
     Q_PROPERTY(int dhtMessageTimeout READ dhtMessageTimeout WRITE setDhtMessageTimeout NOTIFY dhtMessageTimeoutChanged)
     Q_PROPERTY(QString btExternalIp READ btExternalIp WRITE setBtExternalIp NOTIFY btExternalIpChanged)
     Q_PROPERTY(QString btTracker READ btTracker WRITE setBtTracker NOTIFY btTrackerChanged)
+    Q_PROPERTY(QString btTrackerSources READ btTrackerSources WRITE setBtTrackerSources NOTIFY btTrackerSourcesChanged)
+    Q_PROPERTY(QString btTrackerBlacklist READ btTrackerBlacklist WRITE setBtTrackerBlacklist NOTIFY btTrackerBlacklistChanged)
+    Q_PROPERTY(bool btTrackerInject READ btTrackerInject WRITE setBtTrackerInject NOTIFY btTrackerInjectChanged)
     Q_PROPERTY(QString dhtEntryPoint READ dhtEntryPoint WRITE setDhtEntryPoint NOTIFY dhtEntryPointChanged)
     Q_PROPERTY(QString dhtEntryPoint6 READ dhtEntryPoint6 WRITE setDhtEntryPoint6 NOTIFY dhtEntryPoint6Changed)
     Q_PROPERTY(QString dhtFilePath READ dhtFilePath WRITE setDhtFilePath NOTIFY dhtFilePathChanged)
@@ -397,12 +400,24 @@ public:
     QString btExternalIp() const { return m_btExternalIp; }
     void setBtExternalIp(const QString &v);
     QString btTracker() const { return m_btTracker; }
+    /// Subscription sources for the tracker page: the ids of the built-in lists
+    /// ("ngosang-best") or any http(s)/local URL, comma separated.
+    QString btTrackerSources() const { return m_btTrackerSources; }
+    void setBtTrackerSources(const QString &v);
+    /// Trackers that must never be handed to the engine, one per line.
+    QString btTrackerBlacklist() const { return m_btTrackerBlacklist; }
+    void setBtTrackerBlacklist(const QString &v);
+    /// Whether the fetched subscription lists are injected into every BT task.
+    bool btTrackerInject() const { return m_btTrackerInject; }
+    void setBtTrackerInject(bool v);
     void setBtTracker(const QString &v);
     /// The tracker list actually used: what the user configured, or the built-in
     /// list when that field is empty. A magnet link carries no trackers of its own
     /// and aria2's DHT alone is not enough to find peers everywhere, so "no
     /// trackers at all" would mean "a magnet that never downloads".
     QStringList effectiveTrackers() const;
+    /// The blacklist as a list: trackers that must never be handed to the engine.
+    QStringList blacklistTrackers() const;
     /// The list that ships with the app (see SettingsManager.cpp).
     static QStringList builtInTrackers();
     QString dhtEntryPoint() const { return m_dhtEntryPoint; }
@@ -614,6 +629,9 @@ signals:
     void dhtMessageTimeoutChanged();
     void btExternalIpChanged();
     void btTrackerChanged();
+    void btTrackerSourcesChanged();
+    void btTrackerBlacklistChanged();
+    void btTrackerInjectChanged();
     void dhtEntryPointChanged();
     void dhtEntryPoint6Changed();
     void dhtFilePathChanged();
@@ -777,6 +795,9 @@ private:
     int m_dhtMessageTimeout = 10;
     QString m_btExternalIp;
     QString m_btTracker;
+    QString m_btTrackerSources;
+    QString m_btTrackerBlacklist;
+    bool m_btTrackerInject = true;
     QString m_dhtEntryPoint;
     QString m_dhtEntryPoint6;
     QString m_dhtFilePath;
