@@ -26,6 +26,10 @@
 
 #include <QActionGroup>
 #include <QApplication>
+#include <QEventLoop>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
 #include <QCommandLineParser>
 #include <QDir>
 #include <QFileDialog>
@@ -453,6 +457,66 @@ int runTorrentSelfTest()
     return 0;
 }
 
+/**
+ * Headless tracker sync (-—sync-trackers): fetches every subscription source, merges
+ * what came back, drops the blacklist and stores the result. It is what the page's
+ * "Sync now" button does, without a window - which is also how it gets tested and
+ * how a script can refresh the list before starting a download.
+ */
+int runTrackerSync(SettingsManager &settings)
+{
+    QStringList ids;
+    for (const QString &part : settings.btTrackerSources().split(
+             QRegularExpression(QStringLiteral("[\\s,]+")), Qt::SkipEmptyParts)) {
+        if (!ids.contains(part))
+            ids << part;
+    }
+    if (ids.isEmpty()) {
+        out() << "no subscription sources configured; nothing to sync\n";
+        return 0;
+    }
+
+    QNetworkAccessManager nam;
+    QStringList merged;
+    int failed = 0;
+    for (const QString &id : ids) {
+        const TrackerSource source = trackerSourceForId(id);
+        QNetworkRequest request{QUrl(source.url)};
+        request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                             QNetworkRequest::NoLessSafeRedirectPolicy);
+        request.setTransferTimeout(20000);
+        QNetworkReply *reply = nam.get(request);
+        QEventLoop loop;
+        QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+        loop.exec();
+        if (reply->error() != QNetworkReply::NoError) {
+            out() << "  failed  " << source.name << ": " << reply->errorString() << '\n';
+            ++failed;
+        } else {
+            const TrackerList::ParseResult parsed = TrackerList::parse(reply->readAll());
+            int added = 0;
+            for (const QString &tracker : parsed.trackers) {
+                if (!merged.contains(tracker)) {
+                    merged << tracker;
+                    ++added;
+                }
+            }
+            out() << "  ok      " << source.name << ": " << parsed.trackers.size()
+                  << " trackers (" << added << " new, " << parsed.rejected << " lines skipped)\n";
+        }
+        reply->deleteLater();
+    }
+
+    const QStringList blocked = settings.blacklistTrackers();
+    for (const QString &tracker : blocked)
+        merged.removeAll(tracker);
+    settings.setBtTracker(merged.join(QLatin1Char(',')));
+
+    out() << "RESULT: " << ids.size() << " source(s), " << failed << " failed, " << merged.size()
+          << " trackers kept (" << blocked.size() << " blacklisted)\n";
+    return failed == 0 ? 0 : 7;
+}
+
 int runSelfTest(SettingsManager &settings)
 {
     // Deterministic and engine-free, so it runs first - and on every platform,
@@ -662,6 +726,7 @@ int main(int argc, char *argv[])
                                            QStringLiteral("ms"));
     QCommandLineOption pageOption(QStringLiteral("page"),
                                   QStringLiteral("Open on this page (download, tracker, ...)."),
+    QStringLiteral("Fetch every tracker subscription source, apply it and exit."),
                                   QStringLiteral("key"));
     QCommandLineOption detailSectionOption(QStringLiteral("detail"),
                                            QStringLiteral("Section of the task inspector to open "
@@ -696,6 +761,12 @@ int main(int argc, char *argv[])
     parser.addOption(framesOption);
     parser.addOption(frameIntervalOption);
     parser.addOption(pageOption);
+    QCommandLineOption trackerTabOption(QStringList{QStringLiteral("tracker-tab")},
+                                       QStringLiteral("Open the tracker page on effective|blacklist."),
+                                       QStringLiteral("tab"));
+    parser.addOption(trackerTabOption);
+    QCommandLineOption syncOption(QStringList{QStringLiteral("sync-trackers")});
+    parser.addOption(syncOption);
     parser.addOption(detailSectionOption);
     parser.addOption(selfTestOption);
     parser.addOption(makeTorrentOption);
@@ -713,6 +784,10 @@ int main(int argc, char *argv[])
     // --------------------------------------------------- headless entry points
     // Handled before anything else so the self-tests never touch the settings
     // file, start an engine or create a window.
+    if (parser.isSet(syncOption)) {
+        SettingsManager probe;
+        return runTrackerSync(probe);
+    }
     if (parser.isSet(selfTestOption)) {
         SettingsManager probe;
         return runSelfTest(probe);
@@ -947,6 +1022,13 @@ int main(int argc, char *argv[])
                      [toasts](const QString &text, bool isError) {
                          toasts->push(text, isError ? ToastHost::Error : ToastHost::Success);
                      });
+    // --tracker-tab: which of the two lists the page opens on (handy in scripts and
+    // for screenshots; the buttons do the same thing interactively).
+    if (parser.isSet(trackerTabOption))
+        btPage->setTab(parser.value(trackerTabOption) == QLatin1String("blacklist")
+                           ? BitTorrentPage::Blacklist
+                           : BitTorrentPage::Effective);
+
     QObject::connect(btPage, &BitTorrentPage::toast, &window,
                      [toasts](const QString &text, bool isError) {
                          toasts->push(text, isError ? ToastHost::Error : ToastHost::Success);

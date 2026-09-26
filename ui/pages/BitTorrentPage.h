@@ -36,6 +36,11 @@ public:
     explicit BitTorrentPage(Aria2Manager *aria2, QWidget *parent = nullptr);
     ~BitTorrentPage() override;
 
+    /// Which of the two lists the page is showing.
+    enum Tab { Effective = 0, Blacklist };
+    /// Opens the page on one of them (also what the tab buttons do).
+    void setTab(Tab tab);
+
 public slots:
     /// Re-reads the settings, the table and the health column.
     void refresh();
@@ -49,15 +54,11 @@ protected:
     void changeEvent(QEvent *event) override;
 
 private:
-    /// Which of the two lists the page is showing.
-    enum Tab { Effective = 0, Blacklist };
-
     void buildTabs();
     void buildSources();
     void buildTable();
     void wireManager();
 
-    void setTab(Tab tab);
     void rebuildChips();
     void rebuildTable();
     void applyEffectiveList();

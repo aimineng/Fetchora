@@ -240,6 +240,11 @@ void SettingsManager::loadSettings()
     m_btExternalIp = get("btExternalIp", "").toString();
     // Empty means "use the list that ships with the app" - see effectiveTrackers().
     m_btTracker = get("btTracker", "").toString();
+    // Subscription sources for the tracker page ("" = none configured yet), the
+    // trackers to filter out, and whether the fetched lists are injected at all.
+    m_btTrackerSources = get("btTrackerSources", "").toString();
+    m_btTrackerBlacklist = get("btTrackerBlacklist", "").toString();
+    m_btTrackerInject = get("btTrackerInject", true).toBool();
     m_dhtEntryPoint = get("dhtEntryPoint", "").toString();
     m_dhtEntryPoint6 = get("dhtEntryPoint6", "").toString();
     // Our own file rather than aria2's default (~/.cache/aria2/dht.dat): that one
@@ -754,7 +759,10 @@ QStringList SettingsManager::buildAria2Arguments() const
     addBool(QStringLiteral("pause"), false);
 
     // ---- console noise: keep the engine log readable
-    add(QStringLiteral("console-log-level"), QStringLiteral("warn"));
+    // Notice, not warn: the tracker page's 健康度 / 最后探测 columns are read from
+    // aria2's own announce results, and those are logged at notice level. The file
+    // log stays at warn - it is meant for problems, not for chatter.
+    add(QStringLiteral("console-log-level"), QStringLiteral("notice"));
     add(QStringLiteral("log-level"), QStringLiteral("warn"));
     addNum(QStringLiteral("summary-interval"), 0);
     addBool(QStringLiteral("show-console-readout"), false);
