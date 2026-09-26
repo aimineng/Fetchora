@@ -303,6 +303,27 @@ This validates the things that fail silently in a download manager:
 A failing check is printed with the exit code that says which group it came from: 5 is the
 update logic, 2–4 are the engine checks.
 
+### Engine checks
+
+`--self-test` never starts a window or downloads anything, which is on purpose: it runs on
+machines with no desktop. The things that only break in a real session are covered by
+`tools/check-engine-supervision.ps1`, which CI runs on Windows against the built app:
+
+| Check | What it proves |
+| --- | --- |
+| 1 | Starting the app starts the engine. |
+| 2 | Killing the engine makes the app start a new one. |
+| 2b | A download that was running is handed back to the replacement, with its partial data — not declared complete. |
+| 2d | Pausing and resuming keeps downloading instead of finishing on the spot. |
+| 2c | A task the app was told to remove stays removed, poll after poll. |
+| 2e | Asking for the same link twice downloads a second copy (`name (2).ext`). |
+| 3 | Killing the app hard takes the engine with it (no orphaned downloader). |
+
+Pass `-DownloadUrl` and `-SmallDownloadUrl` (served by `tools/testsrv.js`) to enable 2b–2e;
+without them only the process checks run. CI also renders every page to a PNG with
+`--screenshot` and uploads the images — a paint-time crash is invisible to a self-test that
+never draws anything.
+
 ## Translations
 
 The source language is **Simplified Chinese**; English ships as a compiled catalogue.
