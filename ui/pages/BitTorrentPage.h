@@ -67,6 +67,8 @@ public:
 
 private:
     void rebuildChips();
+    /// The field frame (chips live inside it, so the container draws the border).
+    QString sourceFieldStyle() const;
     /// Adds one source (or one blacklist entry, depending on the tab).
     void addSource(const QString &id);
     /// Drops the catalogue out of the source field.

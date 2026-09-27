@@ -761,12 +761,16 @@
       <translation>Click to remove this source: %1</translation>
     </message>
     <message>
-      <source>黑名单条目  ×</source>
-      <translation>Blacklist entries  ×</translation>
+      <source>%1 条黑名单  ×</source>
+      <translation>%1 blacklist entries  ×</translation>
     </message>
     <message>
-      <source>清空黑名单（当前 %1 条）</source>
-      <translation>Clear the blacklist (%1 entries)</translation>
+      <source>清空黑名单</source>
+      <translation>Clear the blacklist</translation>
+    </message>
+    <message>
+      <source>黑名单：填入要屏蔽的 Tracker 地址</source>
+      <translation>Blacklist: type the tracker address to block</translation>
     </message>
     <message>
       <source>无法读取</source>
@@ -1894,10 +1898,6 @@ Info Hash %2 · Size %3</translation>
       <translation>Built-in</translation>
     </message>
     <message>
-      <source>黑名单</source>
-      <translation>Blacklist</translation>
-    </message>
-    <message>
       <source>点击取消订阅</source>
       <translation>Click to unsubscribe</translation>
     </message>
@@ -1908,6 +1908,10 @@ Info Hash %2 · Size %3</translation>
     <message>
       <source>自定义</source>
       <translation>Custom</translation>
+    </message>
+    <message>
+      <source>没有匹配的列表，可在下面直接填入地址</source>
+      <translation>Nothing matches; type an address below</translation>
     </message>
   </context>
   <context>

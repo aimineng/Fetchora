@@ -141,4 +141,8 @@ URL => URL
 点击取消订阅 => Click to unsubscribe
 订阅源：点击选择内置列表，或填入网址 / 本地文件 => Source: click to pick a built-in list, or type a URL / local file
 自定义 => Custom
+没有匹配的列表，可在下面直接填入地址 => Nothing matches; type an address below
+%1 条黑名单  × => %1 blacklist entries  ×
+清空黑名单 => Clear the blacklist
+黑名单：填入要屏蔽的 Tracker 地址 => Blacklist: type the tracker address to block
 

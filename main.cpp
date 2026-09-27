@@ -1,4 +1,4 @@
-#include "Aria2Manager.h"
+﻿#include "Aria2Manager.h"
 #include "ClipboardHelper.h"
 #include "Logger.h"
 #include "NotificationManager.h"
@@ -1081,7 +1081,7 @@ int main(int argc, char *argv[])
                            : BitTorrentPage::Effective);
 
     if (parser.isSet(popupOption))
-        QTimer::singleShot(600, btPage, [btPage]() { btPage->showSourcePopup(); });
+        QTimer::singleShot(3000, btPage, [btPage]() { btPage->showSourcePopup(); });
 
     QObject::connect(btPage, &BitTorrentPage::toast, &window,
                      [toasts](const QString &text, bool isError) {

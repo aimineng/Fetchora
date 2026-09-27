@@ -1,4 +1,4 @@
-#include "ui/pages/BitTorrentPage.h"
+﻿#include "ui/pages/BitTorrentPage.h"
 
 #include "Aria2Manager.h"
 #include "SettingsManager.h"
@@ -77,8 +77,9 @@ public:
         connect(FluentTheme::instance(), &FluentTheme::changed, this, [this]() { restyle(); });
     }
 
-    /// Rows for the catalogue, each marked subscribed or not; `filter` narrows them.
-    void rebuild(const QStringList &subscribed, const QString &filter)
+    /// Rows for `wanted` kind of list, each marked subscribed or not; `filter` narrows
+    /// them down and the popup shrinks to what is left.
+    void rebuild(const QStringList &subscribed, const QString &filter, bool blacklistTab)
     {
         while (QLayoutItem *item = m_listLayout->takeAt(0)) {
             if (QWidget *widget = item->widget())
@@ -86,7 +87,10 @@ public:
             delete item;
         }
         const QString needle = filter.trimmed().toLower();
+        int rows = 0;
         for (const TrackerSource &source : builtInTrackerSources()) {
+            if (source.blacklist != blacklistTab)
+                continue;
             const QString haystack = (source.name + QLatin1Char(' ') + source.id).toLower();
             if (!needle.isEmpty() && !haystack.contains(needle))
                 continue;
@@ -95,10 +99,7 @@ public:
             badges << QObject::tr("内置");
             if (source.cdn)
                 badges << QStringLiteral("CDN");
-            if (source.blacklist)
-                badges << QObject::tr("黑名单");
-            QString text = source.name + QStringLiteral("    ")
-                + badges.join(QStringLiteral(" · "));
+            QString text = source.name + QStringLiteral("    ") + badges.join(QStringLiteral(" · "));
             if (on)
                 text += QStringLiteral("    ✓");
 
@@ -114,13 +115,13 @@ public:
                     onPick(id);
             });
             m_listLayout->addWidget(row);
+            ++rows;
         }
 
-        // A custom entry that is already configured still deserves a row, otherwise
-        // the popup looks like it lost it.
+        // Custom entries are listed too, otherwise the popup looks like it lost them.
         for (const QString &id : subscribed) {
             if (trackerSourceForId(id).url != id)
-                continue;   // a built-in id: already listed above
+                continue;   // a built-in id: already covered above
             if (!needle.isEmpty() && !id.toLower().contains(needle))
                 continue;
             auto *row = new FluentButton(m_list);
@@ -135,9 +136,22 @@ public:
                     onPick(id);
             });
             m_listLayout->addWidget(row);
+            ++rows;
+        }
+
+        if (rows == 0) {
+            auto *none = new QLabel(QObject::tr("没有匹配的列表，可在下面直接填入地址"), m_list);
+            none->setProperty("fluentRole", "tertiary");
+            m_listLayout->addWidget(none);
         }
         m_listLayout->addStretch(1);
+
+        // Height follows the rows that survived the filter: with two matches the
+        // popup is two rows tall, not as tall as it was for five.
         setFixedWidth(440);
+        setMaximumHeight(320);
+        adjustSize();
+        setFixedHeight(qMin(sizeHint().height(), 320));
     }
 
     std::function<void(const QString &)> onPick;
@@ -297,13 +311,22 @@ void BitTorrentPage::buildSources()
 
     connect(m_sourceEdit, &QLineEdit::textEdited, this, [this](const QString &text) {
         if (m_sourcePopup->isVisible())
-            m_sourcePopup->rebuild(sources(), text);
+            m_sourcePopup->rebuild(m_tab == Blacklist ? blacklist() : sources(), text,
+                                   m_tab == Blacklist);
     });
     connect(m_sourceEdit, &QLineEdit::returnPressed, this, [this]() {
         const QString text = m_sourceEdit->text().trimmed();
         if (!text.isEmpty())
             addSource(text);
     });
+    // The chips live inside the field, so it has to look like a field: the edit
+    // itself is borderless and the container draws the frame.
+    ui->sourcesHost->setObjectName(QStringLiteral("sourceField"));
+    ui->sourcesHost->setAttribute(Qt::WA_StyledBackground, true);
+    ui->sourcesHost->installEventFilter(this);
+    m_sourceEdit->setFrame(false);
+    m_sourceEdit->setStyleSheet(
+        QStringLiteral("QLineEdit { background: transparent; border: none; }"));
 
     rebuildChips();
 }
@@ -332,25 +355,29 @@ void BitTorrentPage::showSourcePopup()
 {
     if (!m_sourcePopup || !m_sourceEdit)
         return;
-    m_sourcePopup->rebuild(sources(), m_sourceEdit->text());
-    m_sourcePopup->adjustSize();
-    const QPoint below = m_sourceEdit->mapToGlobal(QPoint(0, m_sourceEdit->height() + 4));
+    m_sourcePopup->rebuild(m_tab == Blacklist ? blacklist() : sources(), m_sourceEdit->text(),
+                           m_tab == Blacklist);
+    const QPoint below = ui->sourcesHost->mapToGlobal(QPoint(0, ui->sourcesHost->height() + 4));
     m_sourcePopup->move(below);
     m_sourcePopup->show();
 }
 
 bool BitTorrentPage::eventFilter(QObject *watched, QEvent *event)
 {
-    if (watched == m_sourceEdit) {
-        // Mouse press rather than focus-in: clicking the field again should re-open
-        // the list even when it already has the focus.
-        if (event->type() == QEvent::MouseButtonPress
-            || event->type() == QEvent::FocusIn) {
-            showSourcePopup();
-            if (event->type() == QEvent::MouseButtonPress
-                && m_sourcePopup->isVisible())
-                return true;   // the popup takes it from here
+    // Clicking the field (or the chips' container) toggles the list, the way a combo
+    // box does: click once to drop it down, click again to put it away. Reacting to
+    // the press instead of the focus is what makes it work the second time, when the
+    // field already has the focus and no FocusIn event would arrive.
+    if (watched == m_sourceEdit || watched == ui->sourcesHost) {
+        if (event->type() == QEvent::MouseButtonPress) {
+            if (m_sourcePopup && m_sourcePopup->isVisible())
+                m_sourcePopup->hide();
+            else
+                showSourcePopup();
+            return true;
         }
+        if (event->type() == QEvent::FocusIn && m_sourcePopup && !m_sourcePopup->isVisible())
+            showSourcePopup();
     }
     return QWidget::eventFilter(watched, event);
 }
@@ -452,12 +479,17 @@ void BitTorrentPage::rebuildChips()
             layout->addWidget(chip);
         }
     } else {
-        auto *chip = new FluentButton(m_chipsHost);
-        chip->setText(tr("黑名单条目  ×"));
-        chip->setRole(FluentButton::Subtle);
-        chip->setTooltipText(tr("清空黑名单（当前 %1 条）").arg(blacklist().size()));
-        connect(chip, &QPushButton::clicked, this, [this]() { setBlacklist({}); });
-        layout->addWidget(chip);
+        // The blacklist tab shows what is blocked, not subscriptions: one chip per
+        // entry would be a wall of chips, so it shows the count and clears them.
+        const QStringList blocked = blacklist();
+        if (!blocked.isEmpty()) {
+            auto *chip = new FluentButton(m_chipsHost);
+            chip->setText(tr("%1 条黑名单  ×").arg(blocked.size()));
+            chip->setRole(FluentButton::Subtle);
+            chip->setTooltipText(tr("清空黑名单"));
+            connect(chip, &QPushButton::clicked, this, [this]() { setBlacklist({}); });
+            layout->addWidget(chip);
+        }
     }
 
     layout->addWidget(m_sourceEdit, 1);
@@ -470,8 +502,24 @@ void BitTorrentPage::setTab(Tab tab)
     m_effectiveTab->setChecked(effective);
     m_blacklistTab->setChecked(!effective);
     ui->injectCard->setVisible(effective);
+    // The two tabs are two different fields: one takes lists to use, the other takes
+    // trackers to avoid. Same widget, different question - and it says which.
+    m_sourceEdit->setPlaceholderText(effective
+                                         ? tr("订阅源：点击选择内置列表，或填入网址 / 本地文件")
+                                         : tr("黑名单：填入要屏蔽的 Tracker 地址"));
+    m_sourceEdit->clear();
+    ui->sourcesHost->setStyleSheet(sourceFieldStyle());
     rebuildChips();
     rebuildTable();
+}
+
+QString BitTorrentPage::sourceFieldStyle() const
+{
+    const FluentTheme *t = FluentTheme::instance();
+    return QStringLiteral("QWidget#sourceField { background: %1; border: 1px solid %2;"
+                          " border-radius: %3px; }")
+        .arg(t->controlFill().name(), t->strokeSubtle().name())
+        .arg(FluentTheme::RadiusMedium);
 }
 
 // --------------------------------------------------------------------- syncing
