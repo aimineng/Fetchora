@@ -1,4 +1,4 @@
-#ifndef BITTORRENTPAGE_H
+﻿#ifndef BITTORRENTPAGE_H
 #define BITTORRENTPAGE_H
 
 #include <QHash>
@@ -52,6 +52,8 @@ signals:
 
 protected:
     void changeEvent(QEvent *event) override;
+    /// The source field opens its popup on click and filters it while typing.
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     void buildTabs();
@@ -59,7 +61,15 @@ private:
     void buildTable();
     void wireManager();
 
+public:
+    /// Drops the catalogue out of the source field (--tracker-popup uses it).
+    void showSourcePopup();
+
+private:
     void rebuildChips();
+    /// Adds one source (or one blacklist entry, depending on the tab).
+    void addSource(const QString &id);
+    /// Drops the catalogue out of the source field.
     void rebuildTable();
     void applyEffectiveList();
     void addFromInput();
@@ -86,8 +96,8 @@ private:
     FluentButton *m_syncButton = nullptr;
 
     QWidget *m_chipsHost = nullptr;      ///< the row of source chips
-    class QComboBox *m_sourceEdit = nullptr;
-    FluentButton *m_sourceAdd = nullptr;
+    class FluentLineEdit *m_sourceEdit = nullptr;
+    class SourcePopup *m_sourcePopup = nullptr;
     QLabel *m_countLabel = nullptr;
 
     /// What each source returned: source id -> tracker URLs.

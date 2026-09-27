@@ -753,12 +753,9 @@
       <translation>Sync now</translation>
     </message>
     <message>
-      <source>订阅源：选择内置列表，或填入网址 / 本地文件</source>
-      <translation>Source: pick a built-in list, or type a URL / local file</translation>
-    </message>
-    <message>
-      <source>添加订阅源</source>
-      <translation>Add source</translation>
+      <source>订阅源：点击选择内置列表，或填入网址 / 本地文件</source>
+      <translation>
+      </translation>
     </message>
     <message>
       <source>点击从订阅源中移除：%1</source>
@@ -843,10 +840,6 @@
     <message>
       <source>已加入黑名单：%1 条</source>
       <translation>Added %1 entry/entries to the blacklist</translation>
-    </message>
-    <message>
-      <source>把上面的订阅源加入列表并立即同步</source>
-      <translation>Add the source above to the list and sync it now</translation>
     </message>
     <message>
       <source>Tracker</source>
@@ -1896,6 +1889,29 @@ Info Hash %2 · Size %3</translation>
     <message>
       <source>跟随系统</source>
       <translation>Follow system</translation>
+    </message>
+    <message>
+      <source>内置</source>
+      <translation>Built-in</translation>
+    </message>
+    <message>
+      <source>黑名单</source>
+      <translation>Blacklist</translation>
+    </message>
+    <message>
+      <source>点击取消订阅</source>
+      <translation>
+      </translation>
+    </message>
+    <message>
+      <source>点击订阅并同步</source>
+      <translation>
+      </translation>
+    </message>
+    <message>
+      <source>自定义</source>
+      <translation>
+      </translation>
     </message>
   </context>
   <context>

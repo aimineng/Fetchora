@@ -11,6 +11,7 @@
 #include "ui/pages/ui_BitTorrentPage.h"
 
 #include <QComboBox>
+#include <functional>
 #include <QCompleter>
 #include <QDateTime>
 #include <QFile>
@@ -29,7 +30,149 @@
 #include <QUrl>
 #include <QVBoxLayout>
 
+class SourcePopup : public QFrame
+{
+public:
+    explicit SourcePopup(QWidget *parent)
+        : QFrame(parent, Qt::Popup)
+    {
+        setObjectName(QStringLiteral("sourcePopup"));
+        setAttribute(Qt::WA_StyledBackground, true);
+
+        auto *root = new QVBoxLayout(this);
+        root->setContentsMargins(8, 8, 8, 8);
+        root->setSpacing(6);
+
+        m_list = new QWidget(this);
+        m_listLayout = new QVBoxLayout(m_list);
+        m_listLayout->setContentsMargins(0, 0, 0, 0);
+        m_listLayout->setSpacing(2);
+        root->addWidget(m_list, 1);
+
+        auto *custom = new QWidget(this);
+        auto *customLayout = new QHBoxLayout(custom);
+        customLayout->setContentsMargins(0, 0, 0, 0);
+        customLayout->setSpacing(6);
+        m_url = new FluentLineEdit(custom);
+        m_url->setPlaceholderText(QStringLiteral("https://example.com/list.txt"));
+        customLayout->addWidget(m_url, 1);
+        m_add = new FluentButton(custom);
+        m_add->setGlyph(FluentTheme::Glyph::Add);
+        m_add->setIconOnly(true);
+        m_add->setRole(FluentButton::Standard);
+        customLayout->addWidget(m_add);
+        root->addWidget(custom);
+
+        auto submitCustom = [this]() {
+            const QString text = m_url->text().trimmed();
+            if (text.isEmpty() || !onCustom)
+                return;
+            hide();
+            onCustom(text);
+        };
+        connect(m_add, &QPushButton::clicked, this, submitCustom);
+        connect(m_url, &QLineEdit::returnPressed, this, submitCustom);
+
+        restyle();
+        connect(FluentTheme::instance(), &FluentTheme::changed, this, [this]() { restyle(); });
+    }
+
+    /// Rows for the catalogue, each marked subscribed or not; `filter` narrows them.
+    void rebuild(const QStringList &subscribed, const QString &filter)
+    {
+        while (QLayoutItem *item = m_listLayout->takeAt(0)) {
+            if (QWidget *widget = item->widget())
+                widget->deleteLater();
+            delete item;
+        }
+        const QString needle = filter.trimmed().toLower();
+        for (const TrackerSource &source : builtInTrackerSources()) {
+            const QString haystack = (source.name + QLatin1Char(' ') + source.id).toLower();
+            if (!needle.isEmpty() && !haystack.contains(needle))
+                continue;
+            const bool on = subscribed.contains(source.id);
+            QStringList badges;
+            badges << QObject::tr("内置");
+            if (source.cdn)
+                badges << QStringLiteral("CDN");
+            if (source.blacklist)
+                badges << QObject::tr("黑名单");
+            QString text = source.name + QStringLiteral("    ")
+                + badges.join(QStringLiteral(" · "));
+            if (on)
+                text += QStringLiteral("    ✓");
+
+            auto *row = new FluentButton(m_list);
+            row->setText(text);
+            row->setRole(FluentButton::Subtle);
+            row->setCheckable(true);
+            row->setChecked(on);
+            row->setTooltipText(on ? QObject::tr("点击取消订阅") : QObject::tr("点击订阅并同步"));
+            connect(row, &QPushButton::clicked, this, [this, id = source.id]() {
+                hide();
+                if (onPick)
+                    onPick(id);
+            });
+            m_listLayout->addWidget(row);
+        }
+
+        // A custom entry that is already configured still deserves a row, otherwise
+        // the popup looks like it lost it.
+        for (const QString &id : subscribed) {
+            if (trackerSourceForId(id).url != id)
+                continue;   // a built-in id: already listed above
+            if (!needle.isEmpty() && !id.toLower().contains(needle))
+                continue;
+            auto *row = new FluentButton(m_list);
+            row->setText(id + QStringLiteral("    ") + QObject::tr("自定义") + QStringLiteral(" ✓"));
+            row->setRole(FluentButton::Subtle);
+            row->setCheckable(true);
+            row->setChecked(true);
+            row->setTooltipText(QObject::tr("点击取消订阅"));
+            connect(row, &QPushButton::clicked, this, [this, id]() {
+                hide();
+                if (onPick)
+                    onPick(id);
+            });
+            m_listLayout->addWidget(row);
+        }
+        m_listLayout->addStretch(1);
+        setFixedWidth(440);
+    }
+
+    std::function<void(const QString &)> onPick;
+    std::function<void(const QString &)> onCustom;
+
+private:
+    void restyle()
+    {
+        const FluentTheme *t = FluentTheme::instance();
+        setStyleSheet(QStringLiteral("QFrame#sourcePopup { background: %1; border: 1px solid %2;"
+                                     " border-radius: %3px; }")
+                          .arg(t->cardSecondary().name(), t->strokeSubtle().name())
+                          .arg(FluentTheme::RadiusMedium));
+    }
+
+    QWidget *m_list = nullptr;
+    QVBoxLayout *m_listLayout = nullptr;
+    FluentLineEdit *m_url = nullptr;
+    FluentButton *m_add = nullptr;
+};
+
 namespace {
+
+
+
+
+/**
+ * The list that drops out of the source field.
+ *
+ * It is a Qt::Popup, not a dialog: it closes when you click elsewhere, takes the
+ * keyboard while it is open and never behaves like a window - the same thing a
+ * combo box does, which is what the field looks like. Rows are the published lists
+ * with their badges, and the row of a list that is already subscribed carries a
+ * tick; picking it again removes the subscription.
+ */
 
 /// True for a path this machine can read (a drive letter, a UNC path or a
 /// file:// URL) rather than an http(s) address.
@@ -133,34 +276,83 @@ void BitTorrentPage::buildSources()
 {
     m_chipsHost = ui->sourcesHost;
 
-    // The field completes on the published lists but accepts anything: a URL, or a
-    // path to a file on this machine - both are fetched/parsed the same way.
-    m_sourceEdit = new QComboBox(this);
-    m_sourceEdit->setEditable(true);
-    m_sourceEdit->setInsertPolicy(QComboBox::NoInsert);
-    m_sourceEdit->setMinimumWidth(280);
-    m_sourceEdit->setProperty("fluentRole", "combo");
-    QStringList completion;
-    for (const TrackerSource &source : builtInTrackerSources())
-        completion << source.id;
-    m_sourceEdit->addItems(completion);
-    m_sourceEdit->setCurrentText(QString());
-    if (auto *completer = m_sourceEdit->completer()) {
-        completer->setCaseSensitivity(Qt::CaseInsensitive);
-        completer->setCompletionMode(QCompleter::PopupCompletion);
-    }
-    m_sourceEdit->lineEdit()->setPlaceholderText(tr("订阅源：选择内置列表，或填入网址 / 本地文件"));
+    // The field *is* the picker: clicking it drops the catalogue out of it, and what
+    // is typed there filters that list (or, on Enter, becomes a custom entry). There
+    // is no separate window - it is a popup, like a combo box's.
+    m_sourceEdit = new FluentLineEdit(this);
+    m_sourceEdit->setMinimumWidth(320);
+    m_sourceEdit->setPlaceholderText(tr("订阅源：点击选择内置列表，或填入网址 / 本地文件"));
+    m_sourceEdit->installEventFilter(this);
 
-    m_sourceAdd = new FluentButton(this);
-    m_sourceAdd->setGlyph(FluentTheme::Glyph::Add);
-    m_sourceAdd->setText(tr("添加订阅源"));
-    m_sourceAdd->setRole(FluentButton::Standard);
+    m_sourcePopup = new SourcePopup(this);
+    m_sourcePopup->onPick = [this](const QString &id) {
+        QStringList list = sources();
+        if (list.contains(id))
+            list.removeAll(id);   // picking a subscribed list again removes it
+        else
+            list << id;
+        setSources(list);
+    };
+    m_sourcePopup->onCustom = [this](const QString &text) { addSource(text); };
 
-    connect(m_sourceAdd, &QPushButton::clicked, this, &BitTorrentPage::addFromInput);
-    connect(m_sourceEdit->lineEdit(), &QLineEdit::returnPressed, this,
-            &BitTorrentPage::addFromInput);
+    connect(m_sourceEdit, &QLineEdit::textEdited, this, [this](const QString &text) {
+        if (m_sourcePopup->isVisible())
+            m_sourcePopup->rebuild(sources(), text);
+    });
+    connect(m_sourceEdit, &QLineEdit::returnPressed, this, [this]() {
+        const QString text = m_sourceEdit->text().trimmed();
+        if (!text.isEmpty())
+            addSource(text);
+    });
 
     rebuildChips();
+}
+
+void BitTorrentPage::addSource(const QString &id)
+{
+    const QString text = id.trimmed();
+    if (text.isEmpty() || !m_aria2)
+        return;
+    m_sourceEdit->clear();
+    if (m_tab == Blacklist) {
+        // In the blacklist tab the field adds an entry to block, not a source.
+        QStringList list = blacklist();
+        if (!list.contains(text))
+            list << text;
+        setBlacklist(list);
+        return;
+    }
+    QStringList list = sources();
+    if (!list.contains(text))
+        list << text;
+    setSources(list);
+}
+
+void BitTorrentPage::showSourcePopup()
+{
+    if (!m_sourcePopup || !m_sourceEdit)
+        return;
+    m_sourcePopup->rebuild(sources(), m_sourceEdit->text());
+    m_sourcePopup->adjustSize();
+    const QPoint below = m_sourceEdit->mapToGlobal(QPoint(0, m_sourceEdit->height() + 4));
+    m_sourcePopup->move(below);
+    m_sourcePopup->show();
+}
+
+bool BitTorrentPage::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == m_sourceEdit) {
+        // Mouse press rather than focus-in: clicking the field again should re-open
+        // the list even when it already has the focus.
+        if (event->type() == QEvent::MouseButtonPress
+            || event->type() == QEvent::FocusIn) {
+            showSourcePopup();
+            if (event->type() == QEvent::MouseButtonPress
+                && m_sourcePopup->isVisible())
+                return true;   // the popup takes it from here
+        }
+    }
+    return QWidget::eventFilter(watched, event);
 }
 
 void BitTorrentPage::buildTable()
@@ -240,7 +432,7 @@ void BitTorrentPage::rebuildChips()
     // sees of the setting, the field is how another one gets in.
     while (QLayoutItem *item = layout->takeAt(0)) {
         if (QWidget *widget = item->widget()) {
-            if (widget != m_sourceEdit && widget != m_sourceAdd)
+            if (widget != m_sourceEdit)
                 widget->deleteLater();
         }
         delete item;
@@ -269,29 +461,6 @@ void BitTorrentPage::rebuildChips()
     }
 
     layout->addWidget(m_sourceEdit, 1);
-    layout->addWidget(m_sourceAdd);
-}
-
-void BitTorrentPage::addFromInput()
-{
-    const QString text = m_sourceEdit->currentText().trimmed();
-    if (text.isEmpty() || !m_aria2)
-        return;
-    m_sourceEdit->setCurrentText(QString());
-
-    if (m_tab == Blacklist) {
-        // In the blacklist tab the field adds an entry to block, not a source.
-        QStringList list = blacklist();
-        if (!list.contains(text))
-            list << text;
-        setBlacklist(list);
-        return;
-    }
-
-    QStringList list = sources();
-    if (!list.contains(text))
-        list << text;
-    setSources(list);
 }
 
 void BitTorrentPage::setTab(Tab tab)
@@ -576,14 +745,11 @@ void BitTorrentPage::retranslate()
     m_blacklistTab->setText(tr("黑名单"));
     m_removeButton->setText(tr("移除选中"));
     m_syncButton->setText(tr("立即同步"));
-    m_sourceAdd->setText(tr("添加订阅源"));
-    m_sourceAdd->setTooltipText(tr("把上面的订阅源加入列表并立即同步"));
     ui->injectTitle->setText(tr("注入精选 Tracker"));
     ui->injectHint->setText(tr("将选中的订阅源合并后追加到所有 BT 任务"));
     ui->filterEdit->setPlaceholderText(tr("按 URL 过滤…"));
     if (m_sourceEdit)
-        m_sourceEdit->lineEdit()->setPlaceholderText(
-            tr("订阅源：选择内置列表，或填入网址 / 本地文件"));
+        m_sourceEdit->setPlaceholderText(tr("订阅源：点击选择内置列表，或填入网址 / 本地文件"));
     rebuildTable();
 }
 

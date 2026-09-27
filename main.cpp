@@ -1,4 +1,4 @@
-﻿#include "Aria2Manager.h"
+#include "Aria2Manager.h"
 #include "ClipboardHelper.h"
 #include "Logger.h"
 #include "NotificationManager.h"
@@ -809,6 +809,10 @@ int main(int argc, char *argv[])
     parser.addOption(trackerTabOption);
     QCommandLineOption syncOption(QStringList{QStringLiteral("sync-trackers")});
     parser.addOption(syncOption);
+    QCommandLineOption popupOption(
+        QStringList{QStringLiteral("tracker-popup")},
+        QStringLiteral("Open the tracker page with the source list dropped down."));
+    parser.addOption(popupOption);
     QCommandLineOption dumpLogOption(
         QStringList{QStringLiteral("dump-engine-log")},
         QStringLiteral("Write what the engine printed to a file when the app exits."),
@@ -1075,6 +1079,9 @@ int main(int argc, char *argv[])
         btPage->setTab(parser.value(trackerTabOption) == QLatin1String("blacklist")
                            ? BitTorrentPage::Blacklist
                            : BitTorrentPage::Effective);
+
+    if (parser.isSet(popupOption))
+        QTimer::singleShot(600, btPage, [btPage]() { btPage->showSourcePopup(); });
 
     QObject::connect(btPage, &BitTorrentPage::toast, &window,
                      [toasts](const QString &text, bool isError) {
