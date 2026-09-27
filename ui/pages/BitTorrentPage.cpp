@@ -1,4 +1,4 @@
-﻿#include "ui/pages/BitTorrentPage.h"
+#include "ui/pages/BitTorrentPage.h"
 
 #include "Aria2Manager.h"
 #include "SettingsManager.h"
@@ -171,6 +171,91 @@ private:
     QVBoxLayout *m_listLayout = nullptr;
     FluentLineEdit *m_url = nullptr;
     FluentButton *m_add = nullptr;
+};
+
+/**
+ * A layout that lays widgets out in a row and wraps to the next line when they no
+ * longer fit - what the source field needs, because the chips inside it must keep
+ * their own size and the field has to grow downwards instead of squeezing them.
+ */
+class FlowLayout : public QLayout
+{
+public:
+    explicit FlowLayout(QWidget *parent = nullptr, int margin = 0, int spacing = 6)
+        : QLayout(parent)
+    {
+        setContentsMargins(margin, margin, margin, margin);
+        setSpacing(spacing);
+    }
+
+    ~FlowLayout() override
+    {
+        while (QLayoutItem *item = takeAt(0))
+            delete item;
+    }
+
+    void addItem(QLayoutItem *item) override { m_items.append(item); }
+    int count() const override { return m_items.size(); }
+    QLayoutItem *itemAt(int index) const override { return m_items.value(index); }
+
+    QLayoutItem *takeAt(int index) override
+    {
+        if (index < 0 || index >= m_items.size())
+            return nullptr;
+        return m_items.takeAt(index);
+    }
+
+    Qt::Orientations expandingDirections() const override { return {}; }
+    bool hasHeightForWidth() const override { return true; }
+
+    int heightForWidth(int width) const override { return doLayout(QRect(0, 0, width, 0), true); }
+    void setGeometry(const QRect &rect) override
+    {
+        QLayout::setGeometry(rect);
+        doLayout(rect, false);
+    }
+
+    QSize sizeHint() const override { return minimumSize(); }
+
+    QSize minimumSize() const override
+    {
+        QSize size;
+        for (const QLayoutItem *item : m_items)
+            size = size.expandedTo(item->minimumSize());
+        const QMargins margins = contentsMargins();
+        return size + QSize(margins.left() + margins.right(), margins.top() + margins.bottom());
+    }
+
+private:
+    /// Places the items; with `testOnly` it only reports the height they need.
+    int doLayout(const QRect &rect, bool testOnly) const
+    {
+        const QMargins margins = contentsMargins();
+        const QRect effective = rect.adjusted(margins.left(), margins.top(), -margins.right(),
+                                              -margins.bottom());
+        const int space = spacing();
+        int x = effective.x();
+        int y = effective.y();
+        int lineHeight = 0;
+
+        for (QLayoutItem *item : m_items) {
+            const QSize hint = item->sizeHint();
+            int next = x + hint.width() + space;
+            if (next - space > effective.right() + 1 && lineHeight > 0) {
+                x = effective.x();
+                y += lineHeight + space;
+                next = x + hint.width() + space;
+                lineHeight = 0;
+            }
+            if (!testOnly)
+                item->setGeometry(QRect(QPoint(x, y), hint));
+            x = next;
+            lineHeight = qMax(lineHeight, hint.height());
+        }
+        return y + lineHeight - rect.y() + margins.bottom();
+    }
+
+    QList<QLayoutItem *> m_items;
 };
 
 namespace {
@@ -458,16 +543,21 @@ void BitTorrentPage::setBlacklist(const QStringList &list)
 // ----------------------------------------------------------------------- chips
 void BitTorrentPage::rebuildChips()
 {
-    auto *layout = qobject_cast<QHBoxLayout *>(m_chipsHost->layout());
-    if (!layout)
-        return;
-
-    // The chip row and the field are rebuilt together: the chips are what the user
-    // sees of the setting, the field is how another one gets in.
+    if (!m_flow) {
+        // A flow layout inside the field: the chips wrap to a second line instead of
+        // being squeezed, and the field grows downwards.
+        m_flowHost = new QWidget(m_chipsHost);
+        m_flow = new FlowLayout(m_flowHost, 4, 6);
+        if (auto *hostLayout = qobject_cast<QHBoxLayout *>(m_chipsHost->layout()))
+            hostLayout->addWidget(m_flowHost, 1);
+    }
+    QLayout *layout = m_flow;
     while (QLayoutItem *item = layout->takeAt(0)) {
         if (QWidget *widget = item->widget()) {
-            if (widget != m_sourceEdit)
+            if (widget != m_sourceEdit) {
+                widget->setParent(nullptr);
                 widget->deleteLater();
+            }
         }
         delete item;
     }
@@ -499,7 +589,16 @@ void BitTorrentPage::rebuildChips()
         }
     }
 
-    layout->addWidget(m_sourceEdit, 1);
+    layout->addWidget(m_sourceEdit);
+    // The hint only shows while nothing is picked: the field grows with its chips,
+    // and a placeholder squeezed in beside them reads like one more chip.
+    const bool any = m_tab == Effective ? !sources().isEmpty() : !blacklist().isEmpty();
+    m_sourceEdit->setPlaceholderText(any ? QString()
+                                         : (m_tab == Effective
+                                                ? tr("璁㈤槄婧愶細鐐瑰嚮閫夋嫨鍐呯疆鍒楄〃锛屾垨濉叆缃戝潃 / 鏈湴鏂囦欢")
+                                                : tr("榛戝悕鍗曪細濉叆瑕佸睆钄界殑 Tracker 鍦板潃")));
+    m_sourceEdit->setMinimumWidth(any ? 120 : 260);
+    m_flowHost->updateGeometry();
 }
 
 void BitTorrentPage::setTab(Tab tab)

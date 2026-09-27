@@ -1,4 +1,4 @@
-﻿#ifndef BITTORRENTPAGE_H
+#ifndef BITTORRENTPAGE_H
 #define BITTORRENTPAGE_H
 
 #include <QHash>
@@ -9,6 +9,7 @@
 
 class Aria2Manager;
 class FluentButton;
+class FlowLayout;
 class QLabel;
 class QTableWidget;
 
@@ -100,6 +101,8 @@ private:
     FluentButton *m_syncButton = nullptr;
 
     QWidget *m_chipsHost = nullptr;      ///< the row of source chips
+    QWidget *m_flowHost = nullptr;       ///< chips wrap inside this one
+    FlowLayout *m_flow = nullptr;
     class QLineEdit *m_sourceEdit = nullptr;
     class SourcePopup *m_sourcePopup = nullptr;
     QLabel *m_countLabel = nullptr;

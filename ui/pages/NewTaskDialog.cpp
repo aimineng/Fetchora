@@ -1,4 +1,4 @@
-#include "ui/pages/NewTaskDialog.h"
+﻿#include "ui/pages/NewTaskDialog.h"
 
 #include "Aria2Manager.h"
 #include "SettingsManager.h"
@@ -81,6 +81,11 @@ NewTaskDialog::NewTaskDialog(Aria2Manager *aria2, QWidget *parent)
     ui->subtitleLabel->setProperty("fluentRole", "caption");
     ui->urlLabel->setProperty("fluentRole", "caption");
     ui->urlEdit->setProperty("fluentRole", "textArea");
+    // A pasted link is longer than the box, so it has to wrap: with NoWrap the user
+    // sees one line and a horizontal scrollbar and cannot tell whether the whole link
+    // made it in.
+    ui->urlEdit->setLineWrapMode(QPlainTextEdit::WidgetWidth);
+    ui->urlEdit->setWordWrapMode(QTextOption::WrapAnywhere);
 
     buildHeader();
     buildUrlBox();
