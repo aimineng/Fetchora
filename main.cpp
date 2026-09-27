@@ -449,6 +449,48 @@ int runTorrentSelfTest()
               .arg(std::count_if(catalogue.begin(), catalogue.end(),
                                  [](const TrackerSource &s) { return s.blacklist; })));
 
+    // Tracker health is read out of the engine log, so the reader has to survive the
+    // wordings aria2 uses and ignore everything that is not about a tracker.
+    {
+        const TrackerHealth::Verdict good =
+            TrackerHealth::classify(QStringLiteral("[NOTICE] CUID#7 - Announce successfully to "
+                                                   "udp://tracker.opentrackr.org:1337/announce."));
+        const TrackerHealth::Verdict again = TrackerHealth::classify(
+            QStringLiteral("[INFO] Announce to https://tracker.example.org/announce succeeded"));
+        const TrackerHealth::Verdict bad = TrackerHealth::classify(
+            QStringLiteral("[WARN] CUID#9 - Announce to udp://open.stealth.si:80/announce failed. "
+                           "Retrying..."));
+        const TrackerHealth::Verdict refused = TrackerHealth::classify(
+            QStringLiteral("Tracker https://tracker.example.org/announce: connection refused"));
+        const TrackerHealth::Verdict peer = TrackerHealth::classify(
+            QStringLiteral("[INFO] CUID#103 - To: 14.155.204.165:16881 handshake peerId=-TR2930-651"));
+        const TrackerHealth::Verdict dht = TrackerHealth::classify(
+            QStringLiteral("[INFO] Message received: dht response ping TransactionID=8158ecc1"));
+        check(QStringLiteral("an announce line yields the tracker and a success"),
+              good.ok && good.url == QStringLiteral("udp://tracker.opentrackr.org:1337/announce"),
+              good.url);
+        check(QStringLiteral("a differently worded success is recognised too"),
+              again.ok && again.url == QStringLiteral("https://tracker.example.org/announce"),
+              again.url);
+        check(QStringLiteral("a failed announce is reported as a failure"),
+              !bad.ok && bad.url == QStringLiteral("udp://open.stealth.si:80/announce"), bad.url);
+        check(QStringLiteral("a refused connection is a failure"),
+              !refused.ok && refused.url == QStringLiteral("https://tracker.example.org/announce"),
+              refused.url);
+        // The wording below is copied out of a real run (DHT turned off, so the engine
+        // had to use its trackers) - it is what the reader has to cope with.
+        const TrackerHealth::Verdict realFail = TrackerHealth::classify(
+            QStringLiteral("09/27 13:09:45 [ERROR] CUID#25 - Download aborted. "
+                           "URI=udp://tracker.opentrackr.org:1337/announce?info_hash=%AE%D8%CA%03"
+                           "&peer_id=A2-1-37-0-b%EF%C4%15%C0%CD%FA%07%FE%3C&port=6881"));
+        check(QStringLiteral("a real aborted announce is a failure with the plain URL"),
+              !realFail.ok
+                  && realFail.url == QStringLiteral("udp://tracker.opentrackr.org:1337/announce"),
+              realFail.url);
+        check(QStringLiteral("peer and DHT chatter is not mistaken for a tracker"),
+              peer.url.isEmpty() && dht.url.isEmpty(), peer.url + dht.url);
+    }
+
     if (failures > 0) {
         out() << "RESULT: " << failures << " torrent check(s) failed\n";
         return 6;
@@ -767,6 +809,11 @@ int main(int argc, char *argv[])
     parser.addOption(trackerTabOption);
     QCommandLineOption syncOption(QStringList{QStringLiteral("sync-trackers")});
     parser.addOption(syncOption);
+    QCommandLineOption dumpLogOption(
+        QStringList{QStringLiteral("dump-engine-log")},
+        QStringLiteral("Write what the engine printed to a file when the app exits."),
+        QStringLiteral("file"));
+    parser.addOption(dumpLogOption);
     parser.addOption(detailSectionOption);
     parser.addOption(selfTestOption);
     parser.addOption(makeTorrentOption);
@@ -1430,5 +1477,16 @@ int main(int argc, char *argv[])
     // can be told apart from a crash, which ends in the crash handler instead.
     Logger::line(QStringLiteral("app"),
                  QStringLiteral("event loop finished (exit code %1)").arg(exitCode));
+
+    // --dump-engine-log <file>: what the engine actually printed, so a bug report (or
+    // a regex that reads those lines, like the tracker page's health column) can be
+    // checked against real output instead of a guess about its wording.
+    if (parser.isSet(dumpLogOption)) {
+        QFile file(parser.value(dumpLogOption));
+        if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            QTextStream stream(&file);
+            stream << aria2.engineLog();
+        }
+    }
     return exitCode;
 }

@@ -1,6 +1,7 @@
-﻿#include "Aria2Manager.h"
+#include "Aria2Manager.h"
 
 #include "Logger.h"
+#include "TorrentUtils.h"   // TrackerHealth: what the engine said about a tracker
 
 #include <QClipboard>
 #include <QCoreApplication>
@@ -2076,30 +2077,16 @@ QVariantMap Aria2Manager::trackerHealth() const
     // read from those lines rather than by probing third-party servers from here.
     // Keys are tracker URLs, values carry {"ok": bool, "lastSeen": epoch seconds}.
     QVariantMap health;
-    const QRegularExpression line(
-        QStringLiteral("(Announce(?:d)?[^\\s]*\\s+(?:to|successfully to)?\\s*|Failed to announce to\\s+"
-                       "|announce error[^\\s]*\\s+)((?:udp|https?|wss?)://\\S+)"));
-    const QRegularExpression failed(QStringLiteral("Failed|error|timeout|unreachable"),
-                                    QRegularExpression::CaseInsensitiveOption);
     const QStringList lines = engineLog().split(QLatin1Char('\n'), Qt::SkipEmptyParts);
     for (const QString &text : lines) {
-        if (text.isEmpty())
+        const TrackerHealth::Verdict verdict = TrackerHealth::classify(text);
+        if (verdict.url.isEmpty())
             continue;
-        auto match = line.match(text);
-        while (match.hasMatch()) {
-            QString url = match.captured(2);
-            while (url.endsWith(QLatin1Char('.')) || url.endsWith(QLatin1Char(','))
-                   || url.endsWith(QLatin1Char(')')))
-                url.chop(1);
-            QVariantMap entry = health.value(url).toMap();
-            const bool bad = failed.match(text).hasMatch();
-            // A failure only overwrites a success when it is newer, and the log is
-            // read oldest-first, so the last line about a tracker wins.
-            entry[QStringLiteral("ok")] = !bad;
-            entry[QStringLiteral("lastSeen")] = QDateTime::currentSecsSinceEpoch();
-            health[url] = entry;
-            match = line.match(text, match.capturedEnd());
-        }
+        QVariantMap entry = health.value(verdict.url).toMap();
+        // The log is read oldest-first, so the newest line about a tracker wins.
+        entry[QStringLiteral("ok")] = verdict.ok;
+        entry[QStringLiteral("lastSeen")] = QDateTime::currentSecsSinceEpoch();
+        health[verdict.url] = entry;
     }
     return health;
 }

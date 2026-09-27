@@ -131,6 +131,71 @@ ParseResult parse(const QByteArray &data, int limit)
 } // namespace TrackerList
 
 // ============================================================================
+//  TrackerEvent - what the engine said about a tracker
+// ============================================================================
+namespace {
+
+/// Pulls the first tracker URL out of a log line.
+QString trackerUrlIn(const QString &line)
+{
+    static const QRegularExpression url(
+        QStringLiteral("((?:udp|https?|wss?)://[^\\s,;\"'<>)\\]]+)"));
+    const QRegularExpressionMatch match = url.match(line);
+    if (!match.hasMatch())
+        return {};
+    QString value = match.captured(1);
+    // Sentences end in a full stop, and logs often write "tracker: message" - neither
+    // the stop nor the colon belongs to the URL.
+    while (!value.isEmpty()
+           && (value.endsWith(QLatin1Char('.')) || value.endsWith(QLatin1Char(','))
+               || value.endsWith(QLatin1Char(':')) || value.endsWith(QLatin1Char(';'))))
+        value.chop(1);
+    // aria2 logs tracker traffic as "URI=udp://host:port/announce?info_hash=..." - the
+    // query is per-announce and the table lists the plain address, so the two have to
+    // be reduced to the same key or nothing would ever match.
+    const int cut = value.indexOf(QLatin1Char('?'));
+    if (cut > 0)
+        value.truncate(cut);
+    const int hash = value.indexOf(QLatin1Char('#'));
+    if (hash > 0)
+        value.truncate(hash);
+    return value;
+}
+
+} // namespace
+
+namespace TrackerHealth {
+
+Verdict classify(const QString &line)
+{
+    Verdict verdict;
+    const QString url = trackerUrlIn(line);
+    if (url.isEmpty())
+        return verdict;
+
+    // The word that makes a URL line interesting. Peer and DHT chatter never carries
+    // one, so those lines are skipped without needing to know their layout.
+    static const QRegularExpression about(
+        QStringLiteral("announce|tracker|scrape"), QRegularExpression::CaseInsensitiveOption);
+    if (!about.match(line).hasMatch())
+        return verdict;
+
+    verdict.url = url;
+    // Real failures on this engine look like
+    //   [ERROR] CUID#25 - Download aborted. URI=udp://tracker...:1337/announce?info_hash=...
+    // so the severity marker counts, as do the words that describe why it stopped.
+    static const QRegularExpression bad(
+        QStringLiteral("\\[\\s*(?:error|warn)\\s*\\]|fail|error|timeout|timed out|unreachable|"
+                       "refus|invalid|reject|not found|no response|unable|abort|exception|"
+                       "errorcode"),
+        QRegularExpression::CaseInsensitiveOption);
+    verdict.ok = !bad.match(line).hasMatch();
+    return verdict;
+}
+
+} // namespace TrackerHealth
+
+// ============================================================================
 //  Bencode codec
 // ============================================================================
 namespace {

@@ -136,4 +136,25 @@ private:
     void setBusy(bool value);
 };
 
+/**
+ * Tracker health read from aria2's own engine log.
+ *
+ * aria2 announces by itself and logs the outcome; this app never probes a tracker
+ * itself. The wording of those lines is not part of any contract, so the reader is
+ * deliberately loose: a line that carries a tracker URL *and* an announce word is
+ * either a success or a failure depending on whether it also says so.
+ */
+namespace TrackerHealth {
+
+struct Verdict
+{
+    QString url;      ///< the tracker the line is about ("" when the line says nothing)
+    bool ok = false;  ///< true when the line reports a successful announce
+};
+
+/// Classifies one engine-log line. An empty `url` means "not about a tracker".
+Verdict classify(const QString &line);
+
+} // namespace TrackerHealth
+
 #endif // TORRENTUTILS_H
