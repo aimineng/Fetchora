@@ -137,4 +137,8 @@ URL => URL
 将选中的订阅源合并后追加到所有 BT 任务 => Append the selected sources, merged, to every BT task
 无法读取 => could not be read
 注入精选 Tracker => Inject curated trackers
+点击订阅并同步 => Click to subscribe and sync
+点击取消订阅 => Click to unsubscribe
+订阅源：点击选择内置列表，或填入网址 / 本地文件 => Source: click to pick a built-in list, or type a URL / local file
+自定义 => Custom
 

@@ -754,8 +754,7 @@
     </message>
     <message>
       <source>订阅源：点击选择内置列表，或填入网址 / 本地文件</source>
-      <translation>
-      </translation>
+      <translation>Source: click to pick a built-in list, or type a URL / local file</translation>
     </message>
     <message>
       <source>点击从订阅源中移除：%1</source>
@@ -1900,18 +1899,15 @@ Info Hash %2 · Size %3</translation>
     </message>
     <message>
       <source>点击取消订阅</source>
-      <translation>
-      </translation>
+      <translation>Click to unsubscribe</translation>
     </message>
     <message>
       <source>点击订阅并同步</source>
-      <translation>
-      </translation>
+      <translation>Click to subscribe and sync</translation>
     </message>
     <message>
       <source>自定义</source>
-      <translation>
-      </translation>
+      <translation>Custom</translation>
     </message>
   </context>
   <context>
