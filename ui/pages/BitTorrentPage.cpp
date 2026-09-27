@@ -1,4 +1,4 @@
-#include "ui/pages/BitTorrentPage.h"
+﻿#include "ui/pages/BitTorrentPage.h"
 
 #include "Aria2Manager.h"
 #include "SettingsManager.h"
@@ -38,6 +38,10 @@ public:
     {
         setObjectName(QStringLiteral("sourcePopup"));
         setAttribute(Qt::WA_StyledBackground, true);
+        // Rounded corners need the window itself to be translucent: the stylesheet
+        // rounds the frame, but without this the square window corners show through.
+        setAttribute(Qt::WA_TranslucentBackground, true);
+        setWindowFlag(Qt::NoDropShadowWindowHint, false);
 
         auto *root = new QVBoxLayout(this);
         root->setContentsMargins(8, 8, 8, 8);
@@ -148,11 +152,14 @@ public:
 
         // Height follows the rows that survived the filter: with two matches the
         // popup is two rows tall, not as tall as it was for five.
-        setFixedWidth(440);
+        setFixedWidth(m_fieldWidth);
         setMaximumHeight(320);
         adjustSize();
         setFixedHeight(qMin(sizeHint().height(), 320));
     }
+
+    /// The popup is as wide as the field it drops out of.
+    void setFieldWidth(int width) { m_fieldWidth = qMax(240, width); }
 
     std::function<void(const QString &)> onPick;
     std::function<void(const QString &)> onCustom;
@@ -171,6 +178,7 @@ private:
     QVBoxLayout *m_listLayout = nullptr;
     FluentLineEdit *m_url = nullptr;
     FluentButton *m_add = nullptr;
+    int m_fieldWidth = 440;
 };
 
 /**
@@ -392,12 +400,20 @@ void BitTorrentPage::buildSources()
     m_sourcePopup = new SourcePopup(this);
     m_sourcePopup->installEventFilter(this);
     m_sourcePopup->onPick = [this](const QString &id) {
-        QStringList list = sources();
+        // Which list this lands in depends on the tab the popup was opened from:
+        // picking a blacklist list while the blacklist tab was up used to subscribe it
+        // as a source instead, so nothing ever appeared in that field.
+        QStringList list = m_tab == Blacklist ? blacklist() : sources();
         if (list.contains(id))
             list.removeAll(id);   // picking a subscribed list again removes it
         else
             list << id;
-        setSources(list);
+        if (m_tab == Blacklist) {
+            setBlacklist(list);
+            rebuildChips();
+        } else {
+            setSources(list);
+        }
     };
     m_sourcePopup->onCustom = [this](const QString &text) { addSource(text); };
 
@@ -416,6 +432,7 @@ void BitTorrentPage::buildSources()
     ui->sourcesHost->setObjectName(QStringLiteral("sourceField"));
     ui->sourcesHost->setAttribute(Qt::WA_StyledBackground, true);
     ui->sourcesHost->installEventFilter(this);
+    ui->sourcesHost->setStyleSheet(sourceFieldStyle());
     m_sourceEdit->setFrame(false);
     m_sourceEdit->setStyleSheet(
         QStringLiteral("QLineEdit { background: transparent; border: none; }"));
@@ -450,6 +467,8 @@ void BitTorrentPage::showSourcePopup()
     m_sourcePopup->rebuild(m_tab == Blacklist ? blacklist() : sources(), m_sourceEdit->text(),
                            m_tab == Blacklist);
     const QPoint below = ui->sourcesHost->mapToGlobal(QPoint(0, ui->sourcesHost->height() + 4));
+    // As wide as the field it drops out of, not a width of its own.
+    m_sourcePopup->setFixedWidth(qMax(240, ui->sourcesHost->width()));
     m_sourcePopup->move(below);
     m_sourcePopup->show();
 }
@@ -566,7 +585,8 @@ void BitTorrentPage::rebuildChips()
         for (const QString &id : sources()) {
             auto *chip = new FluentButton(m_chipsHost);
             chip->setText(trackerSourceLabel(id) + QStringLiteral("  ×"));
-            chip->setRole(FluentButton::Subtle);
+            chip->setRole(FluentButton::Standard);
+            chip->setStyleSheet(chipStyle());
             chip->setTooltipText(tr("点击从订阅源中移除：%1").arg(id));
             connect(chip, &QPushButton::clicked, this, [this, id]() {
                 QStringList list = sources();
@@ -582,7 +602,8 @@ void BitTorrentPage::rebuildChips()
         if (!blocked.isEmpty()) {
             auto *chip = new FluentButton(m_chipsHost);
             chip->setText(tr("%1 条黑名单  ×").arg(blocked.size()));
-            chip->setRole(FluentButton::Subtle);
+            chip->setRole(FluentButton::Standard);
+            chip->setStyleSheet(chipStyle());
             chip->setTooltipText(tr("清空黑名单"));
             connect(chip, &QPushButton::clicked, this, [this]() { setBlacklist({}); });
             layout->addWidget(chip);
@@ -617,6 +638,19 @@ void BitTorrentPage::setTab(Tab tab)
     ui->sourcesHost->setStyleSheet(sourceFieldStyle());
     rebuildChips();
     rebuildTable();
+}
+
+QString BitTorrentPage::chipStyle() const
+{
+    // A chip has to read as a separate thing inside the field, so it gets its own
+    // surface and a border rather than the field's fill.
+    const FluentTheme *t = FluentTheme::instance();
+    return QStringLiteral("QPushButton { background: %1; border: 1px solid %2;"
+                          " border-radius: %3px; padding: 2px 8px; color: %4; }"
+                          "QPushButton:hover { background: %5; }")
+        .arg(t->cardTertiary().name(), t->strokeSubtle().name())
+        .arg(FluentTheme::RadiusSmall)
+        .arg(t->textPrimary().name(), t->controlFillHover().name());
 }
 
 QString BitTorrentPage::sourceFieldStyle() const
