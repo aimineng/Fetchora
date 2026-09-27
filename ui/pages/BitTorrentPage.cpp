@@ -293,12 +293,19 @@ void BitTorrentPage::buildSources()
     // The field *is* the picker: clicking it drops the catalogue out of it, and what
     // is typed there filters that list (or, on Enter, becomes a custom entry). There
     // is no separate window - it is a popup, like a combo box's.
-    m_sourceEdit = new FluentLineEdit(this);
-    m_sourceEdit->setMinimumWidth(320);
+    // A plain QLineEdit on purpose: the *container* is the input box, so the text
+    // field inside it must not paint a frame and focus underline of its own - that is
+    // what made the chips look like they sat beside the field instead of inside it.
+    m_sourceEdit = new QLineEdit(this);
+    m_sourceEdit->setMinimumWidth(160);
+    m_sourceEdit->setFrame(false);
+    m_sourceEdit->setStyleSheet(
+        QStringLiteral("QLineEdit { background: transparent; border: none; padding: 0; }"));
     m_sourceEdit->setPlaceholderText(tr("订阅源：点击选择内置列表，或填入网址 / 本地文件"));
     m_sourceEdit->installEventFilter(this);
 
     m_sourcePopup = new SourcePopup(this);
+    m_sourcePopup->installEventFilter(this);
     m_sourcePopup->onPick = [this](const QString &id) {
         QStringList list = sources();
         if (list.contains(id))

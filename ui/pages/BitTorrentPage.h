@@ -64,6 +64,8 @@ private:
 public:
     /// Drops the catalogue out of the source field (--tracker-popup uses it).
     void showSourcePopup();
+    /// One click opens the list, the next one puts it away.
+    void toggleSourcePopup();
 
 private:
     void rebuildChips();
@@ -98,7 +100,7 @@ private:
     FluentButton *m_syncButton = nullptr;
 
     QWidget *m_chipsHost = nullptr;      ///< the row of source chips
-    class FluentLineEdit *m_sourceEdit = nullptr;
+    class QLineEdit *m_sourceEdit = nullptr;
     class SourcePopup *m_sourcePopup = nullptr;
     QLabel *m_countLabel = nullptr;
 
