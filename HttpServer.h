@@ -1,4 +1,4 @@
-#ifndef HTTPSERVER_H
+﻿#ifndef HTTPSERVER_H
 #define HTTPSERVER_H
 
 #include <QObject>
