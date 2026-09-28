@@ -76,6 +76,7 @@ file(GLOB APP_PAGE_SOURCES CONFIGURE_DEPENDS
 
 qt_add_executable(Fetchora
     src/app/main.cpp
+    src/app/HeadlessTasks.cpp  src/app/HeadlessTasks.h
     ${APP_BACKEND_SOURCES}
     ${APP_UI_SOURCES}
     ${APP_PAGE_SOURCES}
