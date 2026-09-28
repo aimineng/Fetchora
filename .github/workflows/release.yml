@@ -382,9 +382,13 @@ jobs:
           generate_release_notes: true
           # A missing archive must fail the release instead of publishing two.
           fail_on_unmatched_files: true
+          # Recursive on purpose: an artifact keeps the directory layout it was
+          # uploaded with, so the installer arrives as assets/dist/... and a flat
+          # "assets/*.exe" matches nothing - which fails this step (and the release)
+          # instead of publishing.
           files: |
-            assets/*.zip
-            assets/*.exe
-            assets/*.dmg
-            assets/*.tar.gz
+            assets/**/*.zip
+            assets/**/*.exe
+            assets/**/*.dmg
+            assets/**/*.tar.gz
           body_path: release-body.md
