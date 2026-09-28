@@ -269,8 +269,6 @@ private:
 namespace {
 
 
-
-
 /**
  * The list that drops out of the source field.
  *

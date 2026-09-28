@@ -1,4 +1,4 @@
-# Build output -----------------------------------------------------------------
+﻿# Build output -----------------------------------------------------------------
 # Release staging trees assembled by the packaging steps.
 /stage/
 /dist/
@@ -79,3 +79,19 @@ Thumbs.db
 *.Debug
 *.Release
 *.pyc
+# --- scratch files ---------------------------------------------------------
+# Working notes, captured logs and verification screenshots belong next to the
+# work, not in the repository.
+*.log
+*.tmp
+/out/
+/.vs/
+/CMakeUserPresets.json
+*.user
+build-*/
+/st*.txt
+/sk*.txt
+/be*.txt
+/tr*.txt
+/settings-*.png
+/*-shots/
