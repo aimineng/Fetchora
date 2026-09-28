@@ -199,7 +199,9 @@ jobs:
     # The unit tests need no engine and take a second: they are the fastest signal
     # when a parser regresses, so they run before the slower end-to-end checks.
     - name: Unit tests
-      run: ctest --test-dir build --output-on-failure
+      # build.ps1 configures into build\<type>, not build\ - pointing ctest at the
+      # parent finds no CTestTestfile.cmake and fails.
+      run: ctest --test-dir build/Release --output-on-failure
 
       # The engine must not outlive the app, and must come back when it is killed.
       # Both are invisible until they break: an orphaned aria2c keeps downloading
