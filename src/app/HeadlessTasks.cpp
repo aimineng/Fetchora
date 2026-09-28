@@ -35,23 +35,24 @@ QTextStream &out()
 
 } // namespace
 
-/// The options this build of aria2 accepts, read from its own `--help`: the self-test
-/// must not pass a switch the engine would reject at startup.
-static QSet<QString> aria2KnownOptions(const QString &executable)
+/// Every long option the bundled aria2c understands, taken from --help=#all.
+///
+/// `--help` alone lists only the common ones, which is how a working command line
+/// came to look like it was full of switches the engine rejects.
+QSet<QString> aria2KnownOptions(const QString &executable)
 {
     QSet<QString> known;
     QProcess process;
-    process.start(executable, {QStringLiteral("--help")});
-    if (!process.waitForFinished(15000))
+    process.start(executable, {QStringLiteral("--help=#all")});
+    if (!process.waitForFinished(20000))
         return known;
-    const QString text = QString::fromLocal8Bit(process.readAllStandardOutput());
-    static const QRegularExpression option(QStringLiteral("--([a-z0-9-]+)"));
-    auto it = option.globalMatch(text);
+    const QString help = QString::fromUtf8(process.readAllStandardOutput());
+    static const QRegularExpression optionPattern(QStringLiteral("--([a-zA-Z0-9][a-zA-Z0-9-]*)"));
+    auto it = optionPattern.globalMatch(help);
     while (it.hasNext())
         known.insert(it.next().captured(1));
     return known;
 }
-
 namespace Headless {
 static int runUpdateSelfTest(SettingsManager &settings)
 {
