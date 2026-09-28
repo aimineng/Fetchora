@@ -1,4 +1,4 @@
-﻿cmake_minimum_required(VERSION 3.21)
+cmake_minimum_required(VERSION 3.21)
 
 project(Fetchora VERSION 0.1.5 LANGUAGES CXX)
 
@@ -43,18 +43,18 @@ endif()
 # ------------------------------------------------------------------ backend
 # Framework agnostic: plain QObject/JSON-RPC/process code shared by any UI.
 set(APP_BACKEND_SOURCES
-    Aria2Client.cpp       Aria2Client.h
-    Aria2Process.cpp      Aria2Process.h
-    Aria2Manager.cpp      Aria2Manager.h
-    SettingsManager.cpp   SettingsManager.h
-    DownloadHistory.cpp   DownloadHistory.h
-    TorrentUtils.cpp      TorrentUtils.h
-    TrackerSources.cpp    TrackerSources.h
-    HttpServer.cpp        HttpServer.h
-    ClipboardHelper.cpp   ClipboardHelper.h
-    UpdateChecker.cpp     UpdateChecker.h
-    Logger.cpp            Logger.h
-    NotificationManager.cpp NotificationManager.h
+    src/engine/Aria2Client.cpp       src/engine/Aria2Client.h
+    src/engine/Aria2Process.cpp      src/engine/Aria2Process.h
+    src/engine/Aria2Manager.cpp      src/engine/Aria2Manager.h
+    src/core/SettingsManager.cpp   src/core/SettingsManager.h
+    src/core/DownloadHistory.cpp   src/core/DownloadHistory.h
+    src/core/TorrentUtils.cpp      src/core/TorrentUtils.h
+    src/core/TrackerSources.cpp    src/core/TrackerSources.h
+    src/engine/HttpServer.cpp        src/engine/HttpServer.h
+    src/core/ClipboardHelper.cpp   src/core/ClipboardHelper.h
+    src/core/UpdateChecker.cpp     src/core/UpdateChecker.h
+    src/core/Logger.cpp            src/core/Logger.h
+    src/core/NotificationManager.cpp src/core/NotificationManager.h
 )
 
 # --------------------------------------------------------------- ui framework
@@ -75,14 +75,19 @@ file(GLOB APP_PAGE_SOURCES CONFIGURE_DEPENDS
 )
 
 qt_add_executable(Fetchora
-    main.cpp
+    src/app/main.cpp
     ${APP_BACKEND_SOURCES}
     ${APP_UI_SOURCES}
     ${APP_PAGE_SOURCES}
     ${APP_RESOURCE_SOURCES}
 )
 
-target_include_directories(Fetchora PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(Fetchora PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    # The sources live in src/{app,core,engine}; these two keep the includes inside
+    # them short ("SettingsManager.h") instead of repeating the directory everywhere.
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine)
 # AUTOUIC resolves #include "ui_X.h" against the .ui file's own directory.
 set_source_files_properties(${APP_PAGE_SOURCES} PROPERTIES SKIP_AUTOUIC FALSE)
 
@@ -108,7 +113,7 @@ set_target_properties(Fetchora PROPERTIES
 # present in the source tree (see tools/make-icns.js, which rebuilds it from the
 # PNGs make-icons.ps1 already generates) it is copied into the bundle and named
 # in Info.plist; otherwise CFBundleIconFile stays empty and Finder falls back to
-# the generic application icon. main.cpp always draws the real logo at runtime,
+# the generic application icon. src/app/main.cpp always draws the real logo at runtime,
 # so the in-app icon is correct either way.
 if(APPLE AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app.icns")
     configure_file(

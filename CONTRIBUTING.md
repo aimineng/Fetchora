@@ -22,8 +22,11 @@ Fetchora --self-test          # parsers, settings and the aria2 command line
 ## Layout
 
 ```
-main.cpp, Aria2*.{h,cpp}      engine: supervisor, RPC client, task model, bridge HTTP server
-TrackerSources.*, TorrentUtils.*  tracker subscriptions and .torrent/bencode work
+src/app/                      main.cpp: command line, window assembly, headless modes
+src/engine/                   the supervised aria2c process, its RPC client, the task
+                              model, the bridge HTTP/WebSocket server
+src/core/                     settings, logging, history, updates, torrent and tracker
+                              parsing - everything the UI does not own
 ui/                           Fluent widgets and the pages; pages/*.ui describe the structure
 tools/                        build, translation, screenshot and check scripts
 packaging/                    installer, AppImage and macOS bundle inputs
@@ -32,3 +35,6 @@ Plugin/                       the companion browser extension
 
 `ui/pages/*.cpp` build their interactive parts in code (the widgets the `.ui` files cannot
 express) and keep the rest in the `.ui` files — the split is deliberate, not accidental.
+
+The include path adds `src/core` and `src/engine`, so includes inside those directories stay
+short (`#include "SettingsManager.h"`); only `ui/…` and `resources/…` are spelled out.
