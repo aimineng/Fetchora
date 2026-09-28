@@ -1,10 +1,11 @@
-# Fetchora — contributing
+﻿# Fetchora — contributing
 
 Small, focused changes are easiest to review. Before opening a pull request:
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --parallel
-Fetchora --self-test          # parsers, settings and the aria2 command line
+ctest --test-dir build --output-on-failure   # unit tests: parsers, no engine needed
+Fetchora --self-test          # the same checks plus settings and the aria2 command line
 ```
 
 - **Style** — `.clang-format` describes it (`clang-format -i <files>`). Four spaces, 100 columns,
@@ -27,7 +28,7 @@ src/engine/                   the supervised aria2c process, its RPC client, the
                               model, the bridge HTTP/WebSocket server
 src/core/                     settings, logging, history, updates, torrent and tracker
                               parsing - everything the UI does not own
-ui/                           Fluent widgets and the pages; pages/*.ui describe the structure
+src/ui/                       Fluent widgets and the pages; pages/*.ui describe the structure
 tools/                        build, translation, screenshot and check scripts
 packaging/                    installer, AppImage and macOS bundle inputs
 Plugin/                       the companion browser extension

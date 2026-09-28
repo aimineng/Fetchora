@@ -1,4 +1,4 @@
-<div align="center">
+﻿<div align="center">
 
 <img src="resources/app-256.png" width="112" alt="Fetchora icon">
 
@@ -53,7 +53,8 @@ next to it, or have `aria2c` on `PATH`.
 ```bash
 ./build.ps1                           # Windows wrapper (add -Sign with a signing certificate)
 tools/check-engine-supervision.ps1    # end-to-end engine checks, needs a running app
-Fetchora --self-test                  # parsers, settings and the aria2 command line, no window
+ctest --test-dir build                # unit tests: the parsers, no engine or window
+Fetchora --self-test                  # parsers, settings and the aria2 command line
 ```
 
 ## Notes

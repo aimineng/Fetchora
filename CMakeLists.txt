@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.21)
+﻿cmake_minimum_required(VERSION 3.21)
 
 project(Fetchora VERSION 0.1.5 LANGUAGES CXX)
 
@@ -60,19 +60,26 @@ set(APP_BACKEND_SOURCES
 # --------------------------------------------------------------- ui framework
 # The Fluent/WinUI 3 widget set: design tokens, chrome and self-painted controls.
 file(GLOB APP_UI_SOURCES CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/ui/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ui/*.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/*.h"
 )
 
 # --------------------------------------------------------------------- pages
 # One .ui + .h + .cpp triple per screen. GLOBbed (with CONFIGURE_DEPENDS) so a
-# new page only has to be dropped into ui/pages/ to be picked up; AUTOUIC then
+# new page only has to be dropped into src/ui/pages/ to be picked up; AUTOUIC then
 # resolves the matching #include "ui_<Page>.h".
 file(GLOB APP_PAGE_SOURCES CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/ui/pages/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ui/pages/*.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ui/pages/*.ui"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/pages/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/pages/*.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/pages/*.ui"
 )
+
+# The unit tests are a separate target: they build in seconds and need neither a
+# window nor an engine, so `ctest` is usable while editing the parsers.
+option(FETCHORA_BUILD_TESTS "Build the unit tests" ON)
+if(FETCHORA_BUILD_TESTS)
+    enable_testing()
+endif()
 
 qt_add_executable(Fetchora
     src/app/main.cpp
@@ -85,8 +92,11 @@ qt_add_executable(Fetchora
 
 target_include_directories(Fetchora PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    # The sources live in src/{app,core,engine}; these two keep the includes inside
-    # them short ("SettingsManager.h") instead of repeating the directory everywhere.
+    # The sources live in src/{app,core,engine,ui}. These entries keep the includes
+    # inside them short ("SettingsManager.h") and keep every `#include "ui/..."`
+    # resolving - in the sources and in the headers uic generates alike, so moving
+    # ui/ under src/ did not have to touch a single #include.
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine)
 # AUTOUIC resolves #include "ui_X.h" against the .ui file's own directory.
@@ -282,3 +292,6 @@ install(TARGETS Fetchora
     BUNDLE DESTINATION .
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+if(FETCHORA_BUILD_TESTS)
+    add_subdirectory(tests)
+endif()

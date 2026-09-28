@@ -1,4 +1,4 @@
-<div align="center">
+﻿<div align="center">
 
 <img src="resources/app-256.png" width="112" alt="Fetchora 图标">
 
@@ -49,7 +49,8 @@ cmake --build build --parallel
 ```bash
 ./build.ps1                           # Windows 便捷脚本（有签名证书时加 -Sign）
 tools/check-engine-supervision.ps1    # 引擎端到端检查，需要程序正在运行
-Fetchora --self-test                  # 解析器、设置与 aria2 命令行检查，无需窗口
+ctest --test-dir build                # 单元测试：解析器，不需要引擎或窗口
+Fetchora --self-test                  # 解析器、设置与 aria2 命令行检查
 ```
 
 ## 注意
