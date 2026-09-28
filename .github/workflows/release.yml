@@ -1,4 +1,4 @@
-# Release automation for Fetchora.
+﻿# Release automation for Fetchora.
 #
 # Pushing a v* tag (or dispatching this workflow manually with a tag) builds,
 # self-tests and packages the app on all three desktop platforms, then attaches
@@ -60,10 +60,7 @@ jobs:
       - name: Check out the source
         uses: actions/checkout@v5
 
-      # ------------------------------------------------------------------ Qt
-      # Same modules as ci.yml: Widgets/Network/Sql/Concurrent (qtbase), Svg
-      # (qtsvg) and LinguistTools (qttools) all live in Qt's base installation,
-      # so `modules:` stays empty - it only accepts addon modules.
+
       - name: Install Qt ${{ env.QT_VERSION }} (MinGW)
         if: runner.os == 'Windows'
         uses: jurplel/install-qt-action@v4
@@ -277,6 +274,16 @@ jobs:
     permissions:
       contents: write
     steps:
+# First: actions/checkout cleans the workspace, and running it after the artifacts
+# were downloaded deleted assets/ - which is why every file pattern matched nothing.
+      - name: Check out the source
+        uses: actions/checkout@v5
+
+      # ------------------------------------------------------------------ Qt
+      # Same modules as ci.yml: Widgets/Network/Sql/Concurrent (qtbase), Svg
+      # (qtsvg) and LinguistTools (qttools) all live in Qt's base installation,
+      # so `modules:` stays empty - it only accepts addon modules.
+
       - name: Download the packaged archives
         uses: actions/download-artifact@v4
         with:
@@ -346,13 +353,6 @@ jobs:
 
       - name: List what will be published
         run: ls -l assets
-
-      - name: Check out the source
-        uses: actions/checkout@v4
-        with:
-          # The commit list in the notes comes from the range between the previous
-          # tag and this one, which the default shallow clone does not have.
-          fetch-depth: 0
 
       - name: Compose the release notes
         # The About page shows an excerpt of this body when it offers an update
