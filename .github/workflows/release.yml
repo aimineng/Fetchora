@@ -331,6 +331,19 @@ jobs:
           fi
           find assets -type f | sort
 
+      - name: Flatten the assets
+        # An artifact keeps the directory layout it was uploaded with, so the
+        # installer lands in assets/dist/. The publish step below matches one level
+        # only (`assets/*.exe`), and `**` does not help: in that glob it means "at
+        # least one directory", so it misses files that sit at the top. Moving
+        # everything up is the one arrangement that is the same whatever the
+        # artifacts did.
+        run: |
+          set -euo pipefail
+          find assets -mindepth 2 -type f -exec mv -n -t assets {} +
+          find assets -mindepth 1 -type d -empty -delete
+          find assets -type f | sort
+
       - name: List what will be published
         run: ls -l assets
 
@@ -382,13 +395,11 @@ jobs:
           generate_release_notes: true
           # A missing archive must fail the release instead of publishing two.
           fail_on_unmatched_files: true
-          # Recursive on purpose: an artifact keeps the directory layout it was
-          # uploaded with, so the installer arrives as assets/dist/... and a flat
-          # "assets/*.exe" matches nothing - which fails this step (and the release)
-          # instead of publishing.
+          # Flat on purpose: the step above has already moved every archive to this
+          # one directory, so each pattern matches exactly the files it names.
           files: |
-            assets/**/*.zip
-            assets/**/*.exe
-            assets/**/*.dmg
-            assets/**/*.tar.gz
+            assets/*.zip
+            assets/*.exe
+            assets/*.dmg
+            assets/*.tar.gz
           body_path: release-body.md
