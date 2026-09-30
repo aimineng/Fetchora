@@ -203,6 +203,34 @@ void FluentTaskCard::relayout()
     }
 }
 
+void FluentTaskCard::retranslate()
+{
+    // The card's own strings: the action tooltips and the placeholder a torrent shows
+    // while its metadata is on the way. Everything else is recomputed from the task.
+    m_pauseButton->setTooltipText(tr("暂停"));
+    m_retryButton->setTooltipText(tr("重试"));
+    m_openButton->setTooltipText(tr("打开文件"));
+    m_folderButton->setTooltipText(tr("打开所在文件夹"));
+    m_copyButton->setTooltipText(tr("复制链接"));
+    m_removeButton->setTooltipText(tr("移除"));
+    updateTask(m_task);
+}
+
+void FluentTaskList::changeEvent(QEvent *event)
+{
+    QWidget::changeEvent(event);
+    if (event->type() != QEvent::LanguageChange)
+        return;
+    m_emptyTitleText = tr("还没有下载任务");
+    m_emptyHintText = tr("点击“新建”或直接把链接粘贴进来");
+    if (m_emptyTitle)
+        m_emptyTitle->setText(m_emptyTitleText);
+    if (m_emptyHint)
+        m_emptyHint->setText(m_emptyHintText);
+    for (FluentTaskCard *card : std::as_const(m_cards))
+        card->retranslate();
+}
+
 void FluentTaskCard::updateTask(const QVariantMap &task)
 {
     m_task = task;

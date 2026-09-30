@@ -67,6 +67,8 @@ private:
     void toggleMagnetPanel();
     void submitMagnets();
     void wireManager();
+    /// Re-labels what the page builds in code: chips, cards, command bar, empty state.
+    void retranslate();
     void refresh();
     void restyle();
 

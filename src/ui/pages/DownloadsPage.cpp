@@ -1,4 +1,4 @@
-#include "ui/pages/DownloadsPage.h"
+﻿#include "ui/pages/DownloadsPage.h"
 
 #include "Aria2Manager.h"
 #include "ui/FluentButton.h"
@@ -14,6 +14,7 @@
 #include <QPlainTextEdit>
 #include <QRegularExpression>
 #include <QVBoxLayout>
+#include <utility>   // std::as_const
 
 namespace {
 
@@ -355,6 +356,63 @@ void DownloadsPage::changeEvent(QEvent *event)
     QWidget::changeEvent(event);
     if (event->type() == QEvent::EnabledChange || event->type() == QEvent::PaletteChange)
         restyle();
+    if (event->type() == QEvent::LanguageChange) {
+        ui->retranslateUi(this);
+        retranslate();
+        refresh();
+    }
+}
+
+void DownloadsPage::retranslate()
+{
+    // Everything this page builds in code has to be re-labelled here. The .ui parts
+    // are handled by retranslateUi(), but the chips, the stat cards, the command bar
+    // and the empty state exist only as C++ strings - which is how switching back to
+    // Chinese left half the page in English.
+    struct ChipLabel { const char *key; const char *label; };
+    static const ChipLabel chipLabels[] = {
+        {"all", QT_TR_NOOP("全部")},       {"active", QT_TR_NOOP("下载中")},
+        {"waiting", QT_TR_NOOP("队列")},   {"complete", QT_TR_NOOP("已完成")},
+        {"error", QT_TR_NOOP("失败")},     {"bt", QT_TR_NOOP("BT")},
+    };
+    for (FluentButton *chip : std::as_const(m_chips)) {
+        const QString key = chip->property("chipKey").toString();
+        for (const ChipLabel &entry : chipLabels) {
+            if (key == QLatin1String(entry.key))
+                chip->setText(tr(entry.label));
+        }
+    }
+
+    static const char *cardLabels[] = {QT_TR_NOOP("总下载速度"), QT_TR_NOOP("总上传速度"),
+                                       QT_TR_NOOP("活动 / 队列"), QT_TR_NOOP("累计下载")};
+    for (int i = 0; i < m_cards.size() && i < int(std::size(cardLabels)); ++i)
+        m_cards.at(i)->setLabel(tr(cardLabels[i]));
+
+    if (m_sortCombo) {
+        const int current = m_sortCombo->currentIndex();
+        const QSignalBlocker blocker(m_sortCombo);
+        m_sortCombo->clear();
+        m_sortCombo->addItems({tr("默认顺序"), tr("最快优先"), tr("体积优先")});
+        m_sortCombo->setCurrentIndex(qMax(0, current));
+    }
+
+    m_newButton->setText(tr("新建"));
+    m_newButton->setTooltipText(tr("新建下载 (Ctrl+N)"));
+    m_torrentButton->setText(tr("种子"));
+    m_torrentButton->setTooltipText(tr("打开 .torrent / .metalink 文件"));
+    m_magnetButton->setText(tr("磁力"));
+    m_magnetButton->setTooltipText(tr("粘贴 magnet:?xt=urn:btih:... 链接（可多条）"));
+    m_pauseAllButton->setText(tr("全部暂停"));
+    m_resumeAllButton->setText(tr("全部开始"));
+    m_refreshButton->setTooltipText(tr("刷新 (F5)"));
+    m_clearButton->setTooltipText(tr("清除已完成记录"));
+    m_detailsButton->setTooltipText(tr("显示/隐藏详情面板"));
+    if (m_magnetEdit)
+        m_magnetEdit->setPlaceholderText(tr("粘贴 magnet:?xt=urn:btih:... 链接（可多行）"));
+    if (m_magnetSubmitButton)
+        m_magnetSubmitButton->setText(tr("添加"));
+
+    setEmptyStateText(tr("还没有下载任务"), tr("点击“新建”或直接把链接粘贴进来"));
 }
 
 void DownloadsPage::setStatusFilter(const QString &filter)

@@ -1,4 +1,4 @@
-#ifndef FLUENTTASKLIST_H
+﻿#ifndef FLUENTTASKLIST_H
 #define FLUENTTASKLIST_H
 
 #include <QFrame>
@@ -34,6 +34,8 @@ public:
     bool isSelected() const { return m_selected; }
     /// Merge a task map from Aria2Manager::tasks(); only repaints what changed.
     void updateTask(const QVariantMap &task);
+    /// Re-labels the tooltips and the placeholder for the current language.
+    void retranslate();
     const QVariantMap &task() const { return m_task; }
 
     /// Suggested height for the current content.
@@ -108,6 +110,12 @@ public:
 
     /// Replace the model. Preserves scroll position and card identity.
     void setTasks(const QVariantList &tasks);
+
+protected:
+    /// The empty state and the cards' tooltips are C++ strings too.
+    void changeEvent(QEvent *event) override;
+
+public:
     void setSelectedGid(const QString &gid);
     QString selectedGid() const { return m_selectedGid; }
 
