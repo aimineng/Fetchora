@@ -36,7 +36,9 @@ New-Item -ItemType Directory -Force -Path (Join-Path $root 'translations') | Out
 # NOTE: Get-ChildItem -Include only filters when -Path carries a wildcard (or
 # -Recurse is used), so the extension check is done with Where-Object instead.
 $sources = @()
-foreach ($dir in @('', 'ui', 'ui\pages')) {
+# The sources live under src/ - scanning the root alone found nothing at all after
+# that move, so every string silently counted as "no translation needed".
+foreach ($dir in @('src\app', 'src\core', 'src\engine', 'src\ui', 'src\ui\pages')) {
     $full = if ($dir) { Join-Path $root $dir } else { $root }
     if (-not (Test-Path $full)) { continue }
     $sources += Get-ChildItem -Path $full -File -ErrorAction SilentlyContinue |

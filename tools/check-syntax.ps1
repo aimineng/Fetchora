@@ -31,6 +31,11 @@ $incDir = Join-Path $root 'build\syntaxinc'
 
 $includes = @(
     "-I$root"
+    # The sources live in src/{app,core,engine,ui}; these mirror what CMake puts on
+    # the include path so the checker resolves the same includes the build does.
+    "-I$root\src"
+    "-I$root\src\core"
+    "-I$root\src\engine"
     "-I$qtInc"
     "-I$qtInc\QtCore"
     "-I$qtInc\QtGui"
@@ -89,3 +94,4 @@ if ($failed -gt 0) {
 }
 Write-Host "all clean" -ForegroundColor Green
 exit 0
+

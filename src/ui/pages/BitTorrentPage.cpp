@@ -100,7 +100,7 @@ public:
                 continue;
             const bool on = subscribed.contains(source.id);
             QStringList badges;
-            badges << QObject::tr("内置");
+            badges << BitTorrentPage::tr("内置");
             if (source.cdn)
                 badges << QStringLiteral("CDN");
             QString text = source.name + QStringLiteral("    ") + badges.join(QStringLiteral(" · "));
@@ -112,7 +112,7 @@ public:
             row->setRole(FluentButton::Subtle);
             row->setCheckable(true);
             row->setChecked(on);
-            row->setTooltipText(on ? QObject::tr("点击取消订阅") : QObject::tr("点击订阅并同步"));
+            row->setTooltipText(on ? BitTorrentPage::tr("点击取消订阅") : BitTorrentPage::tr("点击订阅并同步"));
             connect(row, &QPushButton::clicked, this, [this, id = source.id]() {
                 hide();
                 if (onPick)
@@ -129,11 +129,11 @@ public:
             if (!needle.isEmpty() && !id.toLower().contains(needle))
                 continue;
             auto *row = new FluentButton(m_list);
-            row->setText(id + QStringLiteral("    ") + QObject::tr("自定义") + QStringLiteral(" ✓"));
+            row->setText(id + QStringLiteral("    ") + BitTorrentPage::tr("自定义") + QStringLiteral(" ✓"));
             row->setRole(FluentButton::Subtle);
             row->setCheckable(true);
             row->setChecked(true);
-            row->setTooltipText(QObject::tr("点击取消订阅"));
+            row->setTooltipText(BitTorrentPage::tr("点击取消订阅"));
             connect(row, &QPushButton::clicked, this, [this, id]() {
                 hide();
                 if (onPick)
@@ -144,7 +144,7 @@ public:
         }
 
         if (rows == 0) {
-            auto *none = new QLabel(QObject::tr("没有匹配的列表，可在下面直接填入地址"), m_list);
+            auto *none = new QLabel(BitTorrentPage::tr("没有匹配的列表，可在下面直接填入地址"), m_list);
             none->setProperty("fluentRole", "tertiary");
             m_listLayout->addWidget(none);
         }
@@ -904,6 +904,13 @@ void BitTorrentPage::refresh()
 
 void BitTorrentPage::restyle()
 {
+    // The field and its chips carry their colours in a stylesheet, so a theme change
+    // has to re-apply them; without this the old colours stay until something else
+    // rebuilds the row (switching tabs, for instance).
+    if (ui->sourcesHost)
+        ui->sourcesHost->setStyleSheet(sourceFieldStyle());
+    rebuildChips();
+
     const FluentTheme *t = FluentTheme::instance();
     ui->pageSubtitle->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
                                         .arg(t->textTertiary().name()));
