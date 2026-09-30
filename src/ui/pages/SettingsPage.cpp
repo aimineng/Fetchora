@@ -1,4 +1,4 @@
-#include "ui/pages/SettingsPage.h"
+﻿#include "ui/pages/SettingsPage.h"
 
 #include "Aria2Manager.h"
 #include "Logger.h"
@@ -842,6 +842,9 @@ QVBoxLayout *SettingsPage::addSectionPage(const char *title, const char *subtitl
     // Checkable, in an exclusive group: "which section is open" is a selection, and
     // a plain button had no way to show one.
     button->setCheckable(true);
+    // A rail row reads as navigation: left-aligned like the main nav, and elided
+    // rather than clipped when a translation is longer than the column.
+    button->setContentAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     if (!m_railGroup) {
         m_railGroup = new QButtonGroup(this);
         m_railGroup->setExclusive(true);

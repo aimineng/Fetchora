@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
  <class>SettingsPage</class>
  <widget class="QWidget" name="SettingsPage">
@@ -92,13 +92,13 @@
       <widget class="QWidget" name="railHost" native="true">
        <property name="minimumSize">
         <size>
-         <width>200</width>
+         <width>252</width>
          <height>0</height>
         </size>
        </property>
        <property name="maximumSize">
         <size>
-         <width>200</width>
+         <width>252</width>
          <height>16777215</height>
         </size>
        </property>

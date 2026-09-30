@@ -69,6 +69,12 @@ void FluentButton::setCompact(bool compact)
     update();
 }
 
+void FluentButton::setContentAlignment(Qt::Alignment alignment)
+{
+    m_contentAlignment = alignment;
+    update();
+}
+
 void FluentButton::setTooltipText(const QString &text)
 {
     setToolTip(text);
@@ -261,6 +267,8 @@ void FluentButton::paintEvent(QPaintEvent *)
 
     const QString label = text();
     const bool hasGlyph = !m_glyph.isNull() && !m_iconOnly;
+    /// The inset a left-aligned row keeps from the edge of its pill.
+    constexpr int kLeftPadding = 14;
 
     QFontMetrics tfm(textFont);
     QFontMetrics gfm(glyphFont);
@@ -268,7 +276,10 @@ void FluentButton::paintEvent(QPaintEvent *)
     const int labelW = label.isEmpty() || m_iconOnly ? 0 : tfm.horizontalAdvance(label);
     const int gap = (glyphW > 0 && labelW > 0) ? 8 : 0;
     const int contentW = glyphW + gap + labelW;
-    const int startX = (width() - contentW) / 2;
+    // Buttons centre their content; a navigation row is left-aligned with its
+    // siblings, which is why this is opt-in rather than a change to every button.
+    const bool leftAligned = m_contentAlignment & Qt::AlignLeft;
+    const int startX = leftAligned ? kLeftPadding : (width() - contentW) / 2;
 
     if (m_iconOnly && !m_glyph.isNull()) {
         p.setFont(glyphFont);
@@ -287,7 +298,13 @@ void FluentButton::paintEvent(QPaintEvent *)
         if (labelW > 0) {
             p.setFont(textFont);
             p.setPen(fg);
-            p.drawText(x, baseline, label);
+            // A long label is elided instead of running into the edge of the row: a
+            // rail that is too narrow for a translation must not look broken.
+            const int available = width() - x - kLeftPadding;
+            const QString shown = leftAligned && labelW > available
+                                      ? tfm.elidedText(label, Qt::ElideRight, qMax(16, available))
+                                      : label;
+            p.drawText(x, baseline, shown);
         }
     }
 }

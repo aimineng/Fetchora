@@ -43,6 +43,13 @@ public:
 
     void setTooltipText(const QString &text);
 
+    /**
+     * How the glyph and the label sit inside the button: centred (the default, what
+     * a button wants) or Qt::AlignLeft, which is what a navigation row needs so its
+     * items line up with each other whatever language they are in.
+     */
+    void setContentAlignment(Qt::Alignment alignment);
+
     /// Swaps in a busy indicator; the text stays but the button is disabled.
     void setLoading(bool loading);
 
@@ -65,6 +72,9 @@ private:
     /// True while the focus ring should be painted: keyboard focus only, see
     /// focusInEvent().
     bool m_focusVisible = false;
+    /// Centred by default; the navigation rails ask for Qt::AlignLeft so their rows
+    /// line up with each other in any language.
+    Qt::Alignment m_contentAlignment = Qt::AlignCenter;
 };
 
 #endif // FLUENTBUTTON_H
