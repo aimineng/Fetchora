@@ -1,4 +1,4 @@
-﻿#include "Aria2Manager.h"
+#include "Aria2Manager.h"
 #include "HeadlessTasks.h"
 #include "ClipboardHelper.h"
 #include "Logger.h"
@@ -574,11 +574,18 @@ int main(int argc, char *argv[])
                          toasts->push(text, isError ? ToastHost::Error : ToastHost::Success);
                      });
     QObject::connect(downloadsPage, &DownloadsPage::detailsToggleRequested, &window,
-                     [detailsPanel]() {
-                         detailsPanel->setVisible(!detailsPanel->isVisible());
+                     [detailsPanel, &aria2]() {
+                         const bool visible = !detailsPanel->isVisible();
+                         detailsPanel->setVisible(visible);
+                         // A closed pane is a detail fetch nobody is looking at, and
+                         // that fetch is the heaviest call in the poll cycle.
+                         aria2.setDetailVisible(visible);
                      });
     QObject::connect(detailsPanel, &TaskDetailsPanel::closeRequested, &window,
-                     [detailsPanel]() { detailsPanel->setVisible(false); });
+                     [detailsPanel, &aria2]() {
+                         detailsPanel->setVisible(false);
+                         aria2.setDetailVisible(false);
+                     });
     QObject::connect(detailsPanel, &TaskDetailsPanel::toast, &window,
                      [toasts](const QString &text, bool isError) {
                          toasts->push(text, isError ? ToastHost::Error : ToastHost::Success);

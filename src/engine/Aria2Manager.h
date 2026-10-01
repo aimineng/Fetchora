@@ -1,4 +1,4 @@
-﻿#ifndef ARIA2MANAGER_H
+#ifndef ARIA2MANAGER_H
 #define ARIA2MANAGER_H
 
 #include <QObject>
@@ -98,6 +98,13 @@ public:
     void setSearchText(const QString &t);
     QString detailGid() const { return m_detailGid; }
     void setDetailGid(const QString &gid);
+    /**
+     * Whether the details pane is on screen. While it is closed the engine is not
+     * asked for the selected task's options, peers and servers every second - the
+     * heaviest call of the cycle, for a picture nobody can see.
+     */
+    void setDetailVisible(bool visible);
+    bool detailVisible() const { return m_detailVisible; }
     bool paused() const { return m_paused; }
     int pollInterval() const { return m_pollInterval; }
     void setPollInterval(int ms);
@@ -386,6 +393,7 @@ private:
     QString m_filter = QStringLiteral("all");
     QString m_searchText;
     QString m_detailGid;
+    bool m_detailVisible = true;
     QString m_engineError;
     QString m_engineLog;
     /// Trackers fetched from the subscription sources; refetched on every sync.

@@ -1,4 +1,4 @@
-#include "Aria2Manager.h"
+﻿#include "Aria2Manager.h"
 
 #include "Logger.h"
 #include "TorrentUtils.h"   // TrackerHealth: what the engine said about a tracker
@@ -774,8 +774,10 @@ void Aria2Manager::poll()
         emit sessionInfoChanged();
     });
 
-    // Detail panel for the selected task.
-    if (!m_detailGid.isEmpty())
+    // Detail panel for the selected task - but only while that panel is on screen.
+    // The detail call is the heaviest of the three (options, peers, servers), and
+    // nobody is looking at it when the pane is closed.
+    if (m_detailVisible && !m_detailGid.isEmpty())
         fetchTaskDetail(m_detailGid);
 }
 
@@ -1797,6 +1799,16 @@ void Aria2Manager::setDetailGid(const QString &gid)
         m_taskDetail.clear();
         emit taskDetailChanged();
     }
+}
+
+void Aria2Manager::setDetailVisible(bool visible)
+{
+    if (m_detailVisible == visible)
+        return;
+    m_detailVisible = visible;
+    // Opening it again shows the current state at once instead of one poll later.
+    if (visible && !m_detailGid.isEmpty())
+        fetchTaskDetail(m_detailGid);
 }
 
 void Aria2Manager::fetchTaskDetail(const QString &gid)
