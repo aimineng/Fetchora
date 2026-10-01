@@ -162,7 +162,6 @@ AboutPage::AboutPage(Aria2Manager *aria2, QWidget *parent, SettingsManager *sett
     ui->appNameLabel->setProperty("fluentRole", "title");
     ui->appNameLabel->setFont(FluentTheme::uiFont(28, QFont::DemiBold));
     ui->versionLabel->setProperty("fluentRole", "caption");
-    ui->taglineLabel->setProperty("fluentRole", "body");
     ui->footerLabel->setProperty("fluentRole", "tertiary");
     ui->footerLabel->setAlignment(Qt::AlignCenter);
 
@@ -256,30 +255,6 @@ void AboutPage::buildCards()
     features->body()->addLayout(featureList);
 
     // ------------------------------------------------------------ 运行状态
-    FluentCard *facts = addCard(FluentTheme::Glyph::Server, nullptr);
-    for (int i = 0; i < kFactCount; ++i) {
-        if (i > 0)
-            facts->body()->addWidget(makeDivider(facts));
-
-        auto *row = new QHBoxLayout;
-        row->setSpacing(FluentTheme::spacingM());
-
-        auto *dot = new QLabel(facts);
-        dot->setFixedSize(8, 8);
-        row->addWidget(dot, 0, Qt::AlignVCenter);
-
-        auto *label = new QLabel(facts);
-        label->setFixedWidth(120);
-        row->addWidget(label, 0, Qt::AlignVCenter);
-
-        auto *value = new QLabel(facts);
-        value->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-        value->setTextInteractionFlags(Qt::TextSelectableByMouse);
-        row->addWidget(value, 1);
-
-        facts->body()->addLayout(row);
-        m_facts << FactRow{label, dot, value};
-    }
 
     // ------------------------------------------------------------ 开源许可
     FluentCard *license = addCard(FluentTheme::Glyph::Shield, nullptr);
@@ -302,7 +277,7 @@ void AboutPage::buildCards()
 
     // ---------------------------------------------------------------- 致谢
     FluentCard *credits = addCard(FluentTheme::Glyph::Lightbulb, nullptr);
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 2; ++i) {
         auto *item = new QLabel(credits);
         item->setWordWrap(true);
         credits->body()->addWidget(item);
@@ -822,14 +797,13 @@ void AboutPage::refresh()
 void AboutPage::retranslate()
 {
     // ---- 主视觉 ----------------------------------------------------------
-    ui->taglineLabel->setText(tr("基于 aria2 的多协议下载器"));
     if (m_badges.size() == kBadgeCount) {
         m_badges[0]->setText(tr("Qt 6 · QWidget"));
         m_badges[2]->setText(tr("MIT License"));
     }
 
     // ---- 卡片标题 --------------------------------------------------------
-    const QStringList cardTitles = {tr("功能特性"), tr("运行状态"), tr("开源许可"), tr("致谢")};
+    const QStringList cardTitles = {tr("功能特性"), tr("开源许可"), tr("致谢")};
     for (int i = 0; i < m_cardTitles.size(); ++i)
         m_cardTitles[i]->setText(cardTitles.value(i));
 
@@ -866,7 +840,6 @@ void AboutPage::retranslate()
     const QStringList credits = {
         tr("aria2 — 下载引擎（GNU GPL v2+，版权归其作者所有）"),
         tr("Qt 6 — 跨平台应用框架"),
-        tr("Segoe Fluent Icons — 界面图标字体"),
     };
     for (int i = 0; i < m_creditItems.size(); ++i)
         m_creditItems[i]->setText(credits.value(i));
@@ -937,5 +910,4 @@ void AboutPage::restyle()
     m_licenseBody->setStyleSheet(labelStyle(t->textPrimary(), 14));
     m_licenseHint->setStyleSheet(labelStyle(t->textSecondary(), 12));
 
-    ui->taglineLabel->setStyleSheet(labelStyle(t->textSecondary(), 14));
 }

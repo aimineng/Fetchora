@@ -175,16 +175,6 @@
                 </widget>
                </item>
                <item>
-                <widget class="QLabel" name="taglineLabel">
-                 <property name="text">
-                  <string>基于 aria2 的多协议下载器</string>
-                 </property>
-                 <property name="alignment">
-                  <set>Qt::AlignCenter</set>
-                 </property>
-                </widget>
-               </item>
-               <item>
                 <layout class="QHBoxLayout" name="badgeRow">
                  <property name="spacing">
                   <number>8</number>
