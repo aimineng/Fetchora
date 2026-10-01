@@ -265,7 +265,9 @@ void SettingsManager::loadSettings()
     m_maxOverallUploadLimitKB = get("maxOverallUploadLimitKB", 0).toInt();
     m_optimizeConcurrentDownloads = get("optimizeConcurrentDownloads", true).toBool();
     m_optimizePieceLength = get("optimizePieceLength", true).toBool();
-    m_diskCache = get("diskCache", "64M").toString();
+    // aria2's own default is 16M; 32M keeps a large download smooth without holding
+    // 64 MB of the user's RAM for a cache that mostly speeds up writes.
+    m_diskCache = get("diskCache", "32M").toString();
     m_enableHttpKeepAlive = get("enableHttpKeepAlive", true).toBool();
     m_enableHttpPipelining = get("enableHttpPipelining", false).toBool();
     m_noWantDigestHeader = get("noWantDigestHeader", true).toBool();

@@ -787,6 +787,18 @@ void Aria2Manager::finishPollCycle()
     m_pollInFlight = false;
     rebuildLists();
 
+    // Poll at the configured rate while something is moving, and three times slower
+    // when nothing is: an idle manager (tray, nothing downloading) is the normal
+    // state, and asking the engine for a picture that cannot have changed every
+    // second costs CPU for nothing. Adding a task brings the fast rate back on its
+    // first cycle.
+    if (m_pollTimer && m_pollTimer->isActive() && m_failedBuckets == 0) {
+        const bool busy = !m_activeList.isEmpty() || !m_waitingList.isEmpty();
+        const int wanted = busy ? m_pollInterval : qMax(3000, m_pollInterval * 3);
+        if (m_pollTimer->interval() != wanted)
+            m_pollTimer->setInterval(wanted);
+    }
+
     // A successful poll against the replacement engine is the moment to give the
     // downloads back (see m_restoreArmed).
     if (m_restoreArmed && m_client->isConnected()) {

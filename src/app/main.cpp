@@ -49,6 +49,7 @@
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QSystemTrayIcon>
+#include <QPixmapCache>
 #include <QTextStream>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -235,6 +236,10 @@ static int checkUpdate(bool includePrerelease)
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
+    // Qt's pixmap cache defaults to 10 MB, which a desktop app that draws its own
+    // widgets never needs - the icons here are small and few.
+    QPixmapCache::setCacheLimit(4096);
+
     app.setApplicationName(QString::fromLatin1(kAppName));
     app.setApplicationDisplayName(QString::fromLatin1(kAppName));
     app.setOrganizationName(QString::fromLatin1(kAppName));
